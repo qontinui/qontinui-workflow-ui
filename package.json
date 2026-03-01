@@ -1,0 +1,56 @@
+{
+  "name": "@qontinui/workflow-ui",
+  "version": "0.1.0",
+  "description": "Headless React component library for Qontinui workflow builder",
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    },
+    "./components": {
+      "types": "./dist/components/index.d.ts",
+      "import": "./dist/components/index.js",
+      "require": "./dist/components/index.cjs"
+    },
+    "./chat": {
+      "types": "./dist/components/chat/index.d.ts",
+      "import": "./dist/components/chat/index.js",
+      "require": "./dist/components/chat/index.cjs"
+    },
+    "./config": {
+      "types": "./dist/config/phase-colors.d.ts",
+      "import": "./dist/config/phase-colors.js",
+      "require": "./dist/config/phase-colors.cjs"
+    }
+  },
+  "files": [
+    "dist",
+    "src"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "typecheck": "tsc --noEmit",
+    "clean": "rimraf dist"
+  },
+  "dependencies": {
+    "@qontinui/shared-types": "file:../qontinui-schemas/ts",
+    "@qontinui/workflow-utils": "file:../qontinui-workflow-utils"
+  },
+  "peerDependencies": {
+    "react": ">=18.0.0"
+  },
+  "devDependencies": {
+    "tsup": "^8.0.0",
+    "typescript": "^5.3.0",
+    "react": "^19.0.0",
+    "@types/react": "^19.0.0"
+  },
+  "author": "Joshua Spinak",
+  "license": "MIT"
+}
