@@ -39,8 +39,8 @@
     "clean": "rimraf dist"
   },
   "dependencies": {
-    "@qontinui/shared-types": "file:../qontinui-schemas/ts",
-    "@qontinui/workflow-utils": "file:../qontinui-workflow-utils"
+    "@qontinui/shared-types": "github:qontinui/qontinui-shared-types",
+    "@qontinui/workflow-utils": "github:qontinui/qontinui-workflow-utils"
   },
   "peerDependencies": {
     "react": ">=18.0.0"
