@@ -211,11 +211,11 @@ export function PhaseSectionConcrete({
             {!isSelectionMode && (
               <button
                 onClick={() => onAddStep(phase)}
-                className={`w-full flex items-center justify-center gap-2 p-2 rounded-md ${colors.button} transition-colors text-sm`}
+                className={`w-full flex items-center justify-center gap-2 py-1.5 rounded-md border border-dashed ${colors.border} ${colors.text} opacity-60 hover:opacity-100 transition-all text-xs`}
                 data-ui-id={`workflow-builder-phase-${phase}-add-step-btn`}
               >
                 <PlusIcon />
-                <span>Add {phaseInfo.label} Step</span>
+                <span>Add Step</span>
               </button>
             )}
           </div>

@@ -42,9 +42,16 @@ export type {
 
 export { AddStepDropdown } from "./headless/AddStepDropdown";
 export type {
+  AddStepMode,
   AddStepDropdownRenderProps,
   AddStepDropdownProps,
 } from "./headless/AddStepDropdown";
+
+export { SkillCatalog } from "./headless/SkillCatalog";
+export type {
+  SkillCatalogRenderProps,
+  SkillCatalogProps,
+} from "./headless/SkillCatalog";
 
 export { SettingsPanel } from "./headless/SettingsPanel";
 export type {

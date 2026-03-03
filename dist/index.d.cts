@@ -1,4 +1,4 @@
-import { UnifiedWorkflow, UnifiedStep, WorkflowPhase, WorkflowStage, WorkflowFeatures, StepTypeInfo } from '@qontinui/shared-types/workflow';
+import { UnifiedWorkflow, SkillDefinition, UnifiedStep, WorkflowPhase, WorkflowStage, WorkflowFeatures, StepTypeInfo, SkillCategory } from '@qontinui/shared-types/workflow';
 import { LibraryItem } from '@qontinui/shared-types/library';
 import * as react_jsx_runtime from 'react/jsx-runtime';
 import React$1 from 'react';
@@ -15,6 +15,7 @@ interface WorkflowDataAdapter {
     fetchWorkflows(): Promise<UnifiedWorkflow[]>;
     fetchPlaywrightScripts(): Promise<LibraryItem[]>;
     fetchContexts(): Promise<LibraryItem[]>;
+    fetchSkills?(): Promise<SkillDefinition[]>;
     saveWorkflow(workflow: UnifiedWorkflow): Promise<UnifiedWorkflow>;
     loadWorkflow(id: string): Promise<UnifiedWorkflow>;
     deleteWorkflow(id: string): Promise<void>;
@@ -199,11 +200,21 @@ interface StepItemProps {
 }
 declare function StepItem({ step, phase, isSelected, index, totalSteps, onSelect, onMoveUp, onMoveDown, onDelete, onDuplicate, children, }: StepItemProps): react_jsx_runtime.JSX.Element;
 
+type AddStepMode = "skills" | "raw";
 interface AddStepDropdownRenderProps {
     isOpen: boolean;
     phase: WorkflowPhase;
+    mode: AddStepMode;
+    /** Raw step types for the current phase (used in "raw" mode) */
     stepTypes: StepTypeInfo[];
+    /** Select a raw step type */
     onSelect: (stepType: StepTypeInfo) => void;
+    /** Switch to raw step mode */
+    onSwitchToRaw: () => void;
+    /** Switch to skill catalog mode */
+    onSwitchToSkills: () => void;
+    /** Add steps from skill catalog (used in "skills" mode) */
+    onAddSteps: (steps: UnifiedStep[], phase: WorkflowPhase) => void;
     onClose: () => void;
 }
 interface AddStepDropdownProps {
@@ -211,10 +222,43 @@ interface AddStepDropdownProps {
     phase: WorkflowPhase;
     onSelect: (stepType: StepTypeInfo) => void;
     onClose: () => void;
+    /** Called when skills are instantiated into steps */
+    onAddSteps?: (steps: UnifiedStep[], phase: WorkflowPhase) => void;
+    /** Initial mode — defaults to "skills" */
+    defaultMode?: AddStepMode;
     customStepTypes?: Record<WorkflowPhase, StepTypeInfo[]>;
     children: (props: AddStepDropdownRenderProps) => React.ReactNode;
 }
-declare function AddStepDropdown({ isOpen, phase, onSelect, onClose, customStepTypes, children, }: AddStepDropdownProps): react_jsx_runtime.JSX.Element;
+declare function AddStepDropdown({ isOpen, phase, onSelect, onClose, onAddSteps, defaultMode, customStepTypes, children, }: AddStepDropdownProps): react_jsx_runtime.JSX.Element;
+
+interface SkillCatalogRenderProps {
+    mode: "browse" | "configure";
+    searchQuery: string;
+    setSearchQuery: (query: string) => void;
+    selectedCategory: SkillCategory | null;
+    setSelectedCategory: (category: SkillCategory | null) => void;
+    selectedSource: "builtin" | "user" | "community" | null;
+    setSelectedSource: (source: "builtin" | "user" | "community" | null) => void;
+    hasNonBuiltinSkills: boolean;
+    categories: SkillCategory[];
+    filteredSkills: SkillDefinition[];
+    onSelectSkill: (skill: SkillDefinition) => void;
+    selectedSkill: SkillDefinition | null;
+    paramValues: Record<string, unknown>;
+    setParamValue: (name: string, value: unknown) => void;
+    validationErrors: string[];
+    onConfirm: () => void;
+    onBack: () => void;
+}
+interface SkillCatalogProps {
+    phase: WorkflowPhase;
+    onAddSteps: (steps: UnifiedStep[], phase: WorkflowPhase) => void;
+    onClose: () => void;
+    /** Called after a skill is successfully instantiated (steps added). */
+    onSkillUsed?: (skillId: string) => void;
+    children: (props: SkillCatalogRenderProps) => React.ReactNode;
+}
+declare function SkillCatalog({ phase, onAddSteps, onClose, onSkillUsed, children, }: SkillCatalogProps): react_jsx_runtime.JSX.Element;
 
 /**
  * Full workflow settings surface. Covers all fields that can appear in
@@ -307,4 +351,4 @@ declare function UIProvider({ primitives, children }: UIProviderProps): react_js
  */
 declare function useUIPrimitives(): UIPrimitives;
 
-export { AddStepDropdown, type AddStepDropdownProps, type AddStepDropdownRenderProps, type CollapsibleContentProps, type CollapsibleProps, type CollapsibleTriggerProps, LibraryPickerBase, type LibraryPickerBaseProps, type LibraryPickerRenderProps, PhaseSection, type PhaseSectionProps, type PhaseSectionRenderProps, SettingsPanel, type SettingsPanelProps, type SettingsPanelRenderProps, StepItem, type StepItemProps, type StepItemRenderProps, type UIPrimitives, UIProvider, type UIProviderProps, type UseLibraryItemsResult, type WorkflowBuilderAction, type WorkflowBuilderContextValue, WorkflowBuilderProvider, type WorkflowBuilderState, type WorkflowDataAdapter, WorkflowDataProvider, type WorkflowSettings, clearWorkflowDraft, useLibraryItems, useUIPrimitives, useWorkflowBuilder, useWorkflowData, useWorkflowPersistence };
+export { AddStepDropdown, type AddStepDropdownProps, type AddStepDropdownRenderProps, type AddStepMode, type CollapsibleContentProps, type CollapsibleProps, type CollapsibleTriggerProps, LibraryPickerBase, type LibraryPickerBaseProps, type LibraryPickerRenderProps, PhaseSection, type PhaseSectionProps, type PhaseSectionRenderProps, SettingsPanel, type SettingsPanelProps, type SettingsPanelRenderProps, SkillCatalog, type SkillCatalogProps, type SkillCatalogRenderProps, StepItem, type StepItemProps, type StepItemRenderProps, type UIPrimitives, UIProvider, type UIProviderProps, type UseLibraryItemsResult, type WorkflowBuilderAction, type WorkflowBuilderContextValue, WorkflowBuilderProvider, type WorkflowBuilderState, type WorkflowDataAdapter, WorkflowDataProvider, type WorkflowSettings, clearWorkflowDraft, useLibraryItems, useUIPrimitives, useWorkflowBuilder, useWorkflowData, useWorkflowPersistence };

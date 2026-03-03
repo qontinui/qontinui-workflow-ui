@@ -27,6 +27,7 @@ __export(index_exports, {
   LibraryPickerBase: () => LibraryPickerBase,
   PhaseSection: () => PhaseSection,
   SettingsPanel: () => SettingsPanel,
+  SkillCatalog: () => SkillCatalog,
   StepItem: () => StepItem,
   UIProvider: () => UIProvider,
   WorkflowBuilderProvider: () => WorkflowBuilderProvider,
@@ -612,6 +613,7 @@ function StepItem({
 }
 
 // src/headless/AddStepDropdown.tsx
+var import_react6 = require("react");
 var import_workflow2 = require("@qontinui/shared-types/workflow");
 var import_jsx_runtime6 = require("react/jsx-runtime");
 function AddStepDropdown({
@@ -619,23 +621,141 @@ function AddStepDropdown({
   phase,
   onSelect,
   onClose,
+  onAddSteps,
+  defaultMode = "skills",
   customStepTypes,
   children
 }) {
+  const [mode, setMode] = (0, import_react6.useState)(defaultMode);
   const stepTypes = (customStepTypes ?? import_workflow2.STEP_TYPES)[phase] ?? [];
+  const onSwitchToRaw = (0, import_react6.useCallback)(() => setMode("raw"), []);
+  const onSwitchToSkills = (0, import_react6.useCallback)(() => setMode("skills"), []);
+  const handleAddSteps = (0, import_react6.useCallback)(
+    (steps, targetPhase) => {
+      onAddSteps?.(steps, targetPhase);
+      onClose();
+    },
+    [onAddSteps, onClose]
+  );
+  const handleClose = (0, import_react6.useCallback)(() => {
+    setMode(defaultMode);
+    onClose();
+  }, [defaultMode, onClose]);
   return /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(import_jsx_runtime6.Fragment, { children: children({
     isOpen,
     phase,
+    mode,
     stepTypes,
     onSelect,
-    onClose
+    onSwitchToRaw,
+    onSwitchToSkills,
+    onAddSteps: handleAddSteps,
+    onClose: handleClose
+  }) });
+}
+
+// src/headless/SkillCatalog.tsx
+var import_react7 = require("react");
+var import_workflow_utils3 = require("@qontinui/workflow-utils");
+var import_jsx_runtime7 = require("react/jsx-runtime");
+function SkillCatalog({
+  phase,
+  onAddSteps,
+  onClose,
+  onSkillUsed,
+  children
+}) {
+  const [searchQuery, setSearchQuery] = (0, import_react7.useState)("");
+  const [selectedCategory, setSelectedCategory] = (0, import_react7.useState)(null);
+  const [selectedSource, setSelectedSource] = (0, import_react7.useState)(null);
+  const [selectedSkill, setSelectedSkill] = (0, import_react7.useState)(
+    null
+  );
+  const [paramValues, setParamValues] = (0, import_react7.useState)({});
+  const mode = selectedSkill ? "configure" : "browse";
+  const categories = (0, import_react7.useMemo)(() => {
+    const phaseSkills = (0, import_workflow_utils3.getSkillsByPhase)(phase);
+    const cats = /* @__PURE__ */ new Set();
+    for (const skill of phaseSkills) {
+      cats.add(skill.category);
+    }
+    return Array.from(cats);
+  }, [phase]);
+  const hasNonBuiltinSkills = (0, import_react7.useMemo)(() => {
+    const phaseSkills = (0, import_workflow_utils3.getSkillsByPhase)(phase);
+    return phaseSkills.some((s) => s.source !== "builtin");
+  }, [phase]);
+  const filteredSkills = (0, import_react7.useMemo)(() => {
+    const filters = { phase };
+    if (selectedCategory) {
+      filters.category = selectedCategory;
+    }
+    if (selectedSource) {
+      filters.source = selectedSource;
+    }
+    return (0, import_workflow_utils3.searchSkills)(searchQuery, filters);
+  }, [searchQuery, selectedCategory, selectedSource, phase]);
+  const onSelectSkill = (0, import_react7.useCallback)(
+    (skill) => {
+      setSelectedSkill(skill);
+      const defaults = {};
+      for (const param of skill.parameters) {
+        if (param.default !== void 0) {
+          defaults[param.name] = param.default;
+        }
+      }
+      setParamValues(defaults);
+    },
+    []
+  );
+  const setParamValue = (0, import_react7.useCallback)(
+    (name, value) => {
+      setParamValues((prev) => ({ ...prev, [name]: value }));
+    },
+    []
+  );
+  const validationErrors = (0, import_react7.useMemo)(() => {
+    if (!selectedSkill) return [];
+    return (0, import_workflow_utils3.validateSkillParams)(selectedSkill, paramValues);
+  }, [selectedSkill, paramValues]);
+  const onConfirm = (0, import_react7.useCallback)(() => {
+    if (!selectedSkill || validationErrors.length > 0) return;
+    const steps = (0, import_workflow_utils3.instantiateSkill)(selectedSkill, phase, paramValues);
+    onAddSteps(steps, phase);
+    if (onSkillUsed) {
+      onSkillUsed(selectedSkill.id);
+    }
+    onClose();
+  }, [selectedSkill, phase, paramValues, validationErrors, onAddSteps, onSkillUsed, onClose]);
+  const onBack = (0, import_react7.useCallback)(() => {
+    setSelectedSkill(null);
+    setParamValues({});
+  }, []);
+  return /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(import_jsx_runtime7.Fragment, { children: children({
+    mode,
+    searchQuery,
+    setSearchQuery,
+    selectedCategory,
+    setSelectedCategory,
+    selectedSource,
+    setSelectedSource,
+    hasNonBuiltinSkills,
+    categories,
+    filteredSkills,
+    onSelectSkill,
+    selectedSkill,
+    paramValues,
+    setParamValue,
+    validationErrors,
+    onConfirm,
+    onBack
   }) });
 }
 
 // src/headless/SettingsPanel.tsx
-var import_react6 = require("react");
-var import_workflow_utils3 = require("@qontinui/workflow-utils");
-var import_jsx_runtime7 = require("react/jsx-runtime");
+var import_react8 = require("react");
+var import_workflow_utils4 = require("@qontinui/workflow-utils");
+var import_jsx_runtime8 = require("react/jsx-runtime");
 function SettingsPanel({
   settings,
   features,
@@ -643,34 +763,34 @@ function SettingsPanel({
   config,
   children
 }) {
-  const sectionConfig = config ?? import_workflow_utils3.WORKFLOW_SETTINGS_CONFIG;
-  const visibleSections = (0, import_react6.useMemo)(
-    () => (0, import_workflow_utils3.getVisibleSections)(sectionConfig, features),
+  const sectionConfig = config ?? import_workflow_utils4.WORKFLOW_SETTINGS_CONFIG;
+  const visibleSections = (0, import_react8.useMemo)(
+    () => (0, import_workflow_utils4.getVisibleSections)(sectionConfig, features),
     [sectionConfig, features]
   );
-  const getBooleanValue = (0, import_react6.useCallback)(
+  const getBooleanValue = (0, import_react8.useCallback)(
     (def) => {
-      return (0, import_workflow_utils3.getBooleanDisplayValue)(def, settings[def.key]);
+      return (0, import_workflow_utils4.getBooleanDisplayValue)(def, settings[def.key]);
     },
     [settings]
   );
-  const setBooleanValue = (0, import_react6.useCallback)(
+  const setBooleanValue = (0, import_react8.useCallback)(
     (def, displayValue) => {
-      onChange({ [def.key]: (0, import_workflow_utils3.toBooleanStoredValue)(def, displayValue) });
+      onChange({ [def.key]: (0, import_workflow_utils4.toBooleanStoredValue)(def, displayValue) });
     },
     [onChange]
   );
-  const getValue = (0, import_react6.useCallback)(
+  const getValue = (0, import_react8.useCallback)(
     (key) => settings[key],
     [settings]
   );
-  const setValue = (0, import_react6.useCallback)(
+  const setValue = (0, import_react8.useCallback)(
     (key, value) => {
       onChange({ [key]: value });
     },
     [onChange]
   );
-  return /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(import_jsx_runtime7.Fragment, { children: children({
+  return /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(import_jsx_runtime8.Fragment, { children: children({
     settings,
     features,
     onChange,
@@ -683,8 +803,8 @@ function SettingsPanel({
 }
 
 // src/components/chat/ChatHeader.tsx
-var import_react7 = require("react");
-var import_jsx_runtime8 = require("react/jsx-runtime");
+var import_react9 = require("react");
+var import_jsx_runtime9 = require("react/jsx-runtime");
 function StateBadge({ state }) {
   const config = {
     ready: {
@@ -714,7 +834,7 @@ function StateBadge({ state }) {
   };
   const c = config[state];
   if (!c) return null;
-  return /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(
+  return /* @__PURE__ */ (0, import_jsx_runtime9.jsx)(
     "span",
     {
       className: `inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-medium ${c.classes}`,
@@ -729,26 +849,26 @@ function ChatHeader({
   onClose,
   isRunnerConnected
 }) {
-  const [isEditing, setIsEditing] = (0, import_react7.useState)(false);
-  const [editValue, setEditValue] = (0, import_react7.useState)(sessionName);
-  const inputRef = (0, import_react7.useRef)(null);
-  (0, import_react7.useEffect)(() => {
+  const [isEditing, setIsEditing] = (0, import_react9.useState)(false);
+  const [editValue, setEditValue] = (0, import_react9.useState)(sessionName);
+  const inputRef = (0, import_react9.useRef)(null);
+  (0, import_react9.useEffect)(() => {
     setEditValue(sessionName);
   }, [sessionName]);
-  (0, import_react7.useEffect)(() => {
+  (0, import_react9.useEffect)(() => {
     if (isEditing && inputRef.current) {
       inputRef.current.focus();
       inputRef.current.select();
     }
   }, [isEditing]);
-  const handleSave = (0, import_react7.useCallback)(() => {
+  const handleSave = (0, import_react9.useCallback)(() => {
     const trimmed = editValue.trim();
     if (trimmed && trimmed !== sessionName) {
       onRename(trimmed);
     }
     setIsEditing(false);
   }, [editValue, sessionName, onRename]);
-  const handleKeyDown = (0, import_react7.useCallback)(
+  const handleKeyDown = (0, import_react9.useCallback)(
     (e) => {
       if (e.key === "Enter") {
         handleSave();
@@ -759,9 +879,9 @@ function ChatHeader({
     },
     [handleSave, sessionName]
   );
-  return /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)("div", { className: "flex items-center justify-between px-4 py-3 border-b border-border-subtle/50 bg-surface-canvas/80 backdrop-blur-sm", children: [
-    /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)("div", { className: "flex items-center gap-3", children: [
-      /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(
+  return /* @__PURE__ */ (0, import_jsx_runtime9.jsxs)("div", { className: "flex items-center justify-between px-4 py-3 border-b border-border-subtle/50 bg-surface-canvas/80 backdrop-blur-sm", children: [
+    /* @__PURE__ */ (0, import_jsx_runtime9.jsxs)("div", { className: "flex items-center gap-3", children: [
+      /* @__PURE__ */ (0, import_jsx_runtime9.jsx)(
         "svg",
         {
           className: "size-5 text-purple-400",
@@ -771,11 +891,11 @@ function ChatHeader({
           strokeWidth: "2",
           strokeLinecap: "round",
           strokeLinejoin: "round",
-          children: /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("path", { d: "M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" })
+          children: /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("path", { d: "M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" })
         }
       ),
-      isEditing ? /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)("div", { className: "flex items-center gap-1.5", children: [
-        /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(
+      isEditing ? /* @__PURE__ */ (0, import_jsx_runtime9.jsxs)("div", { className: "flex items-center gap-1.5", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime9.jsx)(
           "input",
           {
             ref: inputRef,
@@ -787,12 +907,12 @@ function ChatHeader({
             maxLength: 60
           }
         ),
-        /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(
+        /* @__PURE__ */ (0, import_jsx_runtime9.jsx)(
           "button",
           {
             onClick: handleSave,
             className: "text-green-400 hover:text-green-300",
-            children: /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(
+            children: /* @__PURE__ */ (0, import_jsx_runtime9.jsx)(
               "svg",
               {
                 className: "size-3.5",
@@ -800,19 +920,19 @@ function ChatHeader({
                 fill: "none",
                 stroke: "currentColor",
                 strokeWidth: "2",
-                children: /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("polyline", { points: "20 6 9 17 4 12" })
+                children: /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("polyline", { points: "20 6 9 17 4 12" })
               }
             )
           }
         )
-      ] }) : /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)(
+      ] }) : /* @__PURE__ */ (0, import_jsx_runtime9.jsxs)(
         "button",
         {
           onClick: () => setIsEditing(true),
           className: "flex items-center gap-1.5 text-sm font-medium text-text-primary hover:text-text-secondary group",
           children: [
             sessionName,
-            /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)(
+            /* @__PURE__ */ (0, import_jsx_runtime9.jsxs)(
               "svg",
               {
                 className: "size-3 opacity-0 group-hover:opacity-60",
@@ -821,23 +941,23 @@ function ChatHeader({
                 stroke: "currentColor",
                 strokeWidth: "2",
                 children: [
-                  /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("path", { d: "M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" }),
-                  /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("path", { d: "m15 5 4 4" })
+                  /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("path", { d: "M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" }),
+                  /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("path", { d: "m15 5 4 4" })
                 ]
               }
             )
           ]
         }
       ),
-      /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(StateBadge, { state: sessionState }),
-      isRunnerConnected !== void 0 && /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)("span", { className: "flex items-center gap-1 text-[10px]", children: [
-        /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(
+      /* @__PURE__ */ (0, import_jsx_runtime9.jsx)(StateBadge, { state: sessionState }),
+      isRunnerConnected !== void 0 && /* @__PURE__ */ (0, import_jsx_runtime9.jsxs)("span", { className: "flex items-center gap-1 text-[10px]", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime9.jsx)(
           "span",
           {
             className: `inline-block size-1.5 rounded-full ${isRunnerConnected ? "bg-green-400" : "bg-red-400"}`
           }
         ),
-        /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(
+        /* @__PURE__ */ (0, import_jsx_runtime9.jsx)(
           "span",
           {
             className: isRunnerConnected ? "text-green-400" : "text-red-400",
@@ -846,12 +966,12 @@ function ChatHeader({
         )
       ] })
     ] }),
-    /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(
+    /* @__PURE__ */ (0, import_jsx_runtime9.jsx)(
       "button",
       {
         onClick: onClose,
         className: "h-7 w-7 flex items-center justify-center rounded text-text-muted hover:text-red-400 hover:bg-surface-hover",
-        children: /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)(
+        children: /* @__PURE__ */ (0, import_jsx_runtime9.jsxs)(
           "svg",
           {
             className: "size-4",
@@ -860,8 +980,8 @@ function ChatHeader({
             stroke: "currentColor",
             strokeWidth: "2",
             children: [
-              /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("path", { d: "M18 6 6 18" }),
-              /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("path", { d: "m6 6 12 12" })
+              /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("path", { d: "M18 6 6 18" }),
+              /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("path", { d: "m6 6 12 12" })
             ]
           }
         )
@@ -871,8 +991,8 @@ function ChatHeader({
 }
 
 // src/components/chat/ChatInput.tsx
-var import_react8 = require("react");
-var import_jsx_runtime9 = require("react/jsx-runtime");
+var import_react10 = require("react");
+var import_jsx_runtime10 = require("react/jsx-runtime");
 function ChatInput({
   sessionState,
   onSendMessage,
@@ -882,20 +1002,20 @@ function ChatInput({
   messageCount,
   disabled
 }) {
-  const [message, setMessage] = (0, import_react8.useState)(() => {
+  const [message, setMessage] = (0, import_react10.useState)(() => {
     if (typeof window === "undefined") return "";
     return localStorage.getItem("chat-draft-message") ?? "";
   });
-  const [includeUIBridge, setIncludeUIBridge] = (0, import_react8.useState)(() => {
+  const [includeUIBridge, setIncludeUIBridge] = (0, import_react10.useState)(() => {
     if (typeof window === "undefined") return true;
     const saved = localStorage.getItem("chat-include-ui-bridge");
     return saved !== null ? saved === "true" : true;
   });
-  const textareaRef = (0, import_react8.useRef)(null);
+  const textareaRef = (0, import_react10.useRef)(null);
   const canSend = !disabled && message.trim().length > 0 && (sessionState === "ready" || sessionState === "processing");
   const canInterrupt = sessionState === "processing";
   const showGenerateWorkflow = messageCount >= 2;
-  const handleSend = (0, import_react8.useCallback)(() => {
+  const handleSend = (0, import_react10.useCallback)(() => {
     const trimmed = message.trim();
     if (!trimmed) return;
     onSendMessage(trimmed);
@@ -905,7 +1025,7 @@ function ChatInput({
       textareaRef.current.style.height = "auto";
     }
   }, [message, onSendMessage]);
-  const handleKeyDown = (0, import_react8.useCallback)(
+  const handleKeyDown = (0, import_react10.useCallback)(
     (e) => {
       if (e.key === "Enter" && !e.shiftKey) {
         e.preventDefault();
@@ -916,17 +1036,17 @@ function ChatInput({
     },
     [canSend, handleSend]
   );
-  (0, import_react8.useEffect)(() => {
+  (0, import_react10.useEffect)(() => {
     localStorage.setItem("chat-include-ui-bridge", String(includeUIBridge));
   }, [includeUIBridge]);
-  (0, import_react8.useEffect)(() => {
+  (0, import_react10.useEffect)(() => {
     if (message) {
       localStorage.setItem("chat-draft-message", message);
     } else {
       localStorage.removeItem("chat-draft-message");
     }
   }, [message]);
-  (0, import_react8.useEffect)(() => {
+  (0, import_react10.useEffect)(() => {
     const textarea = textareaRef.current;
     if (textarea) {
       textarea.style.height = "auto";
@@ -935,17 +1055,17 @@ function ChatInput({
   }, [message]);
   const stateLabel = sessionState === "ready" ? "Ready" : sessionState === "processing" ? "Processing..." : sessionState === "initializing" ? "Initializing..." : sessionState === "connecting" ? "Connecting..." : sessionState === "disconnected" ? "Disconnected" : sessionState === "closed" ? "Session Closed" : "";
   const stateColor = sessionState === "ready" ? "text-green-400" : sessionState === "processing" ? "text-amber-400" : "text-text-muted";
-  return /* @__PURE__ */ (0, import_jsx_runtime9.jsxs)("div", { className: "border-t border-border-subtle/50 p-4", children: [
-    /* @__PURE__ */ (0, import_jsx_runtime9.jsxs)("div", { className: "flex items-center justify-between mb-2", children: [
-      /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("span", { className: `text-xs ${stateColor}`, children: stateLabel }),
-      /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("div", { className: "flex items-center gap-2", children: showGenerateWorkflow && /* @__PURE__ */ (0, import_jsx_runtime9.jsxs)(import_jsx_runtime9.Fragment, { children: [
-        /* @__PURE__ */ (0, import_jsx_runtime9.jsxs)(
+  return /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("div", { className: "border-t border-border-subtle/50 p-4", children: [
+    /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("div", { className: "flex items-center justify-between mb-2", children: [
+      /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("span", { className: `text-xs ${stateColor}`, children: stateLabel }),
+      /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("div", { className: "flex items-center gap-2", children: showGenerateWorkflow && /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)(import_jsx_runtime10.Fragment, { children: [
+        /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)(
           "label",
           {
             className: "flex items-center gap-1.5 text-xs text-text-muted cursor-pointer select-none",
             title: "Include UI Bridge SDK integration instructions in the generated workflow",
             children: [
-              /* @__PURE__ */ (0, import_jsx_runtime9.jsx)(
+              /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(
                 "input",
                 {
                   type: "checkbox",
@@ -959,14 +1079,14 @@ function ChatInput({
             ]
           }
         ),
-        /* @__PURE__ */ (0, import_jsx_runtime9.jsxs)(
+        /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)(
           "button",
           {
             onClick: () => onGenerateWorkflow(includeUIBridge),
             disabled: isGeneratingWorkflow || disabled,
             className: "inline-flex items-center gap-1.5 text-xs h-7 px-2.5 rounded-md border border-purple-800/50 text-purple-300 hover:bg-purple-900/30 hover:text-purple-200 disabled:opacity-50 disabled:cursor-not-allowed",
             children: [
-              isGeneratingWorkflow ? /* @__PURE__ */ (0, import_jsx_runtime9.jsx)(
+              isGeneratingWorkflow ? /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(
                 "svg",
                 {
                   className: "size-3 animate-spin",
@@ -974,9 +1094,9 @@ function ChatInput({
                   fill: "none",
                   stroke: "currentColor",
                   strokeWidth: "2",
-                  children: /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("path", { d: "M21 12a9 9 0 1 1-6.219-8.56" })
+                  children: /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("path", { d: "M21 12a9 9 0 1 1-6.219-8.56" })
                 }
-              ) : /* @__PURE__ */ (0, import_jsx_runtime9.jsx)(
+              ) : /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(
                 "svg",
                 {
                   className: "size-3",
@@ -984,7 +1104,7 @@ function ChatInput({
                   fill: "none",
                   stroke: "currentColor",
                   strokeWidth: "2",
-                  children: /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("path", { d: "m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z" })
+                  children: /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("path", { d: "m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z" })
                 }
               ),
               isGeneratingWorkflow ? "Generating..." : "Generate Workflow"
@@ -993,8 +1113,8 @@ function ChatInput({
         )
       ] }) })
     ] }),
-    /* @__PURE__ */ (0, import_jsx_runtime9.jsxs)("div", { className: "flex items-end gap-2", children: [
-      /* @__PURE__ */ (0, import_jsx_runtime9.jsx)(
+    /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("div", { className: "flex items-end gap-2", children: [
+      /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(
         "textarea",
         {
           ref: textareaRef,
@@ -1008,28 +1128,28 @@ function ChatInput({
           style: { minHeight: "42px", maxHeight: "240px" }
         }
       ),
-      canInterrupt ? /* @__PURE__ */ (0, import_jsx_runtime9.jsx)(
+      canInterrupt ? /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(
         "button",
         {
           onClick: onInterrupt,
           className: "h-[42px] px-3 rounded-md border border-amber-800/50 text-amber-400 hover:bg-amber-900/30 flex items-center justify-center",
-          children: /* @__PURE__ */ (0, import_jsx_runtime9.jsx)(
+          children: /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(
             "svg",
             {
               className: "size-4",
               viewBox: "0 0 24 24",
               fill: "currentColor",
-              children: /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("rect", { x: "3", y: "3", width: "18", height: "18", rx: "2" })
+              children: /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("rect", { x: "3", y: "3", width: "18", height: "18", rx: "2" })
             }
           )
         }
-      ) : /* @__PURE__ */ (0, import_jsx_runtime9.jsx)(
+      ) : /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(
         "button",
         {
           onClick: handleSend,
           disabled: !canSend,
           className: "h-[42px] px-3 rounded-md bg-brand-primary hover:bg-brand-primary/90 text-white disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center",
-          children: /* @__PURE__ */ (0, import_jsx_runtime9.jsxs)(
+          children: /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)(
             "svg",
             {
               className: "size-4",
@@ -1040,8 +1160,8 @@ function ChatInput({
               strokeLinecap: "round",
               strokeLinejoin: "round",
               children: [
-                /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("path", { d: "m22 2-7 20-4-9-9-4Z" }),
-                /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("path", { d: "M22 2 11 13" })
+                /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("path", { d: "m22 2-7 20-4-9-9-4Z" }),
+                /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("path", { d: "M22 2 11 13" })
               ]
             }
           )
@@ -1052,8 +1172,8 @@ function ChatInput({
 }
 
 // src/components/chat/ChatMessageArea.tsx
-var import_react9 = require("react");
-var import_jsx_runtime10 = require("react/jsx-runtime");
+var import_react11 = require("react");
+var import_jsx_runtime11 = require("react/jsx-runtime");
 function ChatMessageArea({
   messages,
   streamingContent,
@@ -1062,10 +1182,10 @@ function ChatMessageArea({
   onCreateWorkflowFromMessage,
   toolActivity
 }) {
-  const scrollRef = (0, import_react9.useRef)(null);
-  const [autoScroll, setAutoScroll] = (0, import_react9.useState)(true);
-  const prevLenRef = (0, import_react9.useRef)(0);
-  (0, import_react9.useEffect)(() => {
+  const scrollRef = (0, import_react11.useRef)(null);
+  const [autoScroll, setAutoScroll] = (0, import_react11.useState)(true);
+  const prevLenRef = (0, import_react11.useRef)(0);
+  (0, import_react11.useEffect)(() => {
     const totalLen = messages.length + streamingContent.length;
     if (autoScroll && totalLen !== prevLenRef.current) {
       prevLenRef.current = totalLen;
@@ -1077,30 +1197,30 @@ function ChatMessageArea({
       });
     }
   }, [messages, streamingContent, autoScroll]);
-  const handleScroll = (0, import_react9.useCallback)(() => {
+  const handleScroll = (0, import_react11.useCallback)(() => {
     const el = scrollRef.current;
     if (!el) return;
     const nearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
     setAutoScroll(nearBottom);
   }, []);
-  const scrollToBottom = (0, import_react9.useCallback)(() => {
+  const scrollToBottom = (0, import_react11.useCallback)(() => {
     setAutoScroll(true);
     const el = scrollRef.current;
     if (el) el.scrollTop = el.scrollHeight;
   }, []);
   const renderContent = (content) => {
     if (renderMarkdown) return renderMarkdown(content);
-    return /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("p", { className: "text-sm text-text-primary whitespace-pre-wrap break-words", children: content });
+    return /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("p", { className: "text-sm text-text-primary whitespace-pre-wrap break-words", children: content });
   };
-  return /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)(
+  return /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)(
     "div",
     {
       ref: scrollRef,
       onScroll: handleScroll,
       className: "flex-1 min-h-0 overflow-y-auto space-y-4 pr-2 py-4",
       children: [
-        messages.length === 0 && !streamingContent && /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("div", { className: "flex flex-col items-center justify-center h-full text-text-muted", children: [
-          /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)(
+        messages.length === 0 && !streamingContent && /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { className: "flex flex-col items-center justify-center h-full text-text-muted", children: [
+          /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)(
             "svg",
             {
               className: "size-12 mb-3 opacity-30",
@@ -1109,19 +1229,19 @@ function ChatMessageArea({
               stroke: "currentColor",
               strokeWidth: "1.5",
               children: [
-                /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("path", { d: "M12 8V4H8" }),
-                /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("rect", { width: "16", height: "12", x: "4", y: "8", rx: "2" }),
-                /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("path", { d: "M2 14h2" }),
-                /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("path", { d: "M20 14h2" }),
-                /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("path", { d: "M15 13v2" }),
-                /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("path", { d: "M9 13v2" })
+                /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("path", { d: "M12 8V4H8" }),
+                /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("rect", { width: "16", height: "12", x: "4", y: "8", rx: "2" }),
+                /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("path", { d: "M2 14h2" }),
+                /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("path", { d: "M20 14h2" }),
+                /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("path", { d: "M15 13v2" }),
+                /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("path", { d: "M9 13v2" })
               ]
             }
           ),
-          /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("p", { className: "text-sm", children: "Start a conversation with AI" }),
-          /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("p", { className: "text-xs mt-1 opacity-60", children: "Discuss features, plan workflows, then generate them" })
+          /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("p", { className: "text-sm", children: "Start a conversation with AI" }),
+          /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("p", { className: "text-xs mt-1 opacity-60", children: "Discuss features, plan workflows, then generate them" })
         ] }),
-        messages.map((msg, i) => /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(
+        messages.map((msg, i) => /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(
           MessageBubble,
           {
             message: msg,
@@ -1131,67 +1251,67 @@ function ChatMessageArea({
           },
           i
         )),
-        isStreaming && streamingContent && /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("div", { className: "flex gap-3 items-start", children: [
-          /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("div", { className: "shrink-0 w-7 h-7 rounded-full bg-purple-900/50 flex items-center justify-center", children: /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(AiBotIcon, {}) }),
-          /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("div", { className: "max-w-[85%]", children: /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)(
+        isStreaming && streamingContent && /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { className: "flex gap-3 items-start", children: [
+          /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("div", { className: "shrink-0 w-7 h-7 rounded-full bg-purple-900/50 flex items-center justify-center", children: /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(AiBotIcon, {}) }),
+          /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("div", { className: "max-w-[85%]", children: /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)(
             "div",
             {
               className: "rounded-lg px-4 py-3 border border-border-subtle/30",
               style: { background: "color-mix(in srgb, var(--qontinui-surface-raised, #1e1e22) 30%, var(--qontinui-surface-canvas, #111115))" },
               children: [
-                /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("div", { className: "max-w-none text-sm", children: renderContent(streamingContent) }),
-                /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("span", { className: "inline-block w-2 h-4 bg-purple-400 animate-pulse ml-0.5" })
+                /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("div", { className: "max-w-none text-sm", children: renderContent(streamingContent) }),
+                /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("span", { className: "inline-block w-2 h-4 bg-purple-400 animate-pulse ml-0.5" })
               ]
             }
           ) })
         ] }),
-        isStreaming && !streamingContent && /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("div", { className: "flex gap-3 items-start", children: [
-          /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("div", { className: "shrink-0 w-7 h-7 rounded-full bg-purple-900/50 flex items-center justify-center", children: /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(AiBotIcon, {}) }),
-          /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(
+        isStreaming && !streamingContent && /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { className: "flex gap-3 items-start", children: [
+          /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("div", { className: "shrink-0 w-7 h-7 rounded-full bg-purple-900/50 flex items-center justify-center", children: /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(AiBotIcon, {}) }),
+          /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(
             "div",
             {
               className: "rounded-lg px-4 py-3 border border-border-subtle/30",
               style: { background: "color-mix(in srgb, var(--qontinui-surface-raised, #1e1e22) 30%, var(--qontinui-surface-canvas, #111115))" },
-              children: toolActivity ? /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("div", { className: "flex items-center gap-2", children: [
-                /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("svg", { className: "size-3.5 text-purple-400 animate-spin", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", children: [
-                  /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("path", { d: "M12 2v4" }),
-                  /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("path", { d: "M12 18v4" }),
-                  /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("path", { d: "m4.93 4.93 2.83 2.83" }),
-                  /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("path", { d: "m16.24 16.24 2.83 2.83" }),
-                  /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("path", { d: "M2 12h4" }),
-                  /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("path", { d: "M18 12h4" }),
-                  /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("path", { d: "m4.93 19.07 2.83-2.83" }),
-                  /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("path", { d: "m16.24 7.76 2.83-2.83" })
+              children: toolActivity ? /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { className: "flex items-center gap-2", children: [
+                /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("svg", { className: "size-3.5 text-purple-400 animate-spin", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", children: [
+                  /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("path", { d: "M12 2v4" }),
+                  /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("path", { d: "M12 18v4" }),
+                  /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("path", { d: "m4.93 4.93 2.83 2.83" }),
+                  /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("path", { d: "m16.24 16.24 2.83 2.83" }),
+                  /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("path", { d: "M2 12h4" }),
+                  /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("path", { d: "M18 12h4" }),
+                  /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("path", { d: "m4.93 19.07 2.83-2.83" }),
+                  /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("path", { d: "m16.24 7.76 2.83-2.83" })
                 ] }),
-                /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("span", { className: "text-xs text-purple-300/80", children: toolActivity })
-              ] }) : /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("div", { className: "flex items-center gap-1.5", children: [
-                /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("span", { className: "w-1.5 h-1.5 rounded-full bg-purple-400 animate-bounce [animation-delay:0ms]" }),
-                /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("span", { className: "w-1.5 h-1.5 rounded-full bg-purple-400 animate-bounce [animation-delay:150ms]" }),
-                /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("span", { className: "w-1.5 h-1.5 rounded-full bg-purple-400 animate-bounce [animation-delay:300ms]" })
+                /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("span", { className: "text-xs text-purple-300/80", children: toolActivity })
+              ] }) : /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { className: "flex items-center gap-1.5", children: [
+                /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("span", { className: "w-1.5 h-1.5 rounded-full bg-purple-400 animate-bounce [animation-delay:0ms]" }),
+                /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("span", { className: "w-1.5 h-1.5 rounded-full bg-purple-400 animate-bounce [animation-delay:150ms]" }),
+                /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("span", { className: "w-1.5 h-1.5 rounded-full bg-purple-400 animate-bounce [animation-delay:300ms]" })
               ] })
             }
           )
         ] }),
-        isStreaming && streamingContent && toolActivity && /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("div", { className: "flex gap-3 items-center ml-10", children: /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("div", { className: "flex items-center gap-2 px-3 py-1.5 rounded-md bg-surface-raised/20", children: [
-          /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("svg", { className: "size-3 text-purple-400/60 animate-spin", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", children: [
-            /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("path", { d: "M12 2v4" }),
-            /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("path", { d: "M12 18v4" }),
-            /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("path", { d: "m4.93 4.93 2.83 2.83" }),
-            /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("path", { d: "m16.24 16.24 2.83 2.83" }),
-            /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("path", { d: "M2 12h4" }),
-            /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("path", { d: "M18 12h4" }),
-            /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("path", { d: "m4.93 19.07 2.83-2.83" }),
-            /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("path", { d: "m16.24 7.76 2.83-2.83" })
+        isStreaming && streamingContent && toolActivity && /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("div", { className: "flex gap-3 items-center ml-10", children: /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { className: "flex items-center gap-2 px-3 py-1.5 rounded-md bg-surface-raised/20", children: [
+          /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("svg", { className: "size-3 text-purple-400/60 animate-spin", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", children: [
+            /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("path", { d: "M12 2v4" }),
+            /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("path", { d: "M12 18v4" }),
+            /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("path", { d: "m4.93 4.93 2.83 2.83" }),
+            /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("path", { d: "m16.24 16.24 2.83 2.83" }),
+            /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("path", { d: "M2 12h4" }),
+            /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("path", { d: "M18 12h4" }),
+            /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("path", { d: "m4.93 19.07 2.83-2.83" }),
+            /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("path", { d: "m16.24 7.76 2.83-2.83" })
           ] }),
-          /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("span", { className: "text-xs text-text-muted", children: toolActivity })
+          /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("span", { className: "text-xs text-text-muted", children: toolActivity })
         ] }) }),
-        !autoScroll && /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)(
+        !autoScroll && /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)(
           "button",
           {
             onClick: scrollToBottom,
             className: "sticky bottom-2 left-1/2 -translate-x-1/2 px-3 py-1.5 rounded-full bg-surface-raised border border-border-subtle/50 text-text-secondary text-xs hover:bg-surface-hover flex items-center gap-1.5 shadow-lg",
             children: [
-              /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)(
+              /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)(
                 "svg",
                 {
                   className: "size-3",
@@ -1200,8 +1320,8 @@ function ChatMessageArea({
                   stroke: "currentColor",
                   strokeWidth: "2",
                   children: [
-                    /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("path", { d: "M12 5v14" }),
-                    /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("path", { d: "m19 12-7 7-7-7" })
+                    /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("path", { d: "M12 5v14" }),
+                    /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("path", { d: "m19 12-7 7-7-7" })
                   ]
                 }
               ),
@@ -1214,7 +1334,7 @@ function ChatMessageArea({
   );
 }
 function AiBotIcon() {
-  return /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)(
+  return /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)(
     "svg",
     {
       className: "size-4 text-purple-400",
@@ -1223,18 +1343,18 @@ function AiBotIcon() {
       stroke: "currentColor",
       strokeWidth: "2",
       children: [
-        /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("path", { d: "M12 8V4H8" }),
-        /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("rect", { width: "16", height: "12", x: "4", y: "8", rx: "2" }),
-        /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("path", { d: "M2 14h2" }),
-        /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("path", { d: "M20 14h2" }),
-        /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("path", { d: "M15 13v2" }),
-        /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("path", { d: "M9 13v2" })
+        /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("path", { d: "M12 8V4H8" }),
+        /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("rect", { width: "16", height: "12", x: "4", y: "8", rx: "2" }),
+        /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("path", { d: "M2 14h2" }),
+        /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("path", { d: "M20 14h2" }),
+        /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("path", { d: "M15 13v2" }),
+        /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("path", { d: "M9 13v2" })
       ]
     }
   );
 }
 function UserIcon() {
-  return /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)(
+  return /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)(
     "svg",
     {
       className: "size-4 text-brand-primary",
@@ -1243,8 +1363,8 @@ function UserIcon() {
       stroke: "currentColor",
       strokeWidth: "2",
       children: [
-        /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("path", { d: "M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" }),
-        /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("circle", { cx: "12", cy: "7", r: "4" })
+        /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("path", { d: "M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" }),
+        /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("circle", { cx: "12", cy: "7", r: "4" })
       ]
     }
   );
@@ -1257,8 +1377,8 @@ function MessageBubble({
 }) {
   const formattedTime = message.timestamp ? new Date(message.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : void 0;
   if (message.role === "system") {
-    return /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("div", { className: "flex justify-center py-1", children: /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("div", { className: "inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-surface-raised/40 border border-border-subtle/20", children: [
-      /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)(
+    return /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("div", { className: "flex justify-center py-1", children: /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { className: "inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-surface-raised/40 border border-border-subtle/20", children: [
+      /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)(
         "svg",
         {
           className: "size-3.5 text-text-muted/70 shrink-0",
@@ -1267,51 +1387,51 @@ function MessageBubble({
           stroke: "currentColor",
           strokeWidth: "2",
           children: [
-            /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("circle", { cx: "12", cy: "12", r: "10" }),
-            /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("path", { d: "M12 16v-4" }),
-            /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("path", { d: "M12 8h.01" })
+            /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("circle", { cx: "12", cy: "12", r: "10" }),
+            /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("path", { d: "M12 16v-4" }),
+            /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("path", { d: "M12 8h.01" })
           ]
         }
       ),
-      /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("span", { className: "text-xs text-text-muted/80", children: message.content })
+      /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("span", { className: "text-xs text-text-muted/80", children: message.content })
     ] }) });
   }
   if (message.role === "user") {
-    return /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("div", { className: "flex gap-3 items-start justify-end", children: [
-      /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("div", { className: "max-w-[85%]", children: [
-        /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(
+    return /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { className: "flex gap-3 items-start justify-end", children: [
+      /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { className: "max-w-[85%]", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(
           "div",
           {
             className: "rounded-lg px-4 py-3 border border-brand-primary/30",
             style: { background: "color-mix(in srgb, var(--qontinui-brand-primary, #4a90d9) 10%, var(--qontinui-surface-canvas, #111115))" },
-            children: /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("div", { className: "text-sm text-text-primary", children: renderContent(message.content) })
+            children: /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("div", { className: "text-sm text-text-primary", children: renderContent(message.content) })
           }
         ),
-        formattedTime && /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("div", { className: "text-[10px] text-text-muted/60 mt-1 text-right", children: formattedTime })
+        formattedTime && /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("div", { className: "text-[10px] text-text-muted/60 mt-1 text-right", children: formattedTime })
       ] }),
-      /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("div", { className: "shrink-0 w-7 h-7 rounded-full bg-brand-primary/20 flex items-center justify-center", children: /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(UserIcon, {}) })
+      /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("div", { className: "shrink-0 w-7 h-7 rounded-full bg-brand-primary/20 flex items-center justify-center", children: /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(UserIcon, {}) })
     ] });
   }
-  return /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("div", { className: "group/msg flex gap-3 items-start", children: [
-    /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("div", { className: "shrink-0 w-7 h-7 rounded-full bg-purple-900/50 flex items-center justify-center", children: /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(AiBotIcon, {}) }),
-    /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("div", { className: "max-w-[85%]", children: [
-      /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(
+  return /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { className: "group/msg flex gap-3 items-start", children: [
+    /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("div", { className: "shrink-0 w-7 h-7 rounded-full bg-purple-900/50 flex items-center justify-center", children: /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(AiBotIcon, {}) }),
+    /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { className: "max-w-[85%]", children: [
+      /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(
         "div",
         {
           className: "rounded-lg px-4 py-3 border border-border-subtle/30",
           style: { background: "color-mix(in srgb, var(--qontinui-surface-raised, #1e1e22) 30%, var(--qontinui-surface-canvas, #111115))" },
-          children: /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("div", { className: "max-w-none text-sm", children: renderContent(message.content) })
+          children: /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("div", { className: "max-w-none text-sm", children: renderContent(message.content) })
         }
       ),
-      /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("div", { className: "flex items-center gap-2 mt-1", children: [
-        formattedTime && /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("span", { className: "text-[10px] text-text-muted/60", children: formattedTime }),
-        onCreateWorkflow && /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)(
+      /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { className: "flex items-center gap-2 mt-1", children: [
+        formattedTime && /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("span", { className: "text-[10px] text-text-muted/60", children: formattedTime }),
+        onCreateWorkflow && /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)(
           "button",
           {
             onClick: () => onCreateWorkflow(index, message.content),
             className: "flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs text-text-muted hover:text-purple-300 hover:bg-purple-900/20 transition-colors opacity-0 group-hover/msg:opacity-100",
             children: [
-              /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("svg", { className: "size-3.5", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", children: /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("path", { d: "M12 3l1.912 5.813a2 2 0 0 0 1.275 1.275L21 12l-5.813 1.912a2 2 0 0 0-1.275 1.275L12 21l-1.912-5.813a2 2 0 0 0-1.275-1.275L3 12l5.813-1.912a2 2 0 0 0 1.275-1.275L12 3z" }) }),
+              /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("svg", { className: "size-3.5", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", children: /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("path", { d: "M12 3l1.912 5.813a2 2 0 0 0 1.275 1.275L21 12l-5.813 1.912a2 2 0 0 0-1.275 1.275L12 21l-1.912-5.813a2 2 0 0 0-1.275-1.275L3 12l5.813-1.912a2 2 0 0 0 1.275-1.275L12 3z" }) }),
               "Create Workflow"
             ]
           }
@@ -1322,8 +1442,8 @@ function MessageBubble({
 }
 
 // src/components/chat/WorkflowPreviewPanel.tsx
-var import_react10 = require("react");
-var import_jsx_runtime11 = require("react/jsx-runtime");
+var import_react12 = require("react");
+var import_jsx_runtime12 = require("react/jsx-runtime");
 var PHASE_COLORS = {
   setup: {
     bg: "bg-blue-950/30",
@@ -1360,15 +1480,15 @@ function WorkflowPreviewPanel({
   onSave,
   onClose
 }) {
-  return /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { className: "flex flex-col h-full border-l border-border-subtle/50 bg-surface-canvas/95", children: [
-    /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { className: "flex items-center justify-between px-4 py-3 border-b border-border-subtle/50", children: [
-      /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("h3", { className: "text-sm font-semibold text-text-primary", children: "Generated Workflow" }),
-      /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(
+  return /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)("div", { className: "flex flex-col h-full border-l border-border-subtle/50 bg-surface-canvas/95", children: [
+    /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)("div", { className: "flex items-center justify-between px-4 py-3 border-b border-border-subtle/50", children: [
+      /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("h3", { className: "text-sm font-semibold text-text-primary", children: "Generated Workflow" }),
+      /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(
         "button",
         {
           onClick: onClose,
           className: "h-6 w-6 flex items-center justify-center rounded text-text-muted hover:text-text-primary hover:bg-surface-hover",
-          children: /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)(
+          children: /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)(
             "svg",
             {
               className: "size-3.5",
@@ -1377,17 +1497,17 @@ function WorkflowPreviewPanel({
               stroke: "currentColor",
               strokeWidth: "2",
               children: [
-                /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("path", { d: "M18 6 6 18" }),
-                /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("path", { d: "m6 6 12 12" })
+                /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("path", { d: "M18 6 6 18" }),
+                /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("path", { d: "m6 6 12 12" })
               ]
             }
           )
         }
       )
     ] }),
-    /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { className: "flex-1 overflow-y-auto p-4", children: [
-      isLoading && /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { className: "flex flex-col items-center justify-center h-48 text-text-muted", children: [
-        /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(
+    /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)("div", { className: "flex-1 overflow-y-auto p-4", children: [
+      isLoading && /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)("div", { className: "flex flex-col items-center justify-center h-48 text-text-muted", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(
           "svg",
           {
             className: "size-8 animate-spin mb-3 text-purple-400",
@@ -1395,14 +1515,14 @@ function WorkflowPreviewPanel({
             fill: "none",
             stroke: "currentColor",
             strokeWidth: "2",
-            children: /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("path", { d: "M21 12a9 9 0 1 1-6.219-8.56" })
+            children: /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("path", { d: "M21 12a9 9 0 1 1-6.219-8.56" })
           }
         ),
-        /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("p", { className: "text-sm", children: "Generating workflow..." }),
-        /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("p", { className: "text-xs mt-1 opacity-60", children: "This may take a minute" })
+        /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("p", { className: "text-sm", children: "Generating workflow..." }),
+        /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("p", { className: "text-xs mt-1 opacity-60", children: "This may take a minute" })
       ] }),
-      error && !isLoading && /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { className: "flex flex-col items-center justify-center h-48 text-red-400", children: [
-        /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)(
+      error && !isLoading && /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)("div", { className: "flex flex-col items-center justify-center h-48 text-red-400", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)(
           "svg",
           {
             className: "size-8 mb-3",
@@ -1411,20 +1531,20 @@ function WorkflowPreviewPanel({
             stroke: "currentColor",
             strokeWidth: "2",
             children: [
-              /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("circle", { cx: "12", cy: "12", r: "10" }),
-              /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("path", { d: "m15 9-6 6" }),
-              /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("path", { d: "m9 9 6 6" })
+              /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("circle", { cx: "12", cy: "12", r: "10" }),
+              /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("path", { d: "m15 9-6 6" }),
+              /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("path", { d: "m9 9 6 6" })
             ]
           }
         ),
-        /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("p", { className: "text-sm font-medium", children: "Generation Failed" }),
-        /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("p", { className: "text-xs mt-1 opacity-60 text-center max-w-[250px]", children: error })
+        /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("p", { className: "text-sm font-medium", children: "Generation Failed" }),
+        /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("p", { className: "text-xs mt-1 opacity-60 text-center max-w-[250px]", children: error })
       ] }),
-      workflow && !isLoading && /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { className: "space-y-3", children: [
-        /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { className: "mb-4", children: [
-          /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("h4", { className: "text-sm font-medium text-text-primary", children: workflow.name }),
-          workflow.description && /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("p", { className: "text-xs text-text-muted mt-1", children: workflow.description }),
-          workflow.tags && workflow.tags.length > 0 && /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("div", { className: "flex gap-1 mt-2 flex-wrap", children: workflow.tags.map((tag) => /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(
+      workflow && !isLoading && /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)("div", { className: "space-y-3", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)("div", { className: "mb-4", children: [
+          /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("h4", { className: "text-sm font-medium text-text-primary", children: workflow.name }),
+          workflow.description && /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("p", { className: "text-xs text-text-muted mt-1", children: workflow.description }),
+          workflow.tags && workflow.tags.length > 0 && /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("div", { className: "flex gap-1 mt-2 flex-wrap", children: workflow.tags.map((tag) => /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(
             "span",
             {
               className: "inline-flex items-center rounded-full border border-border-subtle/50 px-1.5 py-0 text-[10px] text-text-muted",
@@ -1437,7 +1557,7 @@ function WorkflowPreviewPanel({
           (phase) => {
             const steps = getStepsForPhase(workflow, phase);
             if (steps.length === 0) return null;
-            return /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(
+            return /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(
               PreviewPhaseSection,
               {
                 phase,
@@ -1449,34 +1569,34 @@ function WorkflowPreviewPanel({
         )
       ] })
     ] }),
-    workflow && !isLoading && /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { className: "border-t border-border-subtle/50 p-4 space-y-2", children: [
-      /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { className: "flex gap-2", children: [
-        /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)(
+    workflow && !isLoading && /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)("div", { className: "border-t border-border-subtle/50 p-4 space-y-2", children: [
+      /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)("div", { className: "flex gap-2", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)(
           "button",
           {
             onClick: onExecute,
             className: "flex-1 h-8 rounded-md bg-green-700 hover:bg-green-600 text-white text-sm flex items-center justify-center gap-1.5",
             children: [
-              /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(
+              /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(
                 "svg",
                 {
                   className: "size-3.5",
                   viewBox: "0 0 24 24",
                   fill: "currentColor",
-                  children: /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("polygon", { points: "5 3 19 12 5 21 5 3" })
+                  children: /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("polygon", { points: "5 3 19 12 5 21 5 3" })
                 }
               ),
               "Execute"
             ]
           }
         ),
-        /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)(
+        /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)(
           "button",
           {
             onClick: onEditInBuilder,
             className: "flex-1 h-8 rounded-md border border-border-subtle/50 text-text-primary text-sm hover:bg-surface-hover flex items-center justify-center gap-1.5",
             children: [
-              /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)(
+              /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)(
                 "svg",
                 {
                   className: "size-3.5",
@@ -1485,8 +1605,8 @@ function WorkflowPreviewPanel({
                   stroke: "currentColor",
                   strokeWidth: "2",
                   children: [
-                    /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("path", { d: "M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" }),
-                    /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("path", { d: "m15 5 4 4" })
+                    /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("path", { d: "M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" }),
+                    /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("path", { d: "m15 5 4 4" })
                   ]
                 }
               ),
@@ -1495,14 +1615,14 @@ function WorkflowPreviewPanel({
           }
         )
       ] }),
-      /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { className: "flex gap-2", children: [
-        /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)(
+      /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)("div", { className: "flex gap-2", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)(
           "button",
           {
             onClick: onRegenerate,
             className: "flex-1 h-8 rounded-md border border-border-subtle/50 text-text-primary text-xs hover:bg-surface-hover flex items-center justify-center gap-1.5",
             children: [
-              /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)(
+              /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)(
                 "svg",
                 {
                   className: "size-3",
@@ -1511,10 +1631,10 @@ function WorkflowPreviewPanel({
                   stroke: "currentColor",
                   strokeWidth: "2",
                   children: [
-                    /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("path", { d: "M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" }),
-                    /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("path", { d: "M3 3v5h5" }),
-                    /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("path", { d: "M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16" }),
-                    /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("path", { d: "M16 16h5v5" })
+                    /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("path", { d: "M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" }),
+                    /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("path", { d: "M3 3v5h5" }),
+                    /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("path", { d: "M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16" }),
+                    /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("path", { d: "M16 16h5v5" })
                   ]
                 }
               ),
@@ -1522,13 +1642,13 @@ function WorkflowPreviewPanel({
             ]
           }
         ),
-        /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)(
+        /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)(
           "button",
           {
             onClick: onSave,
             className: "flex-1 h-8 rounded-md border border-border-subtle/50 text-text-primary text-xs hover:bg-surface-hover flex items-center justify-center gap-1.5",
             children: [
-              /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)(
+              /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)(
                 "svg",
                 {
                   className: "size-3",
@@ -1537,9 +1657,9 @@ function WorkflowPreviewPanel({
                   stroke: "currentColor",
                   strokeWidth: "2",
                   children: [
-                    /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("path", { d: "M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" }),
-                    /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("polyline", { points: "17 21 17 13 7 13 7 21" }),
-                    /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("polyline", { points: "7 3 7 8 15 8" })
+                    /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("path", { d: "M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" }),
+                    /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("polyline", { points: "17 21 17 13 7 13 7 21" }),
+                    /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("polyline", { points: "7 3 7 8 15 8" })
                   ]
                 }
               ),
@@ -1555,16 +1675,16 @@ function PreviewPhaseSection({
   phase,
   steps
 }) {
-  const [isExpanded, setIsExpanded] = (0, import_react10.useState)(true);
+  const [isExpanded, setIsExpanded] = (0, import_react12.useState)(true);
   const colors = PHASE_COLORS[phase] ?? PHASE_COLORS["setup"];
-  return /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { className: `rounded-lg border ${colors.border} ${colors.bg}`, children: [
-    /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(
+  return /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)("div", { className: `rounded-lg border ${colors.border} ${colors.bg}`, children: [
+    /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(
       "button",
       {
         onClick: () => setIsExpanded(!isExpanded),
         className: "flex items-center justify-between w-full px-3 py-2 cursor-pointer",
-        children: /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { className: "flex items-center gap-2", children: [
-          /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(
+        children: /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)("div", { className: "flex items-center gap-2", children: [
+          /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(
             "svg",
             {
               className: `w-3.5 h-3.5 transition-transform ${colors.text} ${isExpanded ? "rotate-90" : ""}`,
@@ -1572,17 +1692,17 @@ function PreviewPhaseSection({
               fill: "none",
               stroke: "currentColor",
               strokeWidth: "2",
-              children: /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("path", { d: "m9 18 6-6-6-6" })
+              children: /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("path", { d: "m9 18 6-6-6-6" })
             }
           ),
-          /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(
+          /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(
             "span",
             {
               className: `text-xs font-semibold uppercase tracking-wider ${colors.text}`,
               children: phase
             }
           ),
-          /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(
+          /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(
             "span",
             {
               className: `text-[10px] px-1.5 py-0.5 rounded ${colors.badge}`,
@@ -1592,14 +1712,14 @@ function PreviewPhaseSection({
         ] })
       }
     ),
-    isExpanded && /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("div", { className: "px-2 pb-2 space-y-1", children: steps.map((step, i) => /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)(
+    isExpanded && /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("div", { className: "px-2 pb-2 space-y-1", children: steps.map((step, i) => /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)(
       "div",
       {
         className: "flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-black/20",
         children: [
-          /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(StepTypeIcon, { type: step.type }),
-          /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("div", { className: "flex-1 min-w-0", children: /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("div", { className: "text-xs text-zinc-200 truncate", children: step.name }) }),
-          /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)(
+          /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(StepTypeIcon, { type: step.type }),
+          /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("div", { className: "flex-1 min-w-0", children: /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("div", { className: "text-xs text-zinc-200 truncate", children: step.name }) }),
+          /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)(
             "svg",
             {
               className: "w-3 h-3 text-zinc-600",
@@ -1608,8 +1728,8 @@ function PreviewPhaseSection({
               stroke: "currentColor",
               strokeWidth: "2",
               children: [
-                /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("path", { d: "M22 11.08V12a10 10 0 1 1-5.93-9.14" }),
-                /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("polyline", { points: "22 4 12 14.01 9 11.01" })
+                /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("path", { d: "M22 11.08V12a10 10 0 1 1-5.93-9.14" }),
+                /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("polyline", { points: "22 4 12 14.01 9 11.01" })
               ]
             }
           )
@@ -1621,7 +1741,7 @@ function PreviewPhaseSection({
 }
 function StepTypeIcon({ type }) {
   if (type === "command") {
-    return /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)(
+    return /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)(
       "svg",
       {
         className: "w-3.5 h-3.5 text-zinc-400 shrink-0",
@@ -1630,14 +1750,14 @@ function StepTypeIcon({ type }) {
         stroke: "currentColor",
         strokeWidth: "2",
         children: [
-          /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("polyline", { points: "4 17 10 11 4 5" }),
-          /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("line", { x1: "12", x2: "20", y1: "19", y2: "19" })
+          /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("polyline", { points: "4 17 10 11 4 5" }),
+          /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("line", { x1: "12", x2: "20", y1: "19", y2: "19" })
         ]
       }
     );
   }
   if (type === "ui_bridge") {
-    return /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)(
+    return /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)(
       "svg",
       {
         className: "w-3.5 h-3.5 text-zinc-400 shrink-0",
@@ -1646,14 +1766,14 @@ function StepTypeIcon({ type }) {
         stroke: "currentColor",
         strokeWidth: "2",
         children: [
-          /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("rect", { width: "20", height: "14", x: "2", y: "3", rx: "2" }),
-          /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("line", { x1: "8", x2: "16", y1: "21", y2: "21" }),
-          /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("line", { x1: "12", x2: "12", y1: "17", y2: "21" })
+          /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("rect", { width: "20", height: "14", x: "2", y: "3", rx: "2" }),
+          /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("line", { x1: "8", x2: "16", y1: "21", y2: "21" }),
+          /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("line", { x1: "12", x2: "12", y1: "17", y2: "21" })
         ]
       }
     );
   }
-  return /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)(
+  return /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)(
     "svg",
     {
       className: "w-3.5 h-3.5 text-zinc-400 shrink-0",
@@ -1662,12 +1782,12 @@ function StepTypeIcon({ type }) {
       stroke: "currentColor",
       strokeWidth: "2",
       children: [
-        /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("path", { d: "M12 8V4H8" }),
-        /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("rect", { width: "16", height: "12", x: "4", y: "8", rx: "2" }),
-        /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("path", { d: "M2 14h2" }),
-        /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("path", { d: "M20 14h2" }),
-        /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("path", { d: "M15 13v2" }),
-        /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("path", { d: "M9 13v2" })
+        /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("path", { d: "M12 8V4H8" }),
+        /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("rect", { width: "16", height: "12", x: "4", y: "8", rx: "2" }),
+        /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("path", { d: "M2 14h2" }),
+        /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("path", { d: "M20 14h2" }),
+        /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("path", { d: "M15 13v2" }),
+        /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("path", { d: "M9 13v2" })
       ]
     }
   );
@@ -1688,42 +1808,42 @@ function getStepsForPhase(workflow, phase) {
 }
 
 // src/UIProvider.tsx
-var import_react11 = require("react");
-var import_jsx_runtime12 = require("react/jsx-runtime");
-var CollapsibleOpenCtx = (0, import_react11.createContext)(true);
+var import_react13 = require("react");
+var import_jsx_runtime13 = require("react/jsx-runtime");
+var CollapsibleOpenCtx = (0, import_react13.createContext)(true);
 function DefaultCollapsible({
   open,
   children,
   className
 }) {
-  return /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(CollapsibleOpenCtx.Provider, { value: open, children: /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("div", { className, children }) });
+  return /* @__PURE__ */ (0, import_jsx_runtime13.jsx)(CollapsibleOpenCtx.Provider, { value: open, children: /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("div", { className, children }) });
 }
 function DefaultCollapsibleTrigger({
   children,
   className
 }) {
-  return /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("div", { className, children });
+  return /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("div", { className, children });
 }
 function DefaultCollapsibleContent({
   children,
   className
 }) {
-  const open = (0, import_react11.useContext)(CollapsibleOpenCtx);
+  const open = (0, import_react13.useContext)(CollapsibleOpenCtx);
   if (!open) return null;
-  return /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("div", { className, children });
+  return /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("div", { className, children });
 }
 var defaultPrimitives = {
   Collapsible: DefaultCollapsible,
   CollapsibleTrigger: DefaultCollapsibleTrigger,
   CollapsibleContent: DefaultCollapsibleContent
 };
-var UIContext = (0, import_react11.createContext)(defaultPrimitives);
+var UIContext = (0, import_react13.createContext)(defaultPrimitives);
 function UIProvider({ primitives, children }) {
   const merged = { ...defaultPrimitives, ...primitives };
-  return /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(UIContext.Provider, { value: merged, children });
+  return /* @__PURE__ */ (0, import_jsx_runtime13.jsx)(UIContext.Provider, { value: merged, children });
 }
 function useUIPrimitives() {
-  return (0, import_react11.useContext)(UIContext);
+  return (0, import_react13.useContext)(UIContext);
 }
 // Annotate the CommonJS export names for ESM import in node:
 0 && (module.exports = {
@@ -1734,6 +1854,7 @@ function useUIPrimitives() {
   LibraryPickerBase,
   PhaseSection,
   SettingsPanel,
+  SkillCatalog,
   StepItem,
   UIProvider,
   WorkflowBuilderProvider,

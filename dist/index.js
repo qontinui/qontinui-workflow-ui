@@ -1,7 +1,8 @@
 import {
+  SkillCatalog,
   UIProvider,
   useUIPrimitives
-} from "./chunk-2RKBTL3R.js";
+} from "./chunk-4XNQM6HX.js";
 import {
   ChatHeader,
   ChatInput,
@@ -592,6 +593,7 @@ function StepItem({
 }
 
 // src/headless/AddStepDropdown.tsx
+import { useState as useState3, useCallback as useCallback4 } from "react";
 import { STEP_TYPES } from "@qontinui/shared-types/workflow";
 import { Fragment as Fragment4, jsx as jsx6 } from "react/jsx-runtime";
 function AddStepDropdown({
@@ -599,21 +601,41 @@ function AddStepDropdown({
   phase,
   onSelect,
   onClose,
+  onAddSteps,
+  defaultMode = "skills",
   customStepTypes,
   children
 }) {
+  const [mode, setMode] = useState3(defaultMode);
   const stepTypes = (customStepTypes ?? STEP_TYPES)[phase] ?? [];
+  const onSwitchToRaw = useCallback4(() => setMode("raw"), []);
+  const onSwitchToSkills = useCallback4(() => setMode("skills"), []);
+  const handleAddSteps = useCallback4(
+    (steps, targetPhase) => {
+      onAddSteps?.(steps, targetPhase);
+      onClose();
+    },
+    [onAddSteps, onClose]
+  );
+  const handleClose = useCallback4(() => {
+    setMode(defaultMode);
+    onClose();
+  }, [defaultMode, onClose]);
   return /* @__PURE__ */ jsx6(Fragment4, { children: children({
     isOpen,
     phase,
+    mode,
     stepTypes,
     onSelect,
-    onClose
+    onSwitchToRaw,
+    onSwitchToSkills,
+    onAddSteps: handleAddSteps,
+    onClose: handleClose
   }) });
 }
 
 // src/headless/SettingsPanel.tsx
-import { useMemo as useMemo2, useCallback as useCallback4 } from "react";
+import { useMemo as useMemo2, useCallback as useCallback5 } from "react";
 import {
   WORKFLOW_SETTINGS_CONFIG,
   getVisibleSections,
@@ -633,23 +655,23 @@ function SettingsPanel({
     () => getVisibleSections(sectionConfig, features),
     [sectionConfig, features]
   );
-  const getBooleanValue = useCallback4(
+  const getBooleanValue = useCallback5(
     (def) => {
       return getBooleanDisplayValue(def, settings[def.key]);
     },
     [settings]
   );
-  const setBooleanValue = useCallback4(
+  const setBooleanValue = useCallback5(
     (def, displayValue) => {
       onChange({ [def.key]: toBooleanStoredValue(def, displayValue) });
     },
     [onChange]
   );
-  const getValue = useCallback4(
+  const getValue = useCallback5(
     (key) => settings[key],
     [settings]
   );
-  const setValue = useCallback4(
+  const setValue = useCallback5(
     (key, value) => {
       onChange({ [key]: value });
     },
@@ -674,6 +696,7 @@ export {
   LibraryPickerBase,
   PhaseSection,
   SettingsPanel,
+  SkillCatalog,
   StepItem,
   UIProvider,
   WorkflowBuilderProvider,

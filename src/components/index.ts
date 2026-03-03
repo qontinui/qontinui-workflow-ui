@@ -4,6 +4,15 @@ export type { PhaseSectionConcreteProps } from "./PhaseSection";
 export { StepItemConcrete } from "./StepItem";
 export type { StepItemConcreteProps } from "./StepItem";
 
+export { SkillCatalogConcrete } from "./SkillCatalog";
+export type { SkillCatalogConcreteProps } from "./SkillCatalog";
+
+export { SkillParamForm } from "./SkillParamForm";
+export type { SkillParamFormProps } from "./SkillParamForm";
+
+export { CompositionSkillBuilder } from "./CompositionSkillBuilder";
+export type { CompositionSkillBuilderProps } from "./CompositionSkillBuilder";
+
 // Chat components
 export {
   ChatHeader,

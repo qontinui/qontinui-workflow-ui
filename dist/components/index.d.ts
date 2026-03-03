@@ -1,6 +1,6 @@
 import * as react_jsx_runtime from 'react/jsx-runtime';
 import React from 'react';
-import { WorkflowPhase, UnifiedStep } from '@qontinui/shared-types/workflow';
+import { WorkflowPhase, UnifiedStep, SkillParameter, SkillRef } from '@qontinui/shared-types/workflow';
 export { ChatHeader, ChatHeaderProps, ChatInput, ChatInputProps, ChatMessageArea, ChatMessageAreaProps, WorkflowPreviewPanel, WorkflowPreviewPanelProps } from './chat/index.js';
 import '@qontinui/shared-types';
 
@@ -42,4 +42,39 @@ interface StepItemConcreteProps {
 }
 declare function StepItemConcrete({ step, isSelected, onClick, onDelete, onDuplicate, isSelectionMode, isSelectedForDelete, reorderSlot, selectionCheckbox, resolveIcon, }: StepItemConcreteProps): react_jsx_runtime.JSX.Element;
 
-export { PhaseSectionConcrete, type PhaseSectionConcreteProps, StepItemConcrete, type StepItemConcreteProps };
+interface SkillCatalogConcreteProps {
+    phase: WorkflowPhase;
+    isOpen: boolean;
+    onAddSteps: (steps: UnifiedStep[], phase: WorkflowPhase) => void;
+    onClose: () => void;
+    /** Called after a skill is successfully instantiated (steps added). */
+    onSkillUsed?: (skillId: string) => void;
+    resolveIcon: (iconId: string) => React.ComponentType<{
+        className?: string;
+    }>;
+}
+declare function SkillCatalogConcrete({ phase, isOpen, onAddSteps, onClose, onSkillUsed, resolveIcon, }: SkillCatalogConcreteProps): react_jsx_runtime.JSX.Element | null;
+
+interface SkillParamFormProps {
+    parameters: SkillParameter[];
+    values: Record<string, unknown>;
+    onChange: (name: string, value: unknown) => void;
+    errors?: string[];
+}
+declare function SkillParamForm({ parameters, values, onChange, errors, }: SkillParamFormProps): react_jsx_runtime.JSX.Element;
+
+interface CompositionSkillBuilderProps {
+    /** Initial skill refs if editing an existing composition */
+    initialRefs?: SkillRef[];
+    /** Called when the composition is saved */
+    onSave: (refs: SkillRef[]) => void;
+    /** Called when canceled */
+    onCancel: () => void;
+    /** Icon resolver */
+    resolveIcon: (iconId: string) => React.ComponentType<{
+        className?: string;
+    }>;
+}
+declare function CompositionSkillBuilder({ initialRefs, onSave, onCancel, resolveIcon, }: CompositionSkillBuilderProps): react_jsx_runtime.JSX.Element;
+
+export { CompositionSkillBuilder, type CompositionSkillBuilderProps, PhaseSectionConcrete, type PhaseSectionConcreteProps, SkillCatalogConcrete, type SkillCatalogConcreteProps, SkillParamForm, type SkillParamFormProps, StepItemConcrete, type StepItemConcreteProps };

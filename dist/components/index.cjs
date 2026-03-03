@@ -23,7 +23,10 @@ __export(components_exports, {
   ChatHeader: () => ChatHeader,
   ChatInput: () => ChatInput,
   ChatMessageArea: () => ChatMessageArea,
+  CompositionSkillBuilder: () => CompositionSkillBuilder,
   PhaseSectionConcrete: () => PhaseSectionConcrete,
+  SkillCatalogConcrete: () => SkillCatalogConcrete,
+  SkillParamForm: () => SkillParamForm,
   StepItemConcrete: () => StepItemConcrete,
   WorkflowPreviewPanel: () => WorkflowPreviewPanel
 });
@@ -230,15 +233,11 @@ function PhaseSectionConcrete({
             "button",
             {
               onClick: () => onAddStep(phase),
-              className: `w-full flex items-center justify-center gap-2 p-2 rounded-md ${colors.button} transition-colors text-sm`,
+              className: `w-full flex items-center justify-center gap-2 py-1.5 rounded-md border border-dashed ${colors.border} ${colors.text} opacity-60 hover:opacity-100 transition-all text-xs`,
               "data-ui-id": `workflow-builder-phase-${phase}-add-step-btn`,
               children: [
                 /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(PlusIcon, {}),
-                /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("span", { children: [
-                  "Add ",
-                  phaseInfo.label,
-                  " Step"
-                ] })
+                /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("span", { children: "Add Step" })
               ]
             }
           )
@@ -355,9 +354,833 @@ function getStepItemIconData(step) {
   return (0, import_workflow_utils.getStepIconData)(step.type);
 }
 
-// src/components/chat/ChatHeader.tsx
+// src/components/SkillCatalog.tsx
+var import_workflow_utils3 = require("@qontinui/workflow-utils");
+
+// src/headless/SkillCatalog.tsx
 var import_react3 = require("react");
+var import_workflow_utils2 = require("@qontinui/workflow-utils");
 var import_jsx_runtime4 = require("react/jsx-runtime");
+function SkillCatalog({
+  phase,
+  onAddSteps,
+  onClose,
+  onSkillUsed,
+  children
+}) {
+  const [searchQuery, setSearchQuery] = (0, import_react3.useState)("");
+  const [selectedCategory, setSelectedCategory] = (0, import_react3.useState)(null);
+  const [selectedSource, setSelectedSource] = (0, import_react3.useState)(null);
+  const [selectedSkill, setSelectedSkill] = (0, import_react3.useState)(
+    null
+  );
+  const [paramValues, setParamValues] = (0, import_react3.useState)({});
+  const mode = selectedSkill ? "configure" : "browse";
+  const categories = (0, import_react3.useMemo)(() => {
+    const phaseSkills = (0, import_workflow_utils2.getSkillsByPhase)(phase);
+    const cats = /* @__PURE__ */ new Set();
+    for (const skill of phaseSkills) {
+      cats.add(skill.category);
+    }
+    return Array.from(cats);
+  }, [phase]);
+  const hasNonBuiltinSkills = (0, import_react3.useMemo)(() => {
+    const phaseSkills = (0, import_workflow_utils2.getSkillsByPhase)(phase);
+    return phaseSkills.some((s) => s.source !== "builtin");
+  }, [phase]);
+  const filteredSkills = (0, import_react3.useMemo)(() => {
+    const filters = { phase };
+    if (selectedCategory) {
+      filters.category = selectedCategory;
+    }
+    if (selectedSource) {
+      filters.source = selectedSource;
+    }
+    return (0, import_workflow_utils2.searchSkills)(searchQuery, filters);
+  }, [searchQuery, selectedCategory, selectedSource, phase]);
+  const onSelectSkill = (0, import_react3.useCallback)(
+    (skill) => {
+      setSelectedSkill(skill);
+      const defaults = {};
+      for (const param of skill.parameters) {
+        if (param.default !== void 0) {
+          defaults[param.name] = param.default;
+        }
+      }
+      setParamValues(defaults);
+    },
+    []
+  );
+  const setParamValue = (0, import_react3.useCallback)(
+    (name, value) => {
+      setParamValues((prev) => ({ ...prev, [name]: value }));
+    },
+    []
+  );
+  const validationErrors = (0, import_react3.useMemo)(() => {
+    if (!selectedSkill) return [];
+    return (0, import_workflow_utils2.validateSkillParams)(selectedSkill, paramValues);
+  }, [selectedSkill, paramValues]);
+  const onConfirm = (0, import_react3.useCallback)(() => {
+    if (!selectedSkill || validationErrors.length > 0) return;
+    const steps = (0, import_workflow_utils2.instantiateSkill)(selectedSkill, phase, paramValues);
+    onAddSteps(steps, phase);
+    if (onSkillUsed) {
+      onSkillUsed(selectedSkill.id);
+    }
+    onClose();
+  }, [selectedSkill, phase, paramValues, validationErrors, onAddSteps, onSkillUsed, onClose]);
+  const onBack = (0, import_react3.useCallback)(() => {
+    setSelectedSkill(null);
+    setParamValues({});
+  }, []);
+  return /* @__PURE__ */ (0, import_jsx_runtime4.jsx)(import_jsx_runtime4.Fragment, { children: children({
+    mode,
+    searchQuery,
+    setSearchQuery,
+    selectedCategory,
+    setSelectedCategory,
+    selectedSource,
+    setSelectedSource,
+    hasNonBuiltinSkills,
+    categories,
+    filteredSkills,
+    onSelectSkill,
+    selectedSkill,
+    paramValues,
+    setParamValue,
+    validationErrors,
+    onConfirm,
+    onBack
+  }) });
+}
+
+// src/components/SkillParamForm.tsx
+var import_jsx_runtime5 = require("react/jsx-runtime");
+function SkillParamForm({
+  parameters,
+  values,
+  onChange,
+  errors
+}) {
+  if (parameters.length === 0) {
+    return /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("p", { className: "text-sm text-zinc-500 italic py-2", children: "No parameters needed \u2014 this skill is ready to use." });
+  }
+  return /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("div", { className: "space-y-3", children: [
+    parameters.map((param) => {
+      if (param.depends_on) {
+        const depValue = values[param.depends_on.param];
+        if (depValue !== param.depends_on.value) {
+          return null;
+        }
+      }
+      return /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(
+        SkillParamField,
+        {
+          param,
+          value: values[param.name],
+          onChange: (value) => onChange(param.name, value)
+        },
+        param.name
+      );
+    }),
+    errors && errors.length > 0 && /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("div", { className: "space-y-1", children: errors.map((err, i) => /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("p", { className: "text-xs text-red-400", children: err }, i)) })
+  ] });
+}
+function SkillParamField({ param, value, onChange }) {
+  const inputClasses = "w-full bg-zinc-800 border border-zinc-700 rounded px-2.5 py-1.5 text-sm text-zinc-200 placeholder:text-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500 focus:border-zinc-500";
+  return /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("div", { children: [
+    /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("label", { className: "flex items-center gap-1 text-sm text-zinc-300 mb-1", children: [
+      param.label,
+      param.required && /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("span", { className: "text-red-400", children: "*" })
+    ] }),
+    param.description && /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("p", { className: "text-xs text-zinc-500 mb-1.5", children: param.description }),
+    param.type === "string" && /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)(import_jsx_runtime5.Fragment, { children: [
+      /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(
+        "input",
+        {
+          type: "text",
+          className: inputClasses,
+          value: value ?? "",
+          onChange: (e) => onChange(e.target.value),
+          placeholder: param.placeholder
+        }
+      ),
+      param.pattern && /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("p", { className: "text-[11px] text-zinc-600 mt-1", children: [
+        "Pattern: ",
+        /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("code", { className: "text-zinc-500", children: param.pattern })
+      ] })
+    ] }),
+    param.type === "number" && /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)(import_jsx_runtime5.Fragment, { children: [
+      /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(
+        "input",
+        {
+          type: "number",
+          className: inputClasses,
+          value: value !== void 0 && value !== null ? String(value) : "",
+          onChange: (e) => {
+            const num = e.target.value === "" ? void 0 : Number(e.target.value);
+            onChange(num);
+          },
+          placeholder: param.placeholder,
+          min: param.min,
+          max: param.max
+        }
+      ),
+      (param.min != null || param.max != null) && /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("p", { className: "text-[11px] text-zinc-600 mt-1", children: param.min != null && param.max != null ? `Range: ${param.min} \u2013 ${param.max}` : param.min != null ? `Min: ${param.min}` : `Max: ${param.max}` })
+    ] }),
+    param.type === "boolean" && /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(
+      "button",
+      {
+        type: "button",
+        role: "switch",
+        "aria-checked": !!value,
+        className: `
+            relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full
+            transition-colors focus:outline-none focus:ring-1 focus:ring-zinc-500
+            ${value ? "bg-blue-500" : "bg-zinc-700"}
+          `,
+        onClick: () => onChange(!value),
+        children: /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(
+          "span",
+          {
+            className: `
+              pointer-events-none inline-block h-4 w-4 rounded-full bg-white shadow
+              transform transition-transform mt-0.5
+              ${value ? "translate-x-5 ml-0.5" : "translate-x-0.5"}
+            `
+          }
+        )
+      }
+    ),
+    param.type === "select" && param.options && /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)(
+      "select",
+      {
+        className: inputClasses,
+        value: value ?? "",
+        onChange: (e) => onChange(e.target.value),
+        children: [
+          /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("option", { value: "", children: "Select..." }),
+          param.options.map((opt) => /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("option", { value: opt.value, children: opt.label }, opt.value))
+        ]
+      }
+    )
+  ] });
+}
+
+// src/components/SkillCatalog.tsx
+var import_jsx_runtime6 = require("react/jsx-runtime");
+var CATEGORY_LABELS = {
+  "code-quality": "Code Quality",
+  testing: "Testing",
+  monitoring: "Monitoring",
+  "ai-task": "AI Task",
+  deployment: "Deployment",
+  composition: "Composition",
+  custom: "Custom"
+};
+function getCategoryLabel(category) {
+  return CATEGORY_LABELS[category] ?? category;
+}
+var SearchIcon = ({ className }) => /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("svg", { className, fill: "none", viewBox: "0 0 24 24", stroke: "currentColor", strokeWidth: 2, children: [
+  /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("circle", { cx: "11", cy: "11", r: "8" }),
+  /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("path", { strokeLinecap: "round", d: "m21 21-4.35-4.35" })
+] });
+var ArrowLeftIcon = ({ className }) => /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("svg", { className, fill: "none", viewBox: "0 0 24 24", stroke: "currentColor", strokeWidth: 2, children: /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("path", { strokeLinecap: "round", strokeLinejoin: "round", d: "M19 12H5m7-7-7 7 7 7" }) });
+function SkillCatalogConcrete({
+  phase,
+  isOpen,
+  onAddSteps,
+  onClose,
+  onSkillUsed,
+  resolveIcon
+}) {
+  if (!isOpen) return null;
+  return /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(
+    SkillCatalog,
+    {
+      phase,
+      onAddSteps,
+      onClose,
+      onSkillUsed,
+      children: (props) => /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { className: "flex flex-col h-full max-h-[480px]", children: props.mode === "browse" ? /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(
+        BrowseView,
+        {
+          ...props,
+          phase,
+          resolveIcon
+        }
+      ) : /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(
+        ConfigureView,
+        {
+          ...props,
+          resolveIcon
+        }
+      ) })
+    }
+  );
+}
+function BrowseView({
+  searchQuery,
+  setSearchQuery,
+  selectedCategory,
+  setSelectedCategory,
+  selectedSource,
+  setSelectedSource,
+  hasNonBuiltinSkills,
+  categories,
+  filteredSkills,
+  onSelectSkill,
+  resolveIcon
+}) {
+  return /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)(import_jsx_runtime6.Fragment, { children: [
+    /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { className: "px-3 pt-3 pb-2", children: /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "relative", children: [
+      /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(SearchIcon, { className: "absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" }),
+      /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(
+        "input",
+        {
+          type: "text",
+          value: searchQuery,
+          onChange: (e) => setSearchQuery(e.target.value),
+          placeholder: "Search skills...",
+          className: "w-full bg-zinc-800 border border-zinc-700 rounded pl-8 pr-3 py-1.5 text-sm text-zinc-200 placeholder:text-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500",
+          autoFocus: true
+        }
+      )
+    ] }) }),
+    /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "px-3 pb-2 flex gap-1.5 flex-wrap", children: [
+      /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(
+        CategoryChip,
+        {
+          label: "All",
+          isActive: selectedCategory === null,
+          onClick: () => setSelectedCategory(null)
+        }
+      ),
+      categories.map((cat) => /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(
+        CategoryChip,
+        {
+          label: getCategoryLabel(cat),
+          isActive: selectedCategory === cat,
+          onClick: () => setSelectedCategory(selectedCategory === cat ? null : cat)
+        },
+        cat
+      ))
+    ] }),
+    hasNonBuiltinSkills && /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "px-3 pb-2 flex gap-1.5 flex-wrap", children: [
+      /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(
+        CategoryChip,
+        {
+          label: "All Sources",
+          isActive: selectedSource === null,
+          onClick: () => setSelectedSource(null)
+        }
+      ),
+      /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(
+        CategoryChip,
+        {
+          label: "Built-in",
+          isActive: selectedSource === "builtin",
+          onClick: () => setSelectedSource(selectedSource === "builtin" ? null : "builtin")
+        }
+      ),
+      /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(
+        CategoryChip,
+        {
+          label: "Custom",
+          isActive: selectedSource === "user",
+          onClick: () => setSelectedSource(selectedSource === "user" ? null : "user")
+        }
+      ),
+      /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(
+        CategoryChip,
+        {
+          label: "Community",
+          isActive: selectedSource === "community",
+          onClick: () => setSelectedSource(
+            selectedSource === "community" ? null : "community"
+          )
+        }
+      )
+    ] }),
+    /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { className: "flex-1 overflow-y-auto px-3 pb-2 space-y-1", children: filteredSkills.length === 0 ? /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("p", { className: "text-sm text-zinc-500 py-4 text-center", children: "No skills match your search." }) : filteredSkills.map((skill) => /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(
+      SkillCard,
+      {
+        skill,
+        onClick: () => {
+          if (skill.parameters.length === 0) {
+            onSelectSkill(skill);
+            return;
+          }
+          onSelectSkill(skill);
+        },
+        resolveIcon
+      },
+      skill.id
+    )) })
+  ] });
+}
+function ConfigureView({
+  selectedSkill,
+  paramValues,
+  setParamValue,
+  validationErrors,
+  onConfirm,
+  onBack,
+  resolveIcon
+}) {
+  if (!selectedSkill) return null;
+  const iconData = (0, import_workflow_utils3.getSkillCategoryIconData)(selectedSkill.category);
+  const Icon = resolveIcon(selectedSkill.icon);
+  return /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)(import_jsx_runtime6.Fragment, { children: [
+    /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "px-3 pt-3 pb-2 flex items-center gap-2", children: [
+      /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(
+        "button",
+        {
+          className: "p-1 rounded hover:bg-zinc-700 text-zinc-400 hover:text-zinc-200 transition-colors",
+          onClick: onBack,
+          title: "Back to catalog",
+          children: /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(ArrowLeftIcon, { className: "w-4 h-4" })
+        }
+      ),
+      /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { className: `p-1.5 rounded ${iconData.bgClass}`, children: /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(Icon, { className: `w-4 h-4 ${iconData.textClass}` }) }),
+      /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "flex-1 min-w-0", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("h3", { className: "text-sm font-medium text-zinc-200 truncate", children: selectedSkill.name }),
+        /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("p", { className: "text-xs text-zinc-500 truncate", children: selectedSkill.description })
+      ] })
+    ] }),
+    /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { className: "flex-1 overflow-y-auto px-3 pb-2", children: /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(
+      SkillParamForm,
+      {
+        parameters: selectedSkill.parameters,
+        values: paramValues,
+        onChange: setParamValue,
+        errors: validationErrors
+      }
+    ) }),
+    /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "px-3 py-2 border-t border-zinc-800 flex justify-end gap-2", children: [
+      /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(
+        "button",
+        {
+          className: "px-3 py-1.5 text-sm text-zinc-400 hover:text-zinc-200 transition-colors rounded",
+          onClick: onBack,
+          children: "Cancel"
+        }
+      ),
+      /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(
+        "button",
+        {
+          className: "px-3 py-1.5 text-sm bg-blue-600 hover:bg-blue-500 text-white rounded disabled:opacity-50 disabled:cursor-not-allowed transition-colors",
+          onClick: onConfirm,
+          disabled: validationErrors.length > 0,
+          children: "Add to Phase"
+        }
+      )
+    ] })
+  ] });
+}
+function CategoryChip({
+  label,
+  isActive,
+  onClick
+}) {
+  return /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(
+    "button",
+    {
+      className: `
+        px-2 py-0.5 text-xs rounded-full transition-colors
+        ${isActive ? "bg-zinc-600 text-zinc-100" : "bg-zinc-800 text-zinc-400 hover:bg-zinc-700 hover:text-zinc-300"}
+      `,
+      onClick,
+      children: label
+    }
+  );
+}
+function SkillCard({
+  skill,
+  onClick,
+  resolveIcon
+}) {
+  const iconData = (0, import_workflow_utils3.getSkillCategoryIconData)(skill.category);
+  const Icon = resolveIcon(skill.icon);
+  return /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)(
+    "button",
+    {
+      className: "w-full flex items-center gap-2.5 px-2 py-2 rounded-md hover:bg-zinc-800/80 transition-colors text-left group",
+      onClick,
+      children: [
+        /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { className: `shrink-0 p-1.5 rounded ${iconData.bgClass}`, children: /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(Icon, { className: `w-4 h-4 ${iconData.textClass}` }) }),
+        /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "flex-1 min-w-0", children: [
+          /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "flex items-center", children: [
+            /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("span", { className: "text-sm text-zinc-200 group-hover:text-zinc-100", children: skill.name }),
+            skill.source !== "builtin" && /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("span", { className: `ml-1.5 px-1.5 py-0.5 text-[10px] rounded-full ${skill.source === "community" ? "bg-purple-900/30 text-purple-400" : "bg-blue-900/30 text-blue-400"}`, children: skill.source === "community" ? "Community" : "Custom" }),
+            skill.forked_from && /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("span", { className: "ml-1.5 text-[10px] text-zinc-600", title: `Forked from ${skill.forked_from}`, children: "(fork)" }),
+            skill.version && skill.version !== "1.0.0" && /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("span", { className: "ml-1.5 px-1.5 py-0.5 text-[10px] bg-zinc-800 text-zinc-400 rounded-full", children: [
+              "v",
+              skill.version
+            ] }),
+            skill.approval_status && /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("span", { className: `ml-1.5 px-1.5 py-0.5 text-[10px] rounded-full ${skill.approval_status === "approved" ? "bg-green-900/30 text-green-400" : skill.approval_status === "rejected" ? "bg-red-900/30 text-red-400" : "bg-yellow-900/30 text-yellow-400"}`, children: skill.approval_status === "approved" ? "Approved" : skill.approval_status === "rejected" ? "Rejected" : "Pending" })
+          ] }),
+          /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("p", { className: "text-xs text-zinc-500 truncate", children: [
+            skill.description,
+            skill.author && /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("span", { className: "ml-1 text-zinc-600", children: [
+              "\u2014 by ",
+              skill.author.name
+            ] })
+          ] })
+        ] }),
+        skill.tags.length > 0 && /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { className: "hidden sm:flex gap-1 shrink-0", children: skill.tags.slice(0, 2).map((tag) => /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(
+          "span",
+          {
+            className: "px-1.5 py-0.5 text-[10px] bg-zinc-800 text-zinc-500 rounded",
+            children: tag
+          },
+          tag
+        )) }),
+        skill.usage_count != null && skill.usage_count > 0 && /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("span", { className: "shrink-0 text-[10px] text-zinc-600", title: "Times used", children: [
+          skill.usage_count,
+          "x"
+        ] })
+      ]
+    }
+  );
+}
+
+// src/components/CompositionSkillBuilder.tsx
+var import_react4 = require("react");
+var import_workflow_utils4 = require("@qontinui/workflow-utils");
+var import_jsx_runtime7 = require("react/jsx-runtime");
+var ChevronUpIcon = ({ className }) => /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("svg", { className, fill: "none", viewBox: "0 0 24 24", stroke: "currentColor", strokeWidth: 2, children: /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("path", { strokeLinecap: "round", strokeLinejoin: "round", d: "m5 15 7-7 7 7" }) });
+var ChevronDownIcon = ({ className }) => /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("svg", { className, fill: "none", viewBox: "0 0 24 24", stroke: "currentColor", strokeWidth: 2, children: /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("path", { strokeLinecap: "round", strokeLinejoin: "round", d: "m19 9-7 7-7-7" }) });
+var XMarkIcon = ({ className }) => /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("svg", { className, fill: "none", viewBox: "0 0 24 24", stroke: "currentColor", strokeWidth: 2, children: /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("path", { strokeLinecap: "round", strokeLinejoin: "round", d: "M6 18 18 6M6 6l12 12" }) });
+var SearchIcon2 = ({ className }) => /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("svg", { className, fill: "none", viewBox: "0 0 24 24", stroke: "currentColor", strokeWidth: 2, children: [
+  /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("circle", { cx: "11", cy: "11", r: "8" }),
+  /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("path", { strokeLinecap: "round", d: "m21 21-4.35-4.35" })
+] });
+var ChevronRightIcon = ({ className }) => /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("svg", { className, fill: "none", viewBox: "0 0 24 24", stroke: "currentColor", strokeWidth: 2, children: /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("path", { strokeLinecap: "round", strokeLinejoin: "round", d: "m9 5 7 7-7 7" }) });
+function resolveRef(ref) {
+  const skill = (0, import_workflow_utils4.getSkill)(ref.skill_id);
+  return {
+    ...ref,
+    _skill: skill
+  };
+}
+function CompositionSkillBuilder({
+  initialRefs = [],
+  onSave,
+  onCancel,
+  resolveIcon
+}) {
+  const [refs, setRefs] = (0, import_react4.useState)(
+    () => initialRefs.map(resolveRef)
+  );
+  const [showPicker, setShowPicker] = (0, import_react4.useState)(false);
+  const [expandedIndex, setExpandedIndex] = (0, import_react4.useState)(null);
+  const handleAddRef = (0, import_react4.useCallback)((skill) => {
+    const newRef = {
+      skill_id: skill.id,
+      parameter_overrides: {},
+      _skill: skill
+    };
+    setRefs((prev) => [...prev, newRef]);
+    setShowPicker(false);
+  }, []);
+  const handleRemoveRef = (0, import_react4.useCallback)((index) => {
+    setRefs((prev) => prev.filter((_, i) => i !== index));
+    setExpandedIndex((prev) => {
+      if (prev === index) return null;
+      if (prev !== null && prev > index) return prev - 1;
+      return prev;
+    });
+  }, []);
+  const handleMoveUp = (0, import_react4.useCallback)((index) => {
+    if (index === 0) return;
+    setRefs((prev) => {
+      const next = [...prev];
+      [next[index - 1], next[index]] = [next[index], next[index - 1]];
+      return next;
+    });
+    setExpandedIndex((prev) => {
+      if (prev === index) return index - 1;
+      if (prev === index - 1) return index;
+      return prev;
+    });
+  }, []);
+  const handleMoveDown = (0, import_react4.useCallback)((index) => {
+    setRefs((prev) => {
+      if (index >= prev.length - 1) return prev;
+      const next = [...prev];
+      [next[index], next[index + 1]] = [next[index + 1], next[index]];
+      return next;
+    });
+    setExpandedIndex((prev) => {
+      if (prev === index) return index + 1;
+      if (prev === index + 1) return index;
+      return prev;
+    });
+  }, []);
+  const handleToggleExpand = (0, import_react4.useCallback)((index) => {
+    setExpandedIndex((prev) => prev === index ? null : index);
+  }, []);
+  const handleParamOverrideChange = (0, import_react4.useCallback)(
+    (index, paramName, value) => {
+      setRefs(
+        (prev) => prev.map((ref, i) => {
+          if (i !== index) return ref;
+          const overrides = { ...ref.parameter_overrides };
+          if (value === void 0 || value === "" || value === null) {
+            delete overrides[paramName];
+          } else {
+            overrides[paramName] = value;
+          }
+          return { ...ref, parameter_overrides: overrides };
+        })
+      );
+    },
+    []
+  );
+  const handleSave = (0, import_react4.useCallback)(() => {
+    const cleanRefs = refs.map(({ _skill, ...rest }) => {
+      const clean = { skill_id: rest.skill_id };
+      if (rest.parameter_overrides && Object.keys(rest.parameter_overrides).length > 0) {
+        clean.parameter_overrides = rest.parameter_overrides;
+      }
+      return clean;
+    });
+    onSave(cleanRefs);
+  }, [refs, onSave]);
+  return /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: "flex flex-col h-full max-h-[500px]", children: [
+    /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: "px-4 py-3 border-b border-zinc-800", children: [
+      /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("h3", { className: "text-sm font-medium text-zinc-200", children: "Composition Skill Builder" }),
+      /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("p", { className: "text-xs text-zinc-500 mt-0.5", children: "Add skills to compose into a single skill" })
+    ] }),
+    /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("div", { className: "flex-1 overflow-y-auto px-4 py-2 space-y-2", children: refs.length === 0 ? /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("p", { className: "text-sm text-zinc-500 py-8 text-center", children: 'No skills added yet. Click "Add Skill" below.' }) : refs.map((ref, index) => /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(
+      SkillRefItem,
+      {
+        ref_: ref,
+        index,
+        total: refs.length,
+        isExpanded: expandedIndex === index,
+        onToggleExpand: () => handleToggleExpand(index),
+        onMoveUp: () => handleMoveUp(index),
+        onMoveDown: () => handleMoveDown(index),
+        onRemove: () => handleRemoveRef(index),
+        onParamChange: (name, value) => handleParamOverrideChange(index, name, value),
+        resolveIcon
+      },
+      `${ref.skill_id}-${index}`
+    )) }),
+    /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("div", { className: "px-4 py-2 border-t border-zinc-800", children: showPicker ? /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(
+      MiniSkillPicker,
+      {
+        existingRefIds: refs.map((r) => r.skill_id),
+        onSelect: handleAddRef,
+        onCancel: () => setShowPicker(false),
+        resolveIcon
+      }
+    ) : /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(
+      "button",
+      {
+        onClick: () => setShowPicker(true),
+        className: "w-full px-3 py-2 text-sm text-zinc-400 hover:text-zinc-200 border border-dashed border-zinc-700 rounded hover:border-zinc-500 transition-colors",
+        children: "+ Add Skill"
+      }
+    ) }),
+    /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: "px-4 py-3 border-t border-zinc-800 flex justify-end gap-2", children: [
+      /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(
+        "button",
+        {
+          onClick: onCancel,
+          className: "px-3 py-1.5 text-sm text-zinc-400 hover:text-zinc-200 transition-colors rounded",
+          children: "Cancel"
+        }
+      ),
+      /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)(
+        "button",
+        {
+          onClick: handleSave,
+          disabled: refs.length === 0,
+          className: "px-3 py-1.5 text-sm bg-blue-600 hover:bg-blue-500 text-white rounded disabled:opacity-50 disabled:cursor-not-allowed transition-colors",
+          children: [
+            "Save Composition (",
+            refs.length,
+            " skill",
+            refs.length !== 1 ? "s" : "",
+            ")"
+          ]
+        }
+      )
+    ] })
+  ] });
+}
+function SkillRefItem({
+  ref_,
+  index,
+  total,
+  isExpanded,
+  onToggleExpand,
+  onMoveUp,
+  onMoveDown,
+  onRemove,
+  onParamChange,
+  resolveIcon
+}) {
+  const skill = ref_._skill;
+  const hasParams = skill != null && skill.parameters.length > 0;
+  const overrideCount = ref_.parameter_overrides ? Object.keys(ref_.parameter_overrides).length : 0;
+  const iconData = skill ? (0, import_workflow_utils4.getSkillCategoryIconData)(skill.category) : null;
+  const Icon = skill ? resolveIcon(skill.icon) : null;
+  return /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: "border border-zinc-700 rounded-md overflow-hidden", children: [
+    /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: "flex items-center gap-2 px-3 py-2 bg-zinc-800/50", children: [
+      /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("span", { className: "text-xs text-zinc-500 font-mono w-5 text-center shrink-0", children: index + 1 }),
+      Icon && iconData && /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("div", { className: `shrink-0 p-1 rounded ${iconData.bgClass}`, children: /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(Icon, { className: `w-3.5 h-3.5 ${iconData.textClass}` }) }),
+      /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: "flex-1 min-w-0", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("span", { className: "text-sm text-zinc-200 truncate block", children: skill?.name ?? ref_.skill_id }),
+        !skill && /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("span", { className: "text-xs text-red-400", children: "Unknown skill" })
+      ] }),
+      overrideCount > 0 && /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("span", { className: "shrink-0 px-1.5 py-0.5 text-[10px] bg-blue-900/30 text-blue-400 rounded-full", children: [
+        overrideCount,
+        " override",
+        overrideCount !== 1 ? "s" : ""
+      ] }),
+      hasParams && /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(
+        "button",
+        {
+          onClick: onToggleExpand,
+          className: "shrink-0 p-1 rounded hover:bg-zinc-700 text-zinc-400 hover:text-zinc-200 transition-colors",
+          title: isExpanded ? "Collapse parameters" : "Configure parameter overrides",
+          children: /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(
+            ChevronRightIcon,
+            {
+              className: `w-3.5 h-3.5 transition-transform ${isExpanded ? "rotate-90" : ""}`
+            }
+          )
+        }
+      ),
+      /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: "shrink-0 flex flex-col", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(
+          "button",
+          {
+            onClick: onMoveUp,
+            disabled: index === 0,
+            className: "p-0.5 text-zinc-500 hover:text-zinc-300 disabled:text-zinc-700 disabled:cursor-not-allowed transition-colors",
+            title: "Move up",
+            children: /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(ChevronUpIcon, { className: "w-3 h-3" })
+          }
+        ),
+        /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(
+          "button",
+          {
+            onClick: onMoveDown,
+            disabled: index === total - 1,
+            className: "p-0.5 text-zinc-500 hover:text-zinc-300 disabled:text-zinc-700 disabled:cursor-not-allowed transition-colors",
+            title: "Move down",
+            children: /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(ChevronDownIcon, { className: "w-3 h-3" })
+          }
+        )
+      ] }),
+      /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(
+        "button",
+        {
+          onClick: onRemove,
+          className: "shrink-0 p-1 rounded hover:bg-red-900/30 text-zinc-500 hover:text-red-400 transition-colors",
+          title: "Remove skill",
+          children: /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(XMarkIcon, { className: "w-3.5 h-3.5" })
+        }
+      )
+    ] }),
+    isExpanded && skill && /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: "px-3 py-2 border-t border-zinc-700/50 bg-zinc-900/30", children: [
+      /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("p", { className: "text-xs text-zinc-500 mb-2", children: "Parameter overrides (leave empty to use defaults)" }),
+      /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(
+        SkillParamForm,
+        {
+          parameters: skill.parameters.map((p) => ({
+            ...p,
+            // Mark all as optional in override context
+            required: false
+          })),
+          values: ref_.parameter_overrides ?? {},
+          onChange: onParamChange
+        }
+      )
+    ] })
+  ] });
+}
+function MiniSkillPicker({
+  existingRefIds,
+  onSelect,
+  onCancel,
+  resolveIcon
+}) {
+  const [search, setSearch] = (0, import_react4.useState)("");
+  const availableSkills = (0, import_react4.useMemo)(() => {
+    const all = (0, import_workflow_utils4.getAllSkills)();
+    let filtered = all.filter((s) => s.template.kind !== "composition");
+    const trimmed = search.trim().toLowerCase();
+    if (trimmed) {
+      const words = trimmed.split(/\s+/);
+      filtered = filtered.filter((skill) => {
+        const haystack = [
+          skill.name.toLowerCase(),
+          skill.description.toLowerCase(),
+          skill.slug.toLowerCase(),
+          ...skill.tags.map((t) => t.toLowerCase())
+        ].join(" ");
+        return words.every((word) => haystack.includes(word));
+      });
+    }
+    return filtered;
+  }, [search]);
+  return /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: "border border-zinc-700 rounded-md overflow-hidden", children: [
+    /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: "relative px-2 py-2", children: [
+      /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(SearchIcon2, { className: "absolute left-4 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-zinc-500" }),
+      /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(
+        "input",
+        {
+          type: "text",
+          value: search,
+          onChange: (e) => setSearch(e.target.value),
+          placeholder: "Search skills...",
+          className: "w-full bg-zinc-800 border border-zinc-700 rounded pl-7 pr-3 py-1.5 text-sm text-zinc-200 placeholder:text-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500",
+          autoFocus: true
+        }
+      )
+    ] }),
+    /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("div", { className: "max-h-[200px] overflow-y-auto", children: availableSkills.length === 0 ? /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("p", { className: "text-xs text-zinc-500 py-4 text-center", children: "No matching skills found." }) : availableSkills.map((skill) => {
+      const iconData = (0, import_workflow_utils4.getSkillCategoryIconData)(skill.category);
+      const Icon = resolveIcon(skill.icon);
+      const alreadyAdded = existingRefIds.includes(skill.id);
+      return /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)(
+        "button",
+        {
+          onClick: () => onSelect(skill),
+          className: "w-full flex items-center gap-2 px-3 py-1.5 hover:bg-zinc-800/80 transition-colors text-left",
+          children: [
+            /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("div", { className: `shrink-0 p-1 rounded ${iconData.bgClass}`, children: /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(Icon, { className: `w-3.5 h-3.5 ${iconData.textClass}` }) }),
+            /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: "flex-1 min-w-0", children: [
+              /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("span", { className: "text-sm text-zinc-200 truncate block", children: skill.name }),
+              /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("span", { className: "text-xs text-zinc-500 truncate block", children: skill.description })
+            ] }),
+            alreadyAdded && /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("span", { className: "shrink-0 text-[10px] text-zinc-600", children: "added" })
+          ]
+        },
+        skill.id
+      );
+    }) }),
+    /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("div", { className: "px-2 py-1.5 border-t border-zinc-700/50 flex justify-end", children: /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(
+      "button",
+      {
+        onClick: onCancel,
+        className: "px-2 py-1 text-xs text-zinc-400 hover:text-zinc-200 transition-colors",
+        children: "Cancel"
+      }
+    ) })
+  ] });
+}
+
+// src/components/chat/ChatHeader.tsx
+var import_react5 = require("react");
+var import_jsx_runtime8 = require("react/jsx-runtime");
 function StateBadge({ state }) {
   const config = {
     ready: {
@@ -387,7 +1210,7 @@ function StateBadge({ state }) {
   };
   const c = config[state];
   if (!c) return null;
-  return /* @__PURE__ */ (0, import_jsx_runtime4.jsx)(
+  return /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(
     "span",
     {
       className: `inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-medium ${c.classes}`,
@@ -402,26 +1225,26 @@ function ChatHeader({
   onClose,
   isRunnerConnected
 }) {
-  const [isEditing, setIsEditing] = (0, import_react3.useState)(false);
-  const [editValue, setEditValue] = (0, import_react3.useState)(sessionName);
-  const inputRef = (0, import_react3.useRef)(null);
-  (0, import_react3.useEffect)(() => {
+  const [isEditing, setIsEditing] = (0, import_react5.useState)(false);
+  const [editValue, setEditValue] = (0, import_react5.useState)(sessionName);
+  const inputRef = (0, import_react5.useRef)(null);
+  (0, import_react5.useEffect)(() => {
     setEditValue(sessionName);
   }, [sessionName]);
-  (0, import_react3.useEffect)(() => {
+  (0, import_react5.useEffect)(() => {
     if (isEditing && inputRef.current) {
       inputRef.current.focus();
       inputRef.current.select();
     }
   }, [isEditing]);
-  const handleSave = (0, import_react3.useCallback)(() => {
+  const handleSave = (0, import_react5.useCallback)(() => {
     const trimmed = editValue.trim();
     if (trimmed && trimmed !== sessionName) {
       onRename(trimmed);
     }
     setIsEditing(false);
   }, [editValue, sessionName, onRename]);
-  const handleKeyDown = (0, import_react3.useCallback)(
+  const handleKeyDown = (0, import_react5.useCallback)(
     (e) => {
       if (e.key === "Enter") {
         handleSave();
@@ -432,9 +1255,9 @@ function ChatHeader({
     },
     [handleSave, sessionName]
   );
-  return /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)("div", { className: "flex items-center justify-between px-4 py-3 border-b border-border-subtle/50 bg-surface-canvas/80 backdrop-blur-sm", children: [
-    /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)("div", { className: "flex items-center gap-3", children: [
-      /* @__PURE__ */ (0, import_jsx_runtime4.jsx)(
+  return /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)("div", { className: "flex items-center justify-between px-4 py-3 border-b border-border-subtle/50 bg-surface-canvas/80 backdrop-blur-sm", children: [
+    /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)("div", { className: "flex items-center gap-3", children: [
+      /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(
         "svg",
         {
           className: "size-5 text-purple-400",
@@ -444,11 +1267,11 @@ function ChatHeader({
           strokeWidth: "2",
           strokeLinecap: "round",
           strokeLinejoin: "round",
-          children: /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("path", { d: "M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" })
+          children: /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("path", { d: "M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" })
         }
       ),
-      isEditing ? /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)("div", { className: "flex items-center gap-1.5", children: [
-        /* @__PURE__ */ (0, import_jsx_runtime4.jsx)(
+      isEditing ? /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)("div", { className: "flex items-center gap-1.5", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(
           "input",
           {
             ref: inputRef,
@@ -460,12 +1283,12 @@ function ChatHeader({
             maxLength: 60
           }
         ),
-        /* @__PURE__ */ (0, import_jsx_runtime4.jsx)(
+        /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(
           "button",
           {
             onClick: handleSave,
             className: "text-green-400 hover:text-green-300",
-            children: /* @__PURE__ */ (0, import_jsx_runtime4.jsx)(
+            children: /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(
               "svg",
               {
                 className: "size-3.5",
@@ -473,19 +1296,19 @@ function ChatHeader({
                 fill: "none",
                 stroke: "currentColor",
                 strokeWidth: "2",
-                children: /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("polyline", { points: "20 6 9 17 4 12" })
+                children: /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("polyline", { points: "20 6 9 17 4 12" })
               }
             )
           }
         )
-      ] }) : /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)(
+      ] }) : /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)(
         "button",
         {
           onClick: () => setIsEditing(true),
           className: "flex items-center gap-1.5 text-sm font-medium text-text-primary hover:text-text-secondary group",
           children: [
             sessionName,
-            /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)(
+            /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)(
               "svg",
               {
                 className: "size-3 opacity-0 group-hover:opacity-60",
@@ -494,23 +1317,23 @@ function ChatHeader({
                 stroke: "currentColor",
                 strokeWidth: "2",
                 children: [
-                  /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("path", { d: "M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" }),
-                  /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("path", { d: "m15 5 4 4" })
+                  /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("path", { d: "M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" }),
+                  /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("path", { d: "m15 5 4 4" })
                 ]
               }
             )
           ]
         }
       ),
-      /* @__PURE__ */ (0, import_jsx_runtime4.jsx)(StateBadge, { state: sessionState }),
-      isRunnerConnected !== void 0 && /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)("span", { className: "flex items-center gap-1 text-[10px]", children: [
-        /* @__PURE__ */ (0, import_jsx_runtime4.jsx)(
+      /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(StateBadge, { state: sessionState }),
+      isRunnerConnected !== void 0 && /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)("span", { className: "flex items-center gap-1 text-[10px]", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(
           "span",
           {
             className: `inline-block size-1.5 rounded-full ${isRunnerConnected ? "bg-green-400" : "bg-red-400"}`
           }
         ),
-        /* @__PURE__ */ (0, import_jsx_runtime4.jsx)(
+        /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(
           "span",
           {
             className: isRunnerConnected ? "text-green-400" : "text-red-400",
@@ -519,12 +1342,12 @@ function ChatHeader({
         )
       ] })
     ] }),
-    /* @__PURE__ */ (0, import_jsx_runtime4.jsx)(
+    /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(
       "button",
       {
         onClick: onClose,
         className: "h-7 w-7 flex items-center justify-center rounded text-text-muted hover:text-red-400 hover:bg-surface-hover",
-        children: /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)(
+        children: /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)(
           "svg",
           {
             className: "size-4",
@@ -533,8 +1356,8 @@ function ChatHeader({
             stroke: "currentColor",
             strokeWidth: "2",
             children: [
-              /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("path", { d: "M18 6 6 18" }),
-              /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("path", { d: "m6 6 12 12" })
+              /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("path", { d: "M18 6 6 18" }),
+              /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("path", { d: "m6 6 12 12" })
             ]
           }
         )
@@ -544,8 +1367,8 @@ function ChatHeader({
 }
 
 // src/components/chat/ChatInput.tsx
-var import_react4 = require("react");
-var import_jsx_runtime5 = require("react/jsx-runtime");
+var import_react6 = require("react");
+var import_jsx_runtime9 = require("react/jsx-runtime");
 function ChatInput({
   sessionState,
   onSendMessage,
@@ -555,20 +1378,20 @@ function ChatInput({
   messageCount,
   disabled
 }) {
-  const [message, setMessage] = (0, import_react4.useState)(() => {
+  const [message, setMessage] = (0, import_react6.useState)(() => {
     if (typeof window === "undefined") return "";
     return localStorage.getItem("chat-draft-message") ?? "";
   });
-  const [includeUIBridge, setIncludeUIBridge] = (0, import_react4.useState)(() => {
+  const [includeUIBridge, setIncludeUIBridge] = (0, import_react6.useState)(() => {
     if (typeof window === "undefined") return true;
     const saved = localStorage.getItem("chat-include-ui-bridge");
     return saved !== null ? saved === "true" : true;
   });
-  const textareaRef = (0, import_react4.useRef)(null);
+  const textareaRef = (0, import_react6.useRef)(null);
   const canSend = !disabled && message.trim().length > 0 && (sessionState === "ready" || sessionState === "processing");
   const canInterrupt = sessionState === "processing";
   const showGenerateWorkflow = messageCount >= 2;
-  const handleSend = (0, import_react4.useCallback)(() => {
+  const handleSend = (0, import_react6.useCallback)(() => {
     const trimmed = message.trim();
     if (!trimmed) return;
     onSendMessage(trimmed);
@@ -578,7 +1401,7 @@ function ChatInput({
       textareaRef.current.style.height = "auto";
     }
   }, [message, onSendMessage]);
-  const handleKeyDown = (0, import_react4.useCallback)(
+  const handleKeyDown = (0, import_react6.useCallback)(
     (e) => {
       if (e.key === "Enter" && !e.shiftKey) {
         e.preventDefault();
@@ -589,17 +1412,17 @@ function ChatInput({
     },
     [canSend, handleSend]
   );
-  (0, import_react4.useEffect)(() => {
+  (0, import_react6.useEffect)(() => {
     localStorage.setItem("chat-include-ui-bridge", String(includeUIBridge));
   }, [includeUIBridge]);
-  (0, import_react4.useEffect)(() => {
+  (0, import_react6.useEffect)(() => {
     if (message) {
       localStorage.setItem("chat-draft-message", message);
     } else {
       localStorage.removeItem("chat-draft-message");
     }
   }, [message]);
-  (0, import_react4.useEffect)(() => {
+  (0, import_react6.useEffect)(() => {
     const textarea = textareaRef.current;
     if (textarea) {
       textarea.style.height = "auto";
@@ -608,17 +1431,17 @@ function ChatInput({
   }, [message]);
   const stateLabel = sessionState === "ready" ? "Ready" : sessionState === "processing" ? "Processing..." : sessionState === "initializing" ? "Initializing..." : sessionState === "connecting" ? "Connecting..." : sessionState === "disconnected" ? "Disconnected" : sessionState === "closed" ? "Session Closed" : "";
   const stateColor = sessionState === "ready" ? "text-green-400" : sessionState === "processing" ? "text-amber-400" : "text-text-muted";
-  return /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("div", { className: "border-t border-border-subtle/50 p-4", children: [
-    /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("div", { className: "flex items-center justify-between mb-2", children: [
-      /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("span", { className: `text-xs ${stateColor}`, children: stateLabel }),
-      /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("div", { className: "flex items-center gap-2", children: showGenerateWorkflow && /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)(import_jsx_runtime5.Fragment, { children: [
-        /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)(
+  return /* @__PURE__ */ (0, import_jsx_runtime9.jsxs)("div", { className: "border-t border-border-subtle/50 p-4", children: [
+    /* @__PURE__ */ (0, import_jsx_runtime9.jsxs)("div", { className: "flex items-center justify-between mb-2", children: [
+      /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("span", { className: `text-xs ${stateColor}`, children: stateLabel }),
+      /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("div", { className: "flex items-center gap-2", children: showGenerateWorkflow && /* @__PURE__ */ (0, import_jsx_runtime9.jsxs)(import_jsx_runtime9.Fragment, { children: [
+        /* @__PURE__ */ (0, import_jsx_runtime9.jsxs)(
           "label",
           {
             className: "flex items-center gap-1.5 text-xs text-text-muted cursor-pointer select-none",
             title: "Include UI Bridge SDK integration instructions in the generated workflow",
             children: [
-              /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(
+              /* @__PURE__ */ (0, import_jsx_runtime9.jsx)(
                 "input",
                 {
                   type: "checkbox",
@@ -632,14 +1455,14 @@ function ChatInput({
             ]
           }
         ),
-        /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)(
+        /* @__PURE__ */ (0, import_jsx_runtime9.jsxs)(
           "button",
           {
             onClick: () => onGenerateWorkflow(includeUIBridge),
             disabled: isGeneratingWorkflow || disabled,
             className: "inline-flex items-center gap-1.5 text-xs h-7 px-2.5 rounded-md border border-purple-800/50 text-purple-300 hover:bg-purple-900/30 hover:text-purple-200 disabled:opacity-50 disabled:cursor-not-allowed",
             children: [
-              isGeneratingWorkflow ? /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(
+              isGeneratingWorkflow ? /* @__PURE__ */ (0, import_jsx_runtime9.jsx)(
                 "svg",
                 {
                   className: "size-3 animate-spin",
@@ -647,9 +1470,9 @@ function ChatInput({
                   fill: "none",
                   stroke: "currentColor",
                   strokeWidth: "2",
-                  children: /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("path", { d: "M21 12a9 9 0 1 1-6.219-8.56" })
+                  children: /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("path", { d: "M21 12a9 9 0 1 1-6.219-8.56" })
                 }
-              ) : /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(
+              ) : /* @__PURE__ */ (0, import_jsx_runtime9.jsx)(
                 "svg",
                 {
                   className: "size-3",
@@ -657,7 +1480,7 @@ function ChatInput({
                   fill: "none",
                   stroke: "currentColor",
                   strokeWidth: "2",
-                  children: /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("path", { d: "m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z" })
+                  children: /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("path", { d: "m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z" })
                 }
               ),
               isGeneratingWorkflow ? "Generating..." : "Generate Workflow"
@@ -666,8 +1489,8 @@ function ChatInput({
         )
       ] }) })
     ] }),
-    /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("div", { className: "flex items-end gap-2", children: [
-      /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(
+    /* @__PURE__ */ (0, import_jsx_runtime9.jsxs)("div", { className: "flex items-end gap-2", children: [
+      /* @__PURE__ */ (0, import_jsx_runtime9.jsx)(
         "textarea",
         {
           ref: textareaRef,
@@ -681,28 +1504,28 @@ function ChatInput({
           style: { minHeight: "42px", maxHeight: "240px" }
         }
       ),
-      canInterrupt ? /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(
+      canInterrupt ? /* @__PURE__ */ (0, import_jsx_runtime9.jsx)(
         "button",
         {
           onClick: onInterrupt,
           className: "h-[42px] px-3 rounded-md border border-amber-800/50 text-amber-400 hover:bg-amber-900/30 flex items-center justify-center",
-          children: /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(
+          children: /* @__PURE__ */ (0, import_jsx_runtime9.jsx)(
             "svg",
             {
               className: "size-4",
               viewBox: "0 0 24 24",
               fill: "currentColor",
-              children: /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("rect", { x: "3", y: "3", width: "18", height: "18", rx: "2" })
+              children: /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("rect", { x: "3", y: "3", width: "18", height: "18", rx: "2" })
             }
           )
         }
-      ) : /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(
+      ) : /* @__PURE__ */ (0, import_jsx_runtime9.jsx)(
         "button",
         {
           onClick: handleSend,
           disabled: !canSend,
           className: "h-[42px] px-3 rounded-md bg-brand-primary hover:bg-brand-primary/90 text-white disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center",
-          children: /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)(
+          children: /* @__PURE__ */ (0, import_jsx_runtime9.jsxs)(
             "svg",
             {
               className: "size-4",
@@ -713,8 +1536,8 @@ function ChatInput({
               strokeLinecap: "round",
               strokeLinejoin: "round",
               children: [
-                /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("path", { d: "m22 2-7 20-4-9-9-4Z" }),
-                /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("path", { d: "M22 2 11 13" })
+                /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("path", { d: "m22 2-7 20-4-9-9-4Z" }),
+                /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("path", { d: "M22 2 11 13" })
               ]
             }
           )
@@ -725,8 +1548,8 @@ function ChatInput({
 }
 
 // src/components/chat/ChatMessageArea.tsx
-var import_react5 = require("react");
-var import_jsx_runtime6 = require("react/jsx-runtime");
+var import_react7 = require("react");
+var import_jsx_runtime10 = require("react/jsx-runtime");
 function ChatMessageArea({
   messages,
   streamingContent,
@@ -735,10 +1558,10 @@ function ChatMessageArea({
   onCreateWorkflowFromMessage,
   toolActivity
 }) {
-  const scrollRef = (0, import_react5.useRef)(null);
-  const [autoScroll, setAutoScroll] = (0, import_react5.useState)(true);
-  const prevLenRef = (0, import_react5.useRef)(0);
-  (0, import_react5.useEffect)(() => {
+  const scrollRef = (0, import_react7.useRef)(null);
+  const [autoScroll, setAutoScroll] = (0, import_react7.useState)(true);
+  const prevLenRef = (0, import_react7.useRef)(0);
+  (0, import_react7.useEffect)(() => {
     const totalLen = messages.length + streamingContent.length;
     if (autoScroll && totalLen !== prevLenRef.current) {
       prevLenRef.current = totalLen;
@@ -750,30 +1573,30 @@ function ChatMessageArea({
       });
     }
   }, [messages, streamingContent, autoScroll]);
-  const handleScroll = (0, import_react5.useCallback)(() => {
+  const handleScroll = (0, import_react7.useCallback)(() => {
     const el = scrollRef.current;
     if (!el) return;
     const nearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
     setAutoScroll(nearBottom);
   }, []);
-  const scrollToBottom = (0, import_react5.useCallback)(() => {
+  const scrollToBottom = (0, import_react7.useCallback)(() => {
     setAutoScroll(true);
     const el = scrollRef.current;
     if (el) el.scrollTop = el.scrollHeight;
   }, []);
   const renderContent = (content) => {
     if (renderMarkdown) return renderMarkdown(content);
-    return /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("p", { className: "text-sm text-text-primary whitespace-pre-wrap break-words", children: content });
+    return /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("p", { className: "text-sm text-text-primary whitespace-pre-wrap break-words", children: content });
   };
-  return /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)(
+  return /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)(
     "div",
     {
       ref: scrollRef,
       onScroll: handleScroll,
       className: "flex-1 min-h-0 overflow-y-auto space-y-4 pr-2 py-4",
       children: [
-        messages.length === 0 && !streamingContent && /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "flex flex-col items-center justify-center h-full text-text-muted", children: [
-          /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)(
+        messages.length === 0 && !streamingContent && /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("div", { className: "flex flex-col items-center justify-center h-full text-text-muted", children: [
+          /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)(
             "svg",
             {
               className: "size-12 mb-3 opacity-30",
@@ -782,19 +1605,19 @@ function ChatMessageArea({
               stroke: "currentColor",
               strokeWidth: "1.5",
               children: [
-                /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("path", { d: "M12 8V4H8" }),
-                /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("rect", { width: "16", height: "12", x: "4", y: "8", rx: "2" }),
-                /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("path", { d: "M2 14h2" }),
-                /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("path", { d: "M20 14h2" }),
-                /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("path", { d: "M15 13v2" }),
-                /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("path", { d: "M9 13v2" })
+                /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("path", { d: "M12 8V4H8" }),
+                /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("rect", { width: "16", height: "12", x: "4", y: "8", rx: "2" }),
+                /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("path", { d: "M2 14h2" }),
+                /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("path", { d: "M20 14h2" }),
+                /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("path", { d: "M15 13v2" }),
+                /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("path", { d: "M9 13v2" })
               ]
             }
           ),
-          /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("p", { className: "text-sm", children: "Start a conversation with AI" }),
-          /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("p", { className: "text-xs mt-1 opacity-60", children: "Discuss features, plan workflows, then generate them" })
+          /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("p", { className: "text-sm", children: "Start a conversation with AI" }),
+          /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("p", { className: "text-xs mt-1 opacity-60", children: "Discuss features, plan workflows, then generate them" })
         ] }),
-        messages.map((msg, i) => /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(
+        messages.map((msg, i) => /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(
           MessageBubble,
           {
             message: msg,
@@ -804,67 +1627,67 @@ function ChatMessageArea({
           },
           i
         )),
-        isStreaming && streamingContent && /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "flex gap-3 items-start", children: [
-          /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { className: "shrink-0 w-7 h-7 rounded-full bg-purple-900/50 flex items-center justify-center", children: /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(AiBotIcon, {}) }),
-          /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { className: "max-w-[85%]", children: /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)(
+        isStreaming && streamingContent && /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("div", { className: "flex gap-3 items-start", children: [
+          /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("div", { className: "shrink-0 w-7 h-7 rounded-full bg-purple-900/50 flex items-center justify-center", children: /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(AiBotIcon, {}) }),
+          /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("div", { className: "max-w-[85%]", children: /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)(
             "div",
             {
               className: "rounded-lg px-4 py-3 border border-border-subtle/30",
               style: { background: "color-mix(in srgb, var(--qontinui-surface-raised, #1e1e22) 30%, var(--qontinui-surface-canvas, #111115))" },
               children: [
-                /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { className: "max-w-none text-sm", children: renderContent(streamingContent) }),
-                /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("span", { className: "inline-block w-2 h-4 bg-purple-400 animate-pulse ml-0.5" })
+                /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("div", { className: "max-w-none text-sm", children: renderContent(streamingContent) }),
+                /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("span", { className: "inline-block w-2 h-4 bg-purple-400 animate-pulse ml-0.5" })
               ]
             }
           ) })
         ] }),
-        isStreaming && !streamingContent && /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "flex gap-3 items-start", children: [
-          /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { className: "shrink-0 w-7 h-7 rounded-full bg-purple-900/50 flex items-center justify-center", children: /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(AiBotIcon, {}) }),
-          /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(
+        isStreaming && !streamingContent && /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("div", { className: "flex gap-3 items-start", children: [
+          /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("div", { className: "shrink-0 w-7 h-7 rounded-full bg-purple-900/50 flex items-center justify-center", children: /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(AiBotIcon, {}) }),
+          /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(
             "div",
             {
               className: "rounded-lg px-4 py-3 border border-border-subtle/30",
               style: { background: "color-mix(in srgb, var(--qontinui-surface-raised, #1e1e22) 30%, var(--qontinui-surface-canvas, #111115))" },
-              children: toolActivity ? /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "flex items-center gap-2", children: [
-                /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("svg", { className: "size-3.5 text-purple-400 animate-spin", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", children: [
-                  /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("path", { d: "M12 2v4" }),
-                  /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("path", { d: "M12 18v4" }),
-                  /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("path", { d: "m4.93 4.93 2.83 2.83" }),
-                  /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("path", { d: "m16.24 16.24 2.83 2.83" }),
-                  /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("path", { d: "M2 12h4" }),
-                  /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("path", { d: "M18 12h4" }),
-                  /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("path", { d: "m4.93 19.07 2.83-2.83" }),
-                  /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("path", { d: "m16.24 7.76 2.83-2.83" })
+              children: toolActivity ? /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("div", { className: "flex items-center gap-2", children: [
+                /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("svg", { className: "size-3.5 text-purple-400 animate-spin", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", children: [
+                  /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("path", { d: "M12 2v4" }),
+                  /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("path", { d: "M12 18v4" }),
+                  /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("path", { d: "m4.93 4.93 2.83 2.83" }),
+                  /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("path", { d: "m16.24 16.24 2.83 2.83" }),
+                  /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("path", { d: "M2 12h4" }),
+                  /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("path", { d: "M18 12h4" }),
+                  /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("path", { d: "m4.93 19.07 2.83-2.83" }),
+                  /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("path", { d: "m16.24 7.76 2.83-2.83" })
                 ] }),
-                /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("span", { className: "text-xs text-purple-300/80", children: toolActivity })
-              ] }) : /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "flex items-center gap-1.5", children: [
-                /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("span", { className: "w-1.5 h-1.5 rounded-full bg-purple-400 animate-bounce [animation-delay:0ms]" }),
-                /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("span", { className: "w-1.5 h-1.5 rounded-full bg-purple-400 animate-bounce [animation-delay:150ms]" }),
-                /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("span", { className: "w-1.5 h-1.5 rounded-full bg-purple-400 animate-bounce [animation-delay:300ms]" })
+                /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("span", { className: "text-xs text-purple-300/80", children: toolActivity })
+              ] }) : /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("div", { className: "flex items-center gap-1.5", children: [
+                /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("span", { className: "w-1.5 h-1.5 rounded-full bg-purple-400 animate-bounce [animation-delay:0ms]" }),
+                /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("span", { className: "w-1.5 h-1.5 rounded-full bg-purple-400 animate-bounce [animation-delay:150ms]" }),
+                /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("span", { className: "w-1.5 h-1.5 rounded-full bg-purple-400 animate-bounce [animation-delay:300ms]" })
               ] })
             }
           )
         ] }),
-        isStreaming && streamingContent && toolActivity && /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { className: "flex gap-3 items-center ml-10", children: /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "flex items-center gap-2 px-3 py-1.5 rounded-md bg-surface-raised/20", children: [
-          /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("svg", { className: "size-3 text-purple-400/60 animate-spin", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", children: [
-            /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("path", { d: "M12 2v4" }),
-            /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("path", { d: "M12 18v4" }),
-            /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("path", { d: "m4.93 4.93 2.83 2.83" }),
-            /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("path", { d: "m16.24 16.24 2.83 2.83" }),
-            /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("path", { d: "M2 12h4" }),
-            /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("path", { d: "M18 12h4" }),
-            /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("path", { d: "m4.93 19.07 2.83-2.83" }),
-            /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("path", { d: "m16.24 7.76 2.83-2.83" })
+        isStreaming && streamingContent && toolActivity && /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("div", { className: "flex gap-3 items-center ml-10", children: /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("div", { className: "flex items-center gap-2 px-3 py-1.5 rounded-md bg-surface-raised/20", children: [
+          /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("svg", { className: "size-3 text-purple-400/60 animate-spin", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", children: [
+            /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("path", { d: "M12 2v4" }),
+            /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("path", { d: "M12 18v4" }),
+            /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("path", { d: "m4.93 4.93 2.83 2.83" }),
+            /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("path", { d: "m16.24 16.24 2.83 2.83" }),
+            /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("path", { d: "M2 12h4" }),
+            /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("path", { d: "M18 12h4" }),
+            /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("path", { d: "m4.93 19.07 2.83-2.83" }),
+            /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("path", { d: "m16.24 7.76 2.83-2.83" })
           ] }),
-          /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("span", { className: "text-xs text-text-muted", children: toolActivity })
+          /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("span", { className: "text-xs text-text-muted", children: toolActivity })
         ] }) }),
-        !autoScroll && /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)(
+        !autoScroll && /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)(
           "button",
           {
             onClick: scrollToBottom,
             className: "sticky bottom-2 left-1/2 -translate-x-1/2 px-3 py-1.5 rounded-full bg-surface-raised border border-border-subtle/50 text-text-secondary text-xs hover:bg-surface-hover flex items-center gap-1.5 shadow-lg",
             children: [
-              /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)(
+              /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)(
                 "svg",
                 {
                   className: "size-3",
@@ -873,8 +1696,8 @@ function ChatMessageArea({
                   stroke: "currentColor",
                   strokeWidth: "2",
                   children: [
-                    /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("path", { d: "M12 5v14" }),
-                    /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("path", { d: "m19 12-7 7-7-7" })
+                    /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("path", { d: "M12 5v14" }),
+                    /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("path", { d: "m19 12-7 7-7-7" })
                   ]
                 }
               ),
@@ -887,7 +1710,7 @@ function ChatMessageArea({
   );
 }
 function AiBotIcon() {
-  return /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)(
+  return /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)(
     "svg",
     {
       className: "size-4 text-purple-400",
@@ -896,18 +1719,18 @@ function AiBotIcon() {
       stroke: "currentColor",
       strokeWidth: "2",
       children: [
-        /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("path", { d: "M12 8V4H8" }),
-        /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("rect", { width: "16", height: "12", x: "4", y: "8", rx: "2" }),
-        /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("path", { d: "M2 14h2" }),
-        /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("path", { d: "M20 14h2" }),
-        /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("path", { d: "M15 13v2" }),
-        /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("path", { d: "M9 13v2" })
+        /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("path", { d: "M12 8V4H8" }),
+        /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("rect", { width: "16", height: "12", x: "4", y: "8", rx: "2" }),
+        /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("path", { d: "M2 14h2" }),
+        /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("path", { d: "M20 14h2" }),
+        /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("path", { d: "M15 13v2" }),
+        /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("path", { d: "M9 13v2" })
       ]
     }
   );
 }
 function UserIcon() {
-  return /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)(
+  return /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)(
     "svg",
     {
       className: "size-4 text-brand-primary",
@@ -916,8 +1739,8 @@ function UserIcon() {
       stroke: "currentColor",
       strokeWidth: "2",
       children: [
-        /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("path", { d: "M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" }),
-        /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("circle", { cx: "12", cy: "7", r: "4" })
+        /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("path", { d: "M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" }),
+        /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("circle", { cx: "12", cy: "7", r: "4" })
       ]
     }
   );
@@ -930,8 +1753,8 @@ function MessageBubble({
 }) {
   const formattedTime = message.timestamp ? new Date(message.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : void 0;
   if (message.role === "system") {
-    return /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { className: "flex justify-center py-1", children: /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-surface-raised/40 border border-border-subtle/20", children: [
-      /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)(
+    return /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("div", { className: "flex justify-center py-1", children: /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("div", { className: "inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-surface-raised/40 border border-border-subtle/20", children: [
+      /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)(
         "svg",
         {
           className: "size-3.5 text-text-muted/70 shrink-0",
@@ -940,51 +1763,51 @@ function MessageBubble({
           stroke: "currentColor",
           strokeWidth: "2",
           children: [
-            /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("circle", { cx: "12", cy: "12", r: "10" }),
-            /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("path", { d: "M12 16v-4" }),
-            /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("path", { d: "M12 8h.01" })
+            /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("circle", { cx: "12", cy: "12", r: "10" }),
+            /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("path", { d: "M12 16v-4" }),
+            /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("path", { d: "M12 8h.01" })
           ]
         }
       ),
-      /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("span", { className: "text-xs text-text-muted/80", children: message.content })
+      /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("span", { className: "text-xs text-text-muted/80", children: message.content })
     ] }) });
   }
   if (message.role === "user") {
-    return /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "flex gap-3 items-start justify-end", children: [
-      /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "max-w-[85%]", children: [
-        /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(
+    return /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("div", { className: "flex gap-3 items-start justify-end", children: [
+      /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("div", { className: "max-w-[85%]", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(
           "div",
           {
             className: "rounded-lg px-4 py-3 border border-brand-primary/30",
             style: { background: "color-mix(in srgb, var(--qontinui-brand-primary, #4a90d9) 10%, var(--qontinui-surface-canvas, #111115))" },
-            children: /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { className: "text-sm text-text-primary", children: renderContent(message.content) })
+            children: /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("div", { className: "text-sm text-text-primary", children: renderContent(message.content) })
           }
         ),
-        formattedTime && /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { className: "text-[10px] text-text-muted/60 mt-1 text-right", children: formattedTime })
+        formattedTime && /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("div", { className: "text-[10px] text-text-muted/60 mt-1 text-right", children: formattedTime })
       ] }),
-      /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { className: "shrink-0 w-7 h-7 rounded-full bg-brand-primary/20 flex items-center justify-center", children: /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(UserIcon, {}) })
+      /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("div", { className: "shrink-0 w-7 h-7 rounded-full bg-brand-primary/20 flex items-center justify-center", children: /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(UserIcon, {}) })
     ] });
   }
-  return /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "group/msg flex gap-3 items-start", children: [
-    /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { className: "shrink-0 w-7 h-7 rounded-full bg-purple-900/50 flex items-center justify-center", children: /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(AiBotIcon, {}) }),
-    /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "max-w-[85%]", children: [
-      /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(
+  return /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("div", { className: "group/msg flex gap-3 items-start", children: [
+    /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("div", { className: "shrink-0 w-7 h-7 rounded-full bg-purple-900/50 flex items-center justify-center", children: /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(AiBotIcon, {}) }),
+    /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("div", { className: "max-w-[85%]", children: [
+      /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(
         "div",
         {
           className: "rounded-lg px-4 py-3 border border-border-subtle/30",
           style: { background: "color-mix(in srgb, var(--qontinui-surface-raised, #1e1e22) 30%, var(--qontinui-surface-canvas, #111115))" },
-          children: /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { className: "max-w-none text-sm", children: renderContent(message.content) })
+          children: /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("div", { className: "max-w-none text-sm", children: renderContent(message.content) })
         }
       ),
-      /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "flex items-center gap-2 mt-1", children: [
-        formattedTime && /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("span", { className: "text-[10px] text-text-muted/60", children: formattedTime }),
-        onCreateWorkflow && /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)(
+      /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("div", { className: "flex items-center gap-2 mt-1", children: [
+        formattedTime && /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("span", { className: "text-[10px] text-text-muted/60", children: formattedTime }),
+        onCreateWorkflow && /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)(
           "button",
           {
             onClick: () => onCreateWorkflow(index, message.content),
             className: "flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs text-text-muted hover:text-purple-300 hover:bg-purple-900/20 transition-colors opacity-0 group-hover/msg:opacity-100",
             children: [
-              /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("svg", { className: "size-3.5", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", children: /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("path", { d: "M12 3l1.912 5.813a2 2 0 0 0 1.275 1.275L21 12l-5.813 1.912a2 2 0 0 0-1.275 1.275L12 21l-1.912-5.813a2 2 0 0 0-1.275-1.275L3 12l5.813-1.912a2 2 0 0 0 1.275-1.275L12 3z" }) }),
+              /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("svg", { className: "size-3.5", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", children: /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("path", { d: "M12 3l1.912 5.813a2 2 0 0 0 1.275 1.275L21 12l-5.813 1.912a2 2 0 0 0-1.275 1.275L12 21l-1.912-5.813a2 2 0 0 0-1.275-1.275L3 12l5.813-1.912a2 2 0 0 0 1.275-1.275L12 3z" }) }),
               "Create Workflow"
             ]
           }
@@ -995,8 +1818,8 @@ function MessageBubble({
 }
 
 // src/components/chat/WorkflowPreviewPanel.tsx
-var import_react6 = require("react");
-var import_jsx_runtime7 = require("react/jsx-runtime");
+var import_react8 = require("react");
+var import_jsx_runtime11 = require("react/jsx-runtime");
 var PHASE_COLORS2 = {
   setup: {
     bg: "bg-blue-950/30",
@@ -1033,15 +1856,15 @@ function WorkflowPreviewPanel({
   onSave,
   onClose
 }) {
-  return /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: "flex flex-col h-full border-l border-border-subtle/50 bg-surface-canvas/95", children: [
-    /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: "flex items-center justify-between px-4 py-3 border-b border-border-subtle/50", children: [
-      /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("h3", { className: "text-sm font-semibold text-text-primary", children: "Generated Workflow" }),
-      /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(
+  return /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { className: "flex flex-col h-full border-l border-border-subtle/50 bg-surface-canvas/95", children: [
+    /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { className: "flex items-center justify-between px-4 py-3 border-b border-border-subtle/50", children: [
+      /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("h3", { className: "text-sm font-semibold text-text-primary", children: "Generated Workflow" }),
+      /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(
         "button",
         {
           onClick: onClose,
           className: "h-6 w-6 flex items-center justify-center rounded text-text-muted hover:text-text-primary hover:bg-surface-hover",
-          children: /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)(
+          children: /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)(
             "svg",
             {
               className: "size-3.5",
@@ -1050,17 +1873,17 @@ function WorkflowPreviewPanel({
               stroke: "currentColor",
               strokeWidth: "2",
               children: [
-                /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("path", { d: "M18 6 6 18" }),
-                /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("path", { d: "m6 6 12 12" })
+                /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("path", { d: "M18 6 6 18" }),
+                /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("path", { d: "m6 6 12 12" })
               ]
             }
           )
         }
       )
     ] }),
-    /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: "flex-1 overflow-y-auto p-4", children: [
-      isLoading && /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: "flex flex-col items-center justify-center h-48 text-text-muted", children: [
-        /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(
+    /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { className: "flex-1 overflow-y-auto p-4", children: [
+      isLoading && /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { className: "flex flex-col items-center justify-center h-48 text-text-muted", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(
           "svg",
           {
             className: "size-8 animate-spin mb-3 text-purple-400",
@@ -1068,14 +1891,14 @@ function WorkflowPreviewPanel({
             fill: "none",
             stroke: "currentColor",
             strokeWidth: "2",
-            children: /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("path", { d: "M21 12a9 9 0 1 1-6.219-8.56" })
+            children: /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("path", { d: "M21 12a9 9 0 1 1-6.219-8.56" })
           }
         ),
-        /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("p", { className: "text-sm", children: "Generating workflow..." }),
-        /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("p", { className: "text-xs mt-1 opacity-60", children: "This may take a minute" })
+        /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("p", { className: "text-sm", children: "Generating workflow..." }),
+        /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("p", { className: "text-xs mt-1 opacity-60", children: "This may take a minute" })
       ] }),
-      error && !isLoading && /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: "flex flex-col items-center justify-center h-48 text-red-400", children: [
-        /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)(
+      error && !isLoading && /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { className: "flex flex-col items-center justify-center h-48 text-red-400", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)(
           "svg",
           {
             className: "size-8 mb-3",
@@ -1084,20 +1907,20 @@ function WorkflowPreviewPanel({
             stroke: "currentColor",
             strokeWidth: "2",
             children: [
-              /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("circle", { cx: "12", cy: "12", r: "10" }),
-              /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("path", { d: "m15 9-6 6" }),
-              /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("path", { d: "m9 9 6 6" })
+              /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("circle", { cx: "12", cy: "12", r: "10" }),
+              /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("path", { d: "m15 9-6 6" }),
+              /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("path", { d: "m9 9 6 6" })
             ]
           }
         ),
-        /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("p", { className: "text-sm font-medium", children: "Generation Failed" }),
-        /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("p", { className: "text-xs mt-1 opacity-60 text-center max-w-[250px]", children: error })
+        /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("p", { className: "text-sm font-medium", children: "Generation Failed" }),
+        /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("p", { className: "text-xs mt-1 opacity-60 text-center max-w-[250px]", children: error })
       ] }),
-      workflow && !isLoading && /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: "space-y-3", children: [
-        /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: "mb-4", children: [
-          /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("h4", { className: "text-sm font-medium text-text-primary", children: workflow.name }),
-          workflow.description && /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("p", { className: "text-xs text-text-muted mt-1", children: workflow.description }),
-          workflow.tags && workflow.tags.length > 0 && /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("div", { className: "flex gap-1 mt-2 flex-wrap", children: workflow.tags.map((tag) => /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(
+      workflow && !isLoading && /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { className: "space-y-3", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { className: "mb-4", children: [
+          /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("h4", { className: "text-sm font-medium text-text-primary", children: workflow.name }),
+          workflow.description && /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("p", { className: "text-xs text-text-muted mt-1", children: workflow.description }),
+          workflow.tags && workflow.tags.length > 0 && /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("div", { className: "flex gap-1 mt-2 flex-wrap", children: workflow.tags.map((tag) => /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(
             "span",
             {
               className: "inline-flex items-center rounded-full border border-border-subtle/50 px-1.5 py-0 text-[10px] text-text-muted",
@@ -1110,7 +1933,7 @@ function WorkflowPreviewPanel({
           (phase) => {
             const steps = getStepsForPhase(workflow, phase);
             if (steps.length === 0) return null;
-            return /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(
+            return /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(
               PreviewPhaseSection,
               {
                 phase,
@@ -1122,34 +1945,34 @@ function WorkflowPreviewPanel({
         )
       ] })
     ] }),
-    workflow && !isLoading && /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: "border-t border-border-subtle/50 p-4 space-y-2", children: [
-      /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: "flex gap-2", children: [
-        /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)(
+    workflow && !isLoading && /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { className: "border-t border-border-subtle/50 p-4 space-y-2", children: [
+      /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { className: "flex gap-2", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)(
           "button",
           {
             onClick: onExecute,
             className: "flex-1 h-8 rounded-md bg-green-700 hover:bg-green-600 text-white text-sm flex items-center justify-center gap-1.5",
             children: [
-              /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(
+              /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(
                 "svg",
                 {
                   className: "size-3.5",
                   viewBox: "0 0 24 24",
                   fill: "currentColor",
-                  children: /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("polygon", { points: "5 3 19 12 5 21 5 3" })
+                  children: /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("polygon", { points: "5 3 19 12 5 21 5 3" })
                 }
               ),
               "Execute"
             ]
           }
         ),
-        /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)(
+        /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)(
           "button",
           {
             onClick: onEditInBuilder,
             className: "flex-1 h-8 rounded-md border border-border-subtle/50 text-text-primary text-sm hover:bg-surface-hover flex items-center justify-center gap-1.5",
             children: [
-              /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)(
+              /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)(
                 "svg",
                 {
                   className: "size-3.5",
@@ -1158,8 +1981,8 @@ function WorkflowPreviewPanel({
                   stroke: "currentColor",
                   strokeWidth: "2",
                   children: [
-                    /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("path", { d: "M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" }),
-                    /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("path", { d: "m15 5 4 4" })
+                    /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("path", { d: "M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" }),
+                    /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("path", { d: "m15 5 4 4" })
                   ]
                 }
               ),
@@ -1168,14 +1991,14 @@ function WorkflowPreviewPanel({
           }
         )
       ] }),
-      /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: "flex gap-2", children: [
-        /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)(
+      /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { className: "flex gap-2", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)(
           "button",
           {
             onClick: onRegenerate,
             className: "flex-1 h-8 rounded-md border border-border-subtle/50 text-text-primary text-xs hover:bg-surface-hover flex items-center justify-center gap-1.5",
             children: [
-              /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)(
+              /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)(
                 "svg",
                 {
                   className: "size-3",
@@ -1184,10 +2007,10 @@ function WorkflowPreviewPanel({
                   stroke: "currentColor",
                   strokeWidth: "2",
                   children: [
-                    /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("path", { d: "M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" }),
-                    /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("path", { d: "M3 3v5h5" }),
-                    /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("path", { d: "M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16" }),
-                    /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("path", { d: "M16 16h5v5" })
+                    /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("path", { d: "M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" }),
+                    /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("path", { d: "M3 3v5h5" }),
+                    /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("path", { d: "M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16" }),
+                    /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("path", { d: "M16 16h5v5" })
                   ]
                 }
               ),
@@ -1195,13 +2018,13 @@ function WorkflowPreviewPanel({
             ]
           }
         ),
-        /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)(
+        /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)(
           "button",
           {
             onClick: onSave,
             className: "flex-1 h-8 rounded-md border border-border-subtle/50 text-text-primary text-xs hover:bg-surface-hover flex items-center justify-center gap-1.5",
             children: [
-              /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)(
+              /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)(
                 "svg",
                 {
                   className: "size-3",
@@ -1210,9 +2033,9 @@ function WorkflowPreviewPanel({
                   stroke: "currentColor",
                   strokeWidth: "2",
                   children: [
-                    /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("path", { d: "M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" }),
-                    /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("polyline", { points: "17 21 17 13 7 13 7 21" }),
-                    /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("polyline", { points: "7 3 7 8 15 8" })
+                    /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("path", { d: "M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" }),
+                    /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("polyline", { points: "17 21 17 13 7 13 7 21" }),
+                    /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("polyline", { points: "7 3 7 8 15 8" })
                   ]
                 }
               ),
@@ -1228,16 +2051,16 @@ function PreviewPhaseSection({
   phase,
   steps
 }) {
-  const [isExpanded, setIsExpanded] = (0, import_react6.useState)(true);
+  const [isExpanded, setIsExpanded] = (0, import_react8.useState)(true);
   const colors = PHASE_COLORS2[phase] ?? PHASE_COLORS2["setup"];
-  return /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: `rounded-lg border ${colors.border} ${colors.bg}`, children: [
-    /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(
+  return /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { className: `rounded-lg border ${colors.border} ${colors.bg}`, children: [
+    /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(
       "button",
       {
         onClick: () => setIsExpanded(!isExpanded),
         className: "flex items-center justify-between w-full px-3 py-2 cursor-pointer",
-        children: /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: "flex items-center gap-2", children: [
-          /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(
+        children: /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { className: "flex items-center gap-2", children: [
+          /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(
             "svg",
             {
               className: `w-3.5 h-3.5 transition-transform ${colors.text} ${isExpanded ? "rotate-90" : ""}`,
@@ -1245,17 +2068,17 @@ function PreviewPhaseSection({
               fill: "none",
               stroke: "currentColor",
               strokeWidth: "2",
-              children: /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("path", { d: "m9 18 6-6-6-6" })
+              children: /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("path", { d: "m9 18 6-6-6-6" })
             }
           ),
-          /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(
+          /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(
             "span",
             {
               className: `text-xs font-semibold uppercase tracking-wider ${colors.text}`,
               children: phase
             }
           ),
-          /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(
+          /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(
             "span",
             {
               className: `text-[10px] px-1.5 py-0.5 rounded ${colors.badge}`,
@@ -1265,14 +2088,14 @@ function PreviewPhaseSection({
         ] })
       }
     ),
-    isExpanded && /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("div", { className: "px-2 pb-2 space-y-1", children: steps.map((step, i) => /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)(
+    isExpanded && /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("div", { className: "px-2 pb-2 space-y-1", children: steps.map((step, i) => /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)(
       "div",
       {
         className: "flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-black/20",
         children: [
-          /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(StepTypeIcon, { type: step.type }),
-          /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("div", { className: "flex-1 min-w-0", children: /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("div", { className: "text-xs text-zinc-200 truncate", children: step.name }) }),
-          /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)(
+          /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(StepTypeIcon, { type: step.type }),
+          /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("div", { className: "flex-1 min-w-0", children: /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("div", { className: "text-xs text-zinc-200 truncate", children: step.name }) }),
+          /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)(
             "svg",
             {
               className: "w-3 h-3 text-zinc-600",
@@ -1281,8 +2104,8 @@ function PreviewPhaseSection({
               stroke: "currentColor",
               strokeWidth: "2",
               children: [
-                /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("path", { d: "M22 11.08V12a10 10 0 1 1-5.93-9.14" }),
-                /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("polyline", { points: "22 4 12 14.01 9 11.01" })
+                /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("path", { d: "M22 11.08V12a10 10 0 1 1-5.93-9.14" }),
+                /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("polyline", { points: "22 4 12 14.01 9 11.01" })
               ]
             }
           )
@@ -1294,7 +2117,7 @@ function PreviewPhaseSection({
 }
 function StepTypeIcon({ type }) {
   if (type === "command") {
-    return /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)(
+    return /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)(
       "svg",
       {
         className: "w-3.5 h-3.5 text-zinc-400 shrink-0",
@@ -1303,14 +2126,14 @@ function StepTypeIcon({ type }) {
         stroke: "currentColor",
         strokeWidth: "2",
         children: [
-          /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("polyline", { points: "4 17 10 11 4 5" }),
-          /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("line", { x1: "12", x2: "20", y1: "19", y2: "19" })
+          /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("polyline", { points: "4 17 10 11 4 5" }),
+          /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("line", { x1: "12", x2: "20", y1: "19", y2: "19" })
         ]
       }
     );
   }
   if (type === "ui_bridge") {
-    return /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)(
+    return /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)(
       "svg",
       {
         className: "w-3.5 h-3.5 text-zinc-400 shrink-0",
@@ -1319,14 +2142,14 @@ function StepTypeIcon({ type }) {
         stroke: "currentColor",
         strokeWidth: "2",
         children: [
-          /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("rect", { width: "20", height: "14", x: "2", y: "3", rx: "2" }),
-          /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("line", { x1: "8", x2: "16", y1: "21", y2: "21" }),
-          /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("line", { x1: "12", x2: "12", y1: "17", y2: "21" })
+          /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("rect", { width: "20", height: "14", x: "2", y: "3", rx: "2" }),
+          /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("line", { x1: "8", x2: "16", y1: "21", y2: "21" }),
+          /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("line", { x1: "12", x2: "12", y1: "17", y2: "21" })
         ]
       }
     );
   }
-  return /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)(
+  return /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)(
     "svg",
     {
       className: "w-3.5 h-3.5 text-zinc-400 shrink-0",
@@ -1335,12 +2158,12 @@ function StepTypeIcon({ type }) {
       stroke: "currentColor",
       strokeWidth: "2",
       children: [
-        /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("path", { d: "M12 8V4H8" }),
-        /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("rect", { width: "16", height: "12", x: "4", y: "8", rx: "2" }),
-        /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("path", { d: "M2 14h2" }),
-        /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("path", { d: "M20 14h2" }),
-        /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("path", { d: "M15 13v2" }),
-        /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("path", { d: "M9 13v2" })
+        /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("path", { d: "M12 8V4H8" }),
+        /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("rect", { width: "16", height: "12", x: "4", y: "8", rx: "2" }),
+        /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("path", { d: "M2 14h2" }),
+        /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("path", { d: "M20 14h2" }),
+        /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("path", { d: "M15 13v2" }),
+        /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("path", { d: "M9 13v2" })
       ]
     }
   );
@@ -1364,7 +2187,10 @@ function getStepsForPhase(workflow, phase) {
   ChatHeader,
   ChatInput,
   ChatMessageArea,
+  CompositionSkillBuilder,
   PhaseSectionConcrete,
+  SkillCatalogConcrete,
+  SkillParamForm,
   StepItemConcrete,
   WorkflowPreviewPanel
 });

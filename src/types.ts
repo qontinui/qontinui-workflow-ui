@@ -1,6 +1,7 @@
 import type {
   UnifiedWorkflow,
   UnifiedStep,
+  SkillDefinition,
 } from "@qontinui/shared-types/workflow";
 import type { LibraryItem } from "@qontinui/shared-types/library";
 
@@ -13,6 +14,9 @@ export interface WorkflowDataAdapter {
   fetchWorkflows(): Promise<UnifiedWorkflow[]>;
   fetchPlaywrightScripts(): Promise<LibraryItem[]>;
   fetchContexts(): Promise<LibraryItem[]>;
+
+  // Skills (user-created skill definitions)
+  fetchSkills?(): Promise<SkillDefinition[]>;
 
   // Workflow CRUD
   saveWorkflow(workflow: UnifiedWorkflow): Promise<UnifiedWorkflow>;
