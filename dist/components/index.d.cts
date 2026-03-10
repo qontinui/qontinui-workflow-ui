@@ -1,5 +1,5 @@
 import * as react_jsx_runtime from 'react/jsx-runtime';
-import React from 'react';
+import React__default from 'react';
 import { WorkflowPhase, UnifiedStep, SkillParameter, SkillRef } from '@qontinui/shared-types/workflow';
 export { ChatHeader, ChatHeaderProps, ChatInput, ChatInputProps, ChatMessageArea, ChatMessageAreaProps, WorkflowPreviewPanel, WorkflowPreviewPanelProps } from './chat/index.cjs';
 import '@qontinui/shared-types';
@@ -13,9 +13,9 @@ interface PhaseSectionConcreteProps {
     /** Whether any step in this phase is currently selected */
     hasSelectedStep?: boolean;
     /** Render the step list — app provides DnD wrapping or plain div */
-    renderStepList: (steps: UnifiedStep[], isSelectionMode: boolean, selectedIds: Set<string>, onToggleSelect: (id: string) => void) => React.ReactNode;
+    renderStepList: (steps: UnifiedStep[], isSelectionMode: boolean, selectedIds: Set<string>, onToggleSelect: (id: string) => void) => React__default.ReactNode;
     /** Optional actions for the phase header (e.g., quick-add buttons) */
-    headerActions?: React.ReactNode;
+    headerActions?: React__default.ReactNode;
     /** Called when batch delete is confirmed */
     onBatchDelete?: (stepIds: string[]) => void;
 }
@@ -32,11 +32,11 @@ interface StepItemConcreteProps {
     /** Whether this step is selected for batch deletion */
     isSelectedForDelete?: boolean;
     /** Render slot: drag handle (web) or move buttons (runner) */
-    reorderSlot?: React.ReactNode;
+    reorderSlot?: React__default.ReactNode;
     /** Render slot: selection checkbox for batch mode */
-    selectionCheckbox?: React.ReactNode;
+    selectionCheckbox?: React__default.ReactNode;
     /** Icon component resolver: maps iconId to a React component */
-    resolveIcon: (iconId: string) => React.ComponentType<{
+    resolveIcon: (iconId: string) => React__default.ComponentType<{
         className?: string;
     }>;
 }
@@ -49,7 +49,7 @@ interface SkillCatalogConcreteProps {
     onClose: () => void;
     /** Called after a skill is successfully instantiated (steps added). */
     onSkillUsed?: (skillId: string) => void;
-    resolveIcon: (iconId: string) => React.ComponentType<{
+    resolveIcon: (iconId: string) => React__default.ComponentType<{
         className?: string;
     }>;
 }
@@ -71,7 +71,7 @@ interface CompositionSkillBuilderProps {
     /** Called when canceled */
     onCancel: () => void;
     /** Icon resolver */
-    resolveIcon: (iconId: string) => React.ComponentType<{
+    resolveIcon: (iconId: string) => React__default.ComponentType<{
         className?: string;
     }>;
 }

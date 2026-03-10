@@ -1,9 +1,9 @@
 import * as react_jsx_runtime from 'react/jsx-runtime';
-import { ChatSessionState, ChatMessage, UnifiedWorkflow } from '@qontinui/shared-types';
+import { AiSessionState, AiMessage, UnifiedWorkflow } from '@qontinui/shared-types';
 
 interface ChatHeaderProps {
     sessionName: string;
-    sessionState: ChatSessionState;
+    sessionState: AiSessionState;
     onRename: (name: string) => void;
     onClose: () => void;
     /** Optional: show runner connection status (web only). */
@@ -12,7 +12,7 @@ interface ChatHeaderProps {
 declare function ChatHeader({ sessionName, sessionState, onRename, onClose, isRunnerConnected, }: ChatHeaderProps): react_jsx_runtime.JSX.Element;
 
 interface ChatInputProps {
-    sessionState: ChatSessionState;
+    sessionState: AiSessionState;
     onSendMessage: (content: string) => void;
     onInterrupt: () => void;
     onGenerateWorkflow: (includeUIBridge: boolean) => void;
@@ -23,7 +23,7 @@ interface ChatInputProps {
 declare function ChatInput({ sessionState, onSendMessage, onInterrupt, onGenerateWorkflow, isGeneratingWorkflow, messageCount, disabled, }: ChatInputProps): react_jsx_runtime.JSX.Element;
 
 interface ChatMessageAreaProps {
-    messages: ChatMessage[];
+    messages: AiMessage[];
     streamingContent: string;
     isStreaming: boolean;
     /** Render markdown content. Falls back to plain text if not provided. */

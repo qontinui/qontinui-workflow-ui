@@ -1,7 +1,7 @@
 import { UnifiedWorkflow, SkillDefinition, UnifiedStep, WorkflowPhase, WorkflowStage, WorkflowFeatures, StepTypeInfo, SkillCategory } from '@qontinui/shared-types/workflow';
 import { LibraryItem } from '@qontinui/shared-types/library';
 import * as react_jsx_runtime from 'react/jsx-runtime';
-import React$1 from 'react';
+import React__default from 'react';
 import { SettingsSection, BooleanSettingDef } from '@qontinui/workflow-utils';
 export { BooleanSettingDef, CustomSettingDef, NumberSettingDef, SelectSettingDef, SettingDef, SettingsSection } from '@qontinui/workflow-utils';
 export { ChatHeader, ChatHeaderProps, ChatInput, ChatInputProps, ChatMessageArea, ChatMessageAreaProps, WorkflowPreviewPanel, WorkflowPreviewPanelProps } from './components/chat/index.cjs';
@@ -26,7 +26,7 @@ interface WorkflowDataAdapter {
 
 declare function WorkflowDataProvider({ adapter, children, }: {
     adapter: WorkflowDataAdapter;
-    children: React$1.ReactNode;
+    children: React__default.ReactNode;
 }): react_jsx_runtime.JSX.Element;
 declare function useWorkflowData(): WorkflowDataAdapter;
 
@@ -106,7 +106,7 @@ type WorkflowBuilderAction = {
 };
 interface WorkflowBuilderContextValue {
     state: WorkflowBuilderState;
-    dispatch: React$1.Dispatch<WorkflowBuilderAction>;
+    dispatch: React__default.Dispatch<WorkflowBuilderAction>;
     features: WorkflowFeatures;
     isEmpty: boolean;
     totalStepCount: number;
@@ -115,7 +115,7 @@ interface WorkflowBuilderContextValue {
     currentPhaseSteps: (phase: WorkflowPhase) => UnifiedStep[];
 }
 declare function WorkflowBuilderProvider({ children, initialWorkflow, }: {
-    children: React$1.ReactNode;
+    children: React__default.ReactNode;
     initialWorkflow?: UnifiedWorkflow;
 }): react_jsx_runtime.JSX.Element;
 declare function useWorkflowBuilder(): WorkflowBuilderContextValue;
@@ -304,33 +304,33 @@ interface SettingsPanelProps {
     onChange: (updates: Partial<WorkflowSettings>) => void;
     /** Override the default section config */
     config?: readonly SettingsSection[];
-    children: (props: SettingsPanelRenderProps) => React$1.ReactNode;
+    children: (props: SettingsPanelRenderProps) => React__default.ReactNode;
 }
 declare function SettingsPanel({ settings, features, onChange, config, children, }: SettingsPanelProps): react_jsx_runtime.JSX.Element;
 
 interface CollapsibleProps {
     open: boolean;
     onOpenChange: (value: boolean) => void;
-    children: React$1.ReactNode;
+    children: React__default.ReactNode;
     className?: string;
 }
 interface CollapsibleTriggerProps {
-    children: React$1.ReactNode;
+    children: React__default.ReactNode;
     className?: string;
     asChild?: boolean;
 }
 interface CollapsibleContentProps {
-    children: React$1.ReactNode;
+    children: React__default.ReactNode;
     className?: string;
 }
 interface UIPrimitives {
-    Collapsible: React$1.ComponentType<CollapsibleProps>;
-    CollapsibleTrigger: React$1.ComponentType<CollapsibleTriggerProps>;
-    CollapsibleContent: React$1.ComponentType<CollapsibleContentProps>;
+    Collapsible: React__default.ComponentType<CollapsibleProps>;
+    CollapsibleTrigger: React__default.ComponentType<CollapsibleTriggerProps>;
+    CollapsibleContent: React__default.ComponentType<CollapsibleContentProps>;
 }
 interface UIProviderProps {
     primitives: Partial<UIPrimitives>;
-    children: React$1.ReactNode;
+    children: React__default.ReactNode;
 }
 /**
  * Provide UI primitives to shared concrete components.

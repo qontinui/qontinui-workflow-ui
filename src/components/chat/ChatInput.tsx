@@ -1,8 +1,8 @@
 import { useState, useRef, useCallback, useEffect } from "react";
-import type { ChatSessionState } from "@qontinui/shared-types";
+import type { AiSessionState } from "@qontinui/shared-types";
 
 export interface ChatInputProps {
-  sessionState: ChatSessionState;
+  sessionState: AiSessionState;
   onSendMessage: (content: string) => void;
   onInterrupt: () => void;
   onGenerateWorkflow: (includeUIBridge: boolean) => void;

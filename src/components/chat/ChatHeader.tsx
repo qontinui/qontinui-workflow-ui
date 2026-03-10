@@ -1,16 +1,16 @@
 import { useState, useCallback, useRef, useEffect } from "react";
-import type { ChatSessionState } from "@qontinui/shared-types";
+import type { AiSessionState } from "@qontinui/shared-types";
 
 export interface ChatHeaderProps {
   sessionName: string;
-  sessionState: ChatSessionState;
+  sessionState: AiSessionState;
   onRename: (name: string) => void;
   onClose: () => void;
   /** Optional: show runner connection status (web only). */
   isRunnerConnected?: boolean;
 }
 
-function StateBadge({ state }: { state: ChatSessionState }) {
+function StateBadge({ state }: { state: AiSessionState }) {
   const config: Record<string, { classes: string; label: string }> = {
     ready: {
       classes: "bg-green-900/30 border-green-800/50 text-green-400",

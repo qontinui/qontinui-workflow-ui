@@ -26,6 +26,11 @@
       "types": "./dist/config/phase-colors.d.ts",
       "import": "./dist/config/phase-colors.js",
       "require": "./dist/config/phase-colors.cjs"
+    },
+    "./state-machine": {
+      "types": "./dist/components/state-machine/index.d.ts",
+      "import": "./dist/components/state-machine/index.js",
+      "require": "./dist/components/state-machine/index.cjs"
     }
   },
   "files": [
@@ -39,13 +44,16 @@
     "clean": "rimraf dist"
   },
   "dependencies": {
-    "@qontinui/shared-types": "github:qontinui/qontinui-shared-types",
-    "@qontinui/workflow-utils": "github:qontinui/qontinui-workflow-utils"
+    "@qontinui/shared-types": "file:../qontinui-schemas/ts",
+    "@qontinui/workflow-utils": "file:../qontinui-workflow-utils"
   },
   "peerDependencies": {
+    "@xyflow/react": ">=12.0.0",
+    "lucide-react": ">=0.300.0",
     "react": ">=18.0.0"
   },
   "devDependencies": {
+    "@xyflow/react": "^12.8.0",
     "tsup": "^8.0.0",
     "typescript": "^5.3.0",
     "react": "^19.0.0",

@@ -10,7 +10,7 @@ import {
   ChatInput,
   ChatMessageArea,
   WorkflowPreviewPanel
-} from "../chunk-CDLZ5R4Z.js";
+} from "../chunk-YPCWEOPL.js";
 
 // src/components/PhaseSection.tsx
 import { useState, useCallback } from "react";
@@ -133,7 +133,7 @@ function PhaseSectionConcrete({
             {
               onClick: () => onAddStep(phase),
               className: `w-full flex items-center justify-center gap-2 py-1.5 rounded-md border border-dashed ${colors.border} ${colors.text} opacity-60 hover:opacity-100 transition-all text-xs`,
-              "data-ui-id": `workflow-builder-phase-${phase}-add-step-btn`,
+              "data-testid": `workflow-builder-phase-${phase}-add-step-btn`,
               children: [
                 /* @__PURE__ */ jsx(PlusIcon, {}),
                 /* @__PURE__ */ jsx("span", { children: "Add Step" })

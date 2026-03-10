@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState, useCallback } from "react";
-import type { ChatMessage } from "@qontinui/shared-types";
+import type { AiMessage } from "@qontinui/shared-types";
 
 export interface ChatMessageAreaProps {
-  messages: ChatMessage[];
+  messages: AiMessage[];
   streamingContent: string;
   isStreaming: boolean;
   /** Render markdown content. Falls back to plain text if not provided. */
@@ -236,7 +236,7 @@ function MessageBubble({
   renderContent,
   onCreateWorkflow,
 }: {
-  message: ChatMessage;
+  message: AiMessage;
   index: number;
   renderContent: (content: string) => React.ReactNode;
   onCreateWorkflow?: (messageIndex: number, content: string) => void;
