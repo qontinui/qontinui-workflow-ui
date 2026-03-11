@@ -279,6 +279,7 @@ export function TransitionsPanel({
               value={searchFilter}
               onChange={(e) => setSearchFilter(e.target.value)}
               placeholder="Search transitions..."
+              aria-label="Search transitions..."
               className="w-full text-[10px] h-6 pl-7 px-2 bg-bg-tertiary border border-border-secondary rounded text-text-primary placeholder:text-text-muted"
             />
           </div>

@@ -1353,6 +1353,7 @@ function TransitionsPanel({
               value: searchFilter,
               onChange: (e) => setSearchFilter(e.target.value),
               placeholder: "Search transitions...",
+              "aria-label": "Search transitions...",
               className: "w-full text-[10px] h-6 pl-7 px-2 bg-bg-tertiary border border-border-secondary rounded text-text-primary placeholder:text-text-muted"
             }
           )
@@ -2552,6 +2553,7 @@ function StateViewPanel({
                 value: searchFilter,
                 onChange: (e) => setSearchFilter(e.target.value),
                 placeholder: "Filter states...",
+                "aria-label": "Filter states...",
                 className: "w-full text-xs h-7 pl-7 px-2 bg-bg-tertiary border border-border-secondary rounded text-text-primary placeholder:text-text-muted"
               }
             )
@@ -2991,7 +2993,7 @@ function PathfindingPanel({
           onClick: handleFind,
           disabled: !fromStateId || !targetStateId || isSearching,
           className: "flex-1 px-3 py-1.5 text-sm font-medium text-white bg-brand-primary hover:bg-brand-primary/90 disabled:opacity-50 disabled:cursor-not-allowed rounded",
-          children: isSearching ? "Searching..." : "Find Path"
+          children: /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("span", { children: isSearching ? "Searching..." : "Find Path" })
         }
       ),
       result && /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(

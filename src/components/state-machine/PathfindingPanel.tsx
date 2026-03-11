@@ -151,7 +151,7 @@ export function PathfindingPanel({
           disabled={!fromStateId || !targetStateId || isSearching}
           className="flex-1 px-3 py-1.5 text-sm font-medium text-white bg-brand-primary hover:bg-brand-primary/90 disabled:opacity-50 disabled:cursor-not-allowed rounded"
         >
-          {isSearching ? "Searching..." : "Find Path"}
+          <span>{isSearching ? "Searching..." : "Find Path"}</span>
         </button>
         {result && (
           <button

@@ -557,6 +557,7 @@ export function StateViewPanel({
                 value={searchFilter}
                 onChange={(e) => setSearchFilter(e.target.value)}
                 placeholder="Filter states..."
+                aria-label="Filter states..."
                 className="w-full text-xs h-7 pl-7 px-2 bg-bg-tertiary border border-border-secondary rounded text-text-primary placeholder:text-text-muted"
               />
             </div>
