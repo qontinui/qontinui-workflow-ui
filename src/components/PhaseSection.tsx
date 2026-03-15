@@ -45,6 +45,38 @@ export interface PhaseSectionConcreteProps {
 }
 
 // =============================================================================
+// Inline SVG Icons (module-scoped to avoid re-creation each render)
+// =============================================================================
+
+const ChevronIcon = ({ expanded, colorClass }: { expanded: boolean; colorClass: string }) => (
+  <svg
+    className={`w-4 h-4 ${colorClass}`}
+    fill="none"
+    viewBox="0 0 24 24"
+    stroke="currentColor"
+    strokeWidth={2}
+  >
+    {expanded ? (
+      <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+    ) : (
+      <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+    )}
+  </svg>
+);
+
+const PlusIcon = () => (
+  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M12 5v14M5 12h14" />
+  </svg>
+);
+
+const PhaseTrashIcon = () => (
+  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+  </svg>
+);
+
+// =============================================================================
 // Component
 // =============================================================================
 
@@ -89,36 +121,6 @@ export function PhaseSectionConcrete({
     exitSelectionMode();
   }, [onBatchDelete, selectedIds, exitSelectionMode]);
 
-  // ─── Chevron icons (inline SVG to avoid lucide dependency) ────────
-
-  const ChevronIcon = ({ expanded }: { expanded: boolean }) => (
-    <svg
-      className={`w-4 h-4 ${colors.text}`}
-      fill="none"
-      viewBox="0 0 24 24"
-      stroke="currentColor"
-      strokeWidth={2}
-    >
-      {expanded ? (
-        <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-      ) : (
-        <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
-      )}
-    </svg>
-  );
-
-  const PlusIcon = () => (
-    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M12 5v14M5 12h14" />
-    </svg>
-  );
-
-  const TrashIcon = () => (
-    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-    </svg>
-  );
-
   return (
     <Collapsible open={isExpanded} onOpenChange={onToggle}>
       <div
@@ -131,7 +133,7 @@ export function PhaseSectionConcrete({
         {/* Phase Header */}
         <CollapsibleTrigger className={`w-full flex items-center justify-between p-3 rounded-t-lg ${colors.bgHeader} transition-colors`}>
           <div className="flex items-center gap-2 flex-1 cursor-pointer" onClick={onToggle}>
-            <ChevronIcon expanded={isExpanded} />
+            <ChevronIcon expanded={isExpanded} colorClass={colors.text} />
             <span className={`font-medium ${colors.text}`}>{phaseInfo.label}</span>
             <span className={`text-xs px-1.5 py-0.5 rounded ${colors.badge}`}>
               {steps.length}
@@ -155,7 +157,7 @@ export function PhaseSectionConcrete({
                 }`}
                 title={isSelectionMode ? "Cancel selection" : "Select steps to delete"}
               >
-                <TrashIcon />
+                <PhaseTrashIcon />
               </button>
             )}
           </div>

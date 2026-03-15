@@ -59,9 +59,8 @@ export function ChatHeader({
   const [editValue, setEditValue] = useState(sessionName);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  useEffect(() => {
-    setEditValue(sessionName);
-  }, [sessionName]);
+  // Sync editValue when sessionName changes externally (derived state)
+  const displayEditValue = isEditing ? editValue : sessionName;
 
   useEffect(() => {
     if (isEditing && inputRef.current) {
@@ -109,7 +108,7 @@ export function ChatHeader({
           <div className="flex items-center gap-1.5">
             <input
               ref={inputRef}
-              value={editValue}
+              value={displayEditValue}
               onChange={(e) => setEditValue(e.target.value)}
               onKeyDown={handleKeyDown}
               onBlur={handleSave}
@@ -133,7 +132,7 @@ export function ChatHeader({
           </div>
         ) : (
           <button
-            onClick={() => setIsEditing(true)}
+            onClick={() => { setEditValue(sessionName); setIsEditing(true); }}
             className="flex items-center gap-1.5 text-sm font-medium text-text-primary hover:text-text-secondary group"
           >
             {sessionName}

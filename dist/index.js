@@ -8,7 +8,7 @@ import {
   ChatInput,
   ChatMessageArea,
   WorkflowPreviewPanel
-} from "./chunk-47XJDVC4.js";
+} from "./chunk-MNJFISLA.js";
 
 // src/WorkflowDataProvider.tsx
 import { createContext, useContext } from "react";

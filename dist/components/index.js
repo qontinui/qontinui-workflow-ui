@@ -10,12 +10,25 @@ import {
   ChatInput,
   ChatMessageArea,
   WorkflowPreviewPanel
-} from "../chunk-47XJDVC4.js";
+} from "../chunk-MNJFISLA.js";
 
 // src/components/PhaseSection.tsx
 import { useState, useCallback } from "react";
 import { PHASE_INFO } from "@qontinui/shared-types/workflow";
 import { jsx, jsxs } from "react/jsx-runtime";
+var ChevronIcon = ({ expanded, colorClass }) => /* @__PURE__ */ jsx(
+  "svg",
+  {
+    className: `w-4 h-4 ${colorClass}`,
+    fill: "none",
+    viewBox: "0 0 24 24",
+    stroke: "currentColor",
+    strokeWidth: 2,
+    children: expanded ? /* @__PURE__ */ jsx("path", { strokeLinecap: "round", strokeLinejoin: "round", d: "M19 9l-7 7-7-7" }) : /* @__PURE__ */ jsx("path", { strokeLinecap: "round", strokeLinejoin: "round", d: "M9 5l7 7-7 7" })
+  }
+);
+var PlusIcon = () => /* @__PURE__ */ jsx("svg", { className: "w-4 h-4", fill: "none", viewBox: "0 0 24 24", stroke: "currentColor", strokeWidth: 2, children: /* @__PURE__ */ jsx("path", { strokeLinecap: "round", strokeLinejoin: "round", d: "M12 5v14M5 12h14" }) });
+var PhaseTrashIcon = () => /* @__PURE__ */ jsx("svg", { className: "w-4 h-4", fill: "none", viewBox: "0 0 24 24", stroke: "currentColor", strokeWidth: 2, children: /* @__PURE__ */ jsx("path", { strokeLinecap: "round", strokeLinejoin: "round", d: "M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" }) });
 function PhaseSectionConcrete({
   phase,
   steps,
@@ -51,19 +64,6 @@ function PhaseSectionConcrete({
     }
     exitSelectionMode();
   }, [onBatchDelete, selectedIds, exitSelectionMode]);
-  const ChevronIcon = ({ expanded }) => /* @__PURE__ */ jsx(
-    "svg",
-    {
-      className: `w-4 h-4 ${colors.text}`,
-      fill: "none",
-      viewBox: "0 0 24 24",
-      stroke: "currentColor",
-      strokeWidth: 2,
-      children: expanded ? /* @__PURE__ */ jsx("path", { strokeLinecap: "round", strokeLinejoin: "round", d: "M19 9l-7 7-7-7" }) : /* @__PURE__ */ jsx("path", { strokeLinecap: "round", strokeLinejoin: "round", d: "M9 5l7 7-7 7" })
-    }
-  );
-  const PlusIcon = () => /* @__PURE__ */ jsx("svg", { className: "w-4 h-4", fill: "none", viewBox: "0 0 24 24", stroke: "currentColor", strokeWidth: 2, children: /* @__PURE__ */ jsx("path", { strokeLinecap: "round", strokeLinejoin: "round", d: "M12 5v14M5 12h14" }) });
-  const TrashIcon = () => /* @__PURE__ */ jsx("svg", { className: "w-4 h-4", fill: "none", viewBox: "0 0 24 24", stroke: "currentColor", strokeWidth: 2, children: /* @__PURE__ */ jsx("path", { strokeLinecap: "round", strokeLinejoin: "round", d: "M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" }) });
   return /* @__PURE__ */ jsx(Collapsible, { open: isExpanded, onOpenChange: onToggle, children: /* @__PURE__ */ jsxs(
     "div",
     {
@@ -73,7 +73,7 @@ function PhaseSectionConcrete({
       children: [
         /* @__PURE__ */ jsxs(CollapsibleTrigger, { className: `w-full flex items-center justify-between p-3 rounded-t-lg ${colors.bgHeader} transition-colors`, children: [
           /* @__PURE__ */ jsxs("div", { className: "flex items-center gap-2 flex-1 cursor-pointer", onClick: onToggle, children: [
-            /* @__PURE__ */ jsx(ChevronIcon, { expanded: isExpanded }),
+            /* @__PURE__ */ jsx(ChevronIcon, { expanded: isExpanded, colorClass: colors.text }),
             /* @__PURE__ */ jsx("span", { className: `font-medium ${colors.text}`, children: phaseInfo.label }),
             /* @__PURE__ */ jsx("span", { className: `text-xs px-1.5 py-0.5 rounded ${colors.badge}`, children: steps.length })
           ] }),
@@ -89,7 +89,7 @@ function PhaseSectionConcrete({
                 },
                 className: `p-1 rounded transition-colors ${isSelectionMode ? "bg-red-500/20 text-red-400" : "text-zinc-400 hover:text-red-400 hover:bg-zinc-700"}`,
                 title: isSelectionMode ? "Cancel selection" : "Select steps to delete",
-                children: /* @__PURE__ */ jsx(TrashIcon, {})
+                children: /* @__PURE__ */ jsx(PhaseTrashIcon, {})
               }
             )
           ] })
@@ -155,6 +155,20 @@ import {
   getTestIconData
 } from "@qontinui/workflow-utils";
 import { jsx as jsx2, jsxs as jsxs2 } from "react/jsx-runtime";
+var LockIcon = () => /* @__PURE__ */ jsxs2("svg", { className: "w-3 h-3 text-zinc-500", fill: "none", viewBox: "0 0 24 24", stroke: "currentColor", strokeWidth: 2, children: [
+  /* @__PURE__ */ jsx2("rect", { x: "3", y: "11", width: "18", height: "11", rx: "2", ry: "2" }),
+  /* @__PURE__ */ jsx2("path", { d: "M7 11V7a5 5 0 0110 0v4" })
+] });
+var TrashIcon = () => /* @__PURE__ */ jsx2("svg", { className: "w-3 h-3", fill: "none", viewBox: "0 0 24 24", stroke: "currentColor", strokeWidth: 2, children: /* @__PURE__ */ jsx2("path", { strokeLinecap: "round", strokeLinejoin: "round", d: "M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" }) });
+var CopyIcon = () => /* @__PURE__ */ jsxs2("svg", { className: "w-3 h-3", fill: "none", viewBox: "0 0 24 24", stroke: "currentColor", strokeWidth: 2, children: [
+  /* @__PURE__ */ jsx2("rect", { x: "9", y: "9", width: "13", height: "13", rx: "2", ry: "2" }),
+  /* @__PURE__ */ jsx2("path", { d: "M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1" })
+] });
+var AlertIcon = () => /* @__PURE__ */ jsxs2("svg", { className: "w-4 h-4 text-yellow-500", fill: "none", viewBox: "0 0 24 24", stroke: "currentColor", strokeWidth: 2, children: [
+  /* @__PURE__ */ jsx2("circle", { cx: "12", cy: "12", r: "10" }),
+  /* @__PURE__ */ jsx2("line", { x1: "12", y1: "8", x2: "12", y2: "12" }),
+  /* @__PURE__ */ jsx2("line", { x1: "12", y1: "16", x2: "12.01", y2: "16" })
+] });
 function StepItemConcrete({
   step,
   isSelected,
@@ -176,20 +190,6 @@ function StepItemConcrete({
   const hasWarnings = issues.some((i) => i.severity === "warning");
   const showNeedsConfig = needsConfig(step);
   const validationTooltip = issues.map((i) => i.message).join("; ");
-  const LockIcon = () => /* @__PURE__ */ jsxs2("svg", { className: "w-3 h-3 text-zinc-500", fill: "none", viewBox: "0 0 24 24", stroke: "currentColor", strokeWidth: 2, children: [
-    /* @__PURE__ */ jsx2("rect", { x: "3", y: "11", width: "18", height: "11", rx: "2", ry: "2" }),
-    /* @__PURE__ */ jsx2("path", { d: "M7 11V7a5 5 0 0110 0v4" })
-  ] });
-  const TrashIcon = () => /* @__PURE__ */ jsx2("svg", { className: "w-3 h-3", fill: "none", viewBox: "0 0 24 24", stroke: "currentColor", strokeWidth: 2, children: /* @__PURE__ */ jsx2("path", { strokeLinecap: "round", strokeLinejoin: "round", d: "M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" }) });
-  const CopyIcon = () => /* @__PURE__ */ jsxs2("svg", { className: "w-3 h-3", fill: "none", viewBox: "0 0 24 24", stroke: "currentColor", strokeWidth: 2, children: [
-    /* @__PURE__ */ jsx2("rect", { x: "9", y: "9", width: "13", height: "13", rx: "2", ry: "2" }),
-    /* @__PURE__ */ jsx2("path", { d: "M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1" })
-  ] });
-  const AlertIcon = () => /* @__PURE__ */ jsxs2("svg", { className: "w-4 h-4 text-yellow-500", fill: "none", viewBox: "0 0 24 24", stroke: "currentColor", strokeWidth: 2, children: [
-    /* @__PURE__ */ jsx2("circle", { cx: "12", cy: "12", r: "10" }),
-    /* @__PURE__ */ jsx2("line", { x1: "12", y1: "8", x2: "12", y2: "12" }),
-    /* @__PURE__ */ jsx2("line", { x1: "12", y1: "16", x2: "12.01", y2: "16" })
-  ] });
   return /* @__PURE__ */ jsxs2(
     "div",
     {

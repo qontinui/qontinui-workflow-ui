@@ -117,6 +117,19 @@ function useUIPrimitives() {
 
 // src/components/PhaseSection.tsx
 var import_jsx_runtime2 = require("react/jsx-runtime");
+var ChevronIcon = ({ expanded, colorClass }) => /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(
+  "svg",
+  {
+    className: `w-4 h-4 ${colorClass}`,
+    fill: "none",
+    viewBox: "0 0 24 24",
+    stroke: "currentColor",
+    strokeWidth: 2,
+    children: expanded ? /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("path", { strokeLinecap: "round", strokeLinejoin: "round", d: "M19 9l-7 7-7-7" }) : /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("path", { strokeLinecap: "round", strokeLinejoin: "round", d: "M9 5l7 7-7 7" })
+  }
+);
+var PlusIcon = () => /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("svg", { className: "w-4 h-4", fill: "none", viewBox: "0 0 24 24", stroke: "currentColor", strokeWidth: 2, children: /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("path", { strokeLinecap: "round", strokeLinejoin: "round", d: "M12 5v14M5 12h14" }) });
+var PhaseTrashIcon = () => /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("svg", { className: "w-4 h-4", fill: "none", viewBox: "0 0 24 24", stroke: "currentColor", strokeWidth: 2, children: /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("path", { strokeLinecap: "round", strokeLinejoin: "round", d: "M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" }) });
 function PhaseSectionConcrete({
   phase,
   steps,
@@ -152,19 +165,6 @@ function PhaseSectionConcrete({
     }
     exitSelectionMode();
   }, [onBatchDelete, selectedIds, exitSelectionMode]);
-  const ChevronIcon = ({ expanded }) => /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(
-    "svg",
-    {
-      className: `w-4 h-4 ${colors.text}`,
-      fill: "none",
-      viewBox: "0 0 24 24",
-      stroke: "currentColor",
-      strokeWidth: 2,
-      children: expanded ? /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("path", { strokeLinecap: "round", strokeLinejoin: "round", d: "M19 9l-7 7-7-7" }) : /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("path", { strokeLinecap: "round", strokeLinejoin: "round", d: "M9 5l7 7-7 7" })
-    }
-  );
-  const PlusIcon = () => /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("svg", { className: "w-4 h-4", fill: "none", viewBox: "0 0 24 24", stroke: "currentColor", strokeWidth: 2, children: /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("path", { strokeLinecap: "round", strokeLinejoin: "round", d: "M12 5v14M5 12h14" }) });
-  const TrashIcon = () => /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("svg", { className: "w-4 h-4", fill: "none", viewBox: "0 0 24 24", stroke: "currentColor", strokeWidth: 2, children: /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("path", { strokeLinecap: "round", strokeLinejoin: "round", d: "M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" }) });
   return /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(Collapsible, { open: isExpanded, onOpenChange: onToggle, children: /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)(
     "div",
     {
@@ -174,7 +174,7 @@ function PhaseSectionConcrete({
       children: [
         /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)(CollapsibleTrigger, { className: `w-full flex items-center justify-between p-3 rounded-t-lg ${colors.bgHeader} transition-colors`, children: [
           /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("div", { className: "flex items-center gap-2 flex-1 cursor-pointer", onClick: onToggle, children: [
-            /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(ChevronIcon, { expanded: isExpanded }),
+            /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(ChevronIcon, { expanded: isExpanded, colorClass: colors.text }),
             /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("span", { className: `font-medium ${colors.text}`, children: phaseInfo.label }),
             /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("span", { className: `text-xs px-1.5 py-0.5 rounded ${colors.badge}`, children: steps.length })
           ] }),
@@ -190,7 +190,7 @@ function PhaseSectionConcrete({
                 },
                 className: `p-1 rounded transition-colors ${isSelectionMode ? "bg-red-500/20 text-red-400" : "text-zinc-400 hover:text-red-400 hover:bg-zinc-700"}`,
                 title: isSelectionMode ? "Cancel selection" : "Select steps to delete",
-                children: /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(TrashIcon, {})
+                children: /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(PhaseTrashIcon, {})
               }
             )
           ] })
@@ -250,6 +250,20 @@ function PhaseSectionConcrete({
 // src/components/StepItem.tsx
 var import_workflow_utils = require("@qontinui/workflow-utils");
 var import_jsx_runtime3 = require("react/jsx-runtime");
+var LockIcon = () => /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("svg", { className: "w-3 h-3 text-zinc-500", fill: "none", viewBox: "0 0 24 24", stroke: "currentColor", strokeWidth: 2, children: [
+  /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("rect", { x: "3", y: "11", width: "18", height: "11", rx: "2", ry: "2" }),
+  /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("path", { d: "M7 11V7a5 5 0 0110 0v4" })
+] });
+var TrashIcon = () => /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("svg", { className: "w-3 h-3", fill: "none", viewBox: "0 0 24 24", stroke: "currentColor", strokeWidth: 2, children: /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("path", { strokeLinecap: "round", strokeLinejoin: "round", d: "M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" }) });
+var CopyIcon = () => /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("svg", { className: "w-3 h-3", fill: "none", viewBox: "0 0 24 24", stroke: "currentColor", strokeWidth: 2, children: [
+  /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("rect", { x: "9", y: "9", width: "13", height: "13", rx: "2", ry: "2" }),
+  /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("path", { d: "M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1" })
+] });
+var AlertIcon = () => /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("svg", { className: "w-4 h-4 text-yellow-500", fill: "none", viewBox: "0 0 24 24", stroke: "currentColor", strokeWidth: 2, children: [
+  /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("circle", { cx: "12", cy: "12", r: "10" }),
+  /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("line", { x1: "12", y1: "8", x2: "12", y2: "12" }),
+  /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("line", { x1: "12", y1: "16", x2: "12.01", y2: "16" })
+] });
 function StepItemConcrete({
   step,
   isSelected,
@@ -271,20 +285,6 @@ function StepItemConcrete({
   const hasWarnings = issues.some((i) => i.severity === "warning");
   const showNeedsConfig = (0, import_workflow_utils.needsConfig)(step);
   const validationTooltip = issues.map((i) => i.message).join("; ");
-  const LockIcon = () => /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("svg", { className: "w-3 h-3 text-zinc-500", fill: "none", viewBox: "0 0 24 24", stroke: "currentColor", strokeWidth: 2, children: [
-    /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("rect", { x: "3", y: "11", width: "18", height: "11", rx: "2", ry: "2" }),
-    /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("path", { d: "M7 11V7a5 5 0 0110 0v4" })
-  ] });
-  const TrashIcon = () => /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("svg", { className: "w-3 h-3", fill: "none", viewBox: "0 0 24 24", stroke: "currentColor", strokeWidth: 2, children: /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("path", { strokeLinecap: "round", strokeLinejoin: "round", d: "M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" }) });
-  const CopyIcon = () => /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("svg", { className: "w-3 h-3", fill: "none", viewBox: "0 0 24 24", stroke: "currentColor", strokeWidth: 2, children: [
-    /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("rect", { x: "9", y: "9", width: "13", height: "13", rx: "2", ry: "2" }),
-    /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("path", { d: "M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1" })
-  ] });
-  const AlertIcon = () => /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("svg", { className: "w-4 h-4 text-yellow-500", fill: "none", viewBox: "0 0 24 24", stroke: "currentColor", strokeWidth: 2, children: [
-    /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("circle", { cx: "12", cy: "12", r: "10" }),
-    /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("line", { x1: "12", y1: "8", x2: "12", y2: "12" }),
-    /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("line", { x1: "12", y1: "16", x2: "12.01", y2: "16" })
-  ] });
   return /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)(
     "div",
     {
@@ -1228,9 +1228,7 @@ function ChatHeader({
   const [isEditing, setIsEditing] = (0, import_react5.useState)(false);
   const [editValue, setEditValue] = (0, import_react5.useState)(sessionName);
   const inputRef = (0, import_react5.useRef)(null);
-  (0, import_react5.useEffect)(() => {
-    setEditValue(sessionName);
-  }, [sessionName]);
+  const displayEditValue = isEditing ? editValue : sessionName;
   (0, import_react5.useEffect)(() => {
     if (isEditing && inputRef.current) {
       inputRef.current.focus();
@@ -1275,7 +1273,7 @@ function ChatHeader({
           "input",
           {
             ref: inputRef,
-            value: editValue,
+            value: displayEditValue,
             onChange: (e) => setEditValue(e.target.value),
             onKeyDown: handleKeyDown,
             onBlur: handleSave,
@@ -1304,7 +1302,10 @@ function ChatHeader({
       ] }) : /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)(
         "button",
         {
-          onClick: () => setIsEditing(true),
+          onClick: () => {
+            setEditValue(sessionName);
+            setIsEditing(true);
+          },
           className: "flex items-center gap-1.5 text-sm font-medium text-text-primary hover:text-text-secondary group",
           children: [
             sessionName,

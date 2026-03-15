@@ -852,9 +852,7 @@ function ChatHeader({
   const [isEditing, setIsEditing] = (0, import_react9.useState)(false);
   const [editValue, setEditValue] = (0, import_react9.useState)(sessionName);
   const inputRef = (0, import_react9.useRef)(null);
-  (0, import_react9.useEffect)(() => {
-    setEditValue(sessionName);
-  }, [sessionName]);
+  const displayEditValue = isEditing ? editValue : sessionName;
   (0, import_react9.useEffect)(() => {
     if (isEditing && inputRef.current) {
       inputRef.current.focus();
@@ -899,7 +897,7 @@ function ChatHeader({
           "input",
           {
             ref: inputRef,
-            value: editValue,
+            value: displayEditValue,
             onChange: (e) => setEditValue(e.target.value),
             onKeyDown: handleKeyDown,
             onBlur: handleSave,
@@ -928,7 +926,10 @@ function ChatHeader({
       ] }) : /* @__PURE__ */ (0, import_jsx_runtime9.jsxs)(
         "button",
         {
-          onClick: () => setIsEditing(true),
+          onClick: () => {
+            setEditValue(sessionName);
+            setIsEditing(true);
+          },
           className: "flex items-center gap-1.5 text-sm font-medium text-text-primary hover:text-text-secondary group",
           children: [
             sessionName,

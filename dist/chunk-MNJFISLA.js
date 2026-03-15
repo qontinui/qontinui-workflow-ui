@@ -48,9 +48,7 @@ function ChatHeader({
   const [isEditing, setIsEditing] = useState(false);
   const [editValue, setEditValue] = useState(sessionName);
   const inputRef = useRef(null);
-  useEffect(() => {
-    setEditValue(sessionName);
-  }, [sessionName]);
+  const displayEditValue = isEditing ? editValue : sessionName;
   useEffect(() => {
     if (isEditing && inputRef.current) {
       inputRef.current.focus();
@@ -95,7 +93,7 @@ function ChatHeader({
           "input",
           {
             ref: inputRef,
-            value: editValue,
+            value: displayEditValue,
             onChange: (e) => setEditValue(e.target.value),
             onKeyDown: handleKeyDown,
             onBlur: handleSave,
@@ -124,7 +122,10 @@ function ChatHeader({
       ] }) : /* @__PURE__ */ jsxs(
         "button",
         {
-          onClick: () => setIsEditing(true),
+          onClick: () => {
+            setEditValue(sessionName);
+            setIsEditing(true);
+          },
           className: "flex items-center gap-1.5 text-sm font-medium text-text-primary hover:text-text-secondary group",
           children: [
             sessionName,
@@ -1009,4 +1010,4 @@ export {
   ChatMessageArea,
   WorkflowPreviewPanel
 };
-//# sourceMappingURL=chunk-47XJDVC4.js.map
+//# sourceMappingURL=chunk-MNJFISLA.js.map
