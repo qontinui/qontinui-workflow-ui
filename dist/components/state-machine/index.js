@@ -199,7 +199,7 @@ Drag to create transition` : elementId,
                           {
                             src: thumbnailSrc,
                             alt: style.label,
-                            className: "w-full h-full object-cover rounded-sm",
+                            className: "w-full h-full object-contain rounded-sm",
                             draggable: false
                           }
                         ) : /* @__PURE__ */ jsxs("div", { className: "flex flex-col items-center justify-center h-full px-0.5 py-1", children: [
@@ -2211,7 +2211,8 @@ import {
   Maximize as Maximize2,
   ArrowUpRight as ArrowUpRight2,
   ArrowDownLeft as ArrowDownLeft2,
-  Target
+  Target,
+  Layout
 } from "lucide-react";
 import {
   getElementTypePrefix as getElementTypePrefix2,
@@ -2244,6 +2245,37 @@ var ACTION_ICONS3 = {
   wait: Layers2,
   navigate: Globe4
 };
+function resolveElementLabel(elementId, fingerprintDetails, state) {
+  const fp = fingerprintDetails?.[elementId];
+  if (fp) {
+    if (fp.accessibleName) return fp.accessibleName;
+    const parts = [fp.tagName, fp.role].filter(Boolean);
+    if (parts.length > 0) return parts.join(" ");
+  }
+  const labels = state?.extra_metadata?.elementLabels;
+  if (labels?.[elementId]) return labels[elementId];
+  return getElementLabel2(elementId);
+}
+function resolveElementPosition(elementId, fingerprintDetails, state) {
+  const fp = fingerprintDetails?.[elementId];
+  if (fp?.relativePosition) return fp.relativePosition;
+  const positions = state?.extra_metadata?.elementPositions;
+  if (positions?.[elementId]) return positions[elementId];
+  return null;
+}
+function resolveElementTag(elementId, fingerprintDetails, state) {
+  const fp = fingerprintDetails?.[elementId];
+  if (fp) {
+    return {
+      tagName: fp.tagName || "",
+      role: fp.role || "",
+      zone: fp.positionZone || ""
+    };
+  }
+  const tags = state?.extra_metadata?.elementTags;
+  if (tags?.[elementId]) return tags[elementId];
+  return null;
+}
 function SpatialCanvas({
   states,
   transitions,
@@ -2540,12 +2572,106 @@ function SpatialCanvas({
     }
   );
 }
+function StateLayoutView({
+  state,
+  elementThumbnails,
+  fingerprintDetails
+}) {
+  const [hoveredElement, setHoveredElement] = useState5(null);
+  const positionedElements = useMemo4(() => {
+    const items = [];
+    for (const eid of state.element_ids) {
+      const pos = resolveElementPosition(eid, fingerprintDetails, state);
+      if (!pos) continue;
+      const label = resolveElementLabel(eid, fingerprintDetails, state);
+      const tag = resolveElementTag(eid, fingerprintDetails, state);
+      const prefix = getElementTypePrefix2(eid);
+      const thumb = elementThumbnails?.[eid] ?? elementThumbnails?.[getElementLabel2(eid)];
+      items.push({ id: eid, label, tag, position: pos, thumbnail: thumb, prefix });
+    }
+    return items;
+  }, [state, fingerprintDetails, elementThumbnails]);
+  const elementsWithoutPosition = state.element_ids.length - positionedElements.length;
+  if (positionedElements.length === 0) {
+    return /* @__PURE__ */ jsx7("div", { className: "flex items-center justify-center h-48 text-text-muted text-xs", children: "No position data available for this state's elements." });
+  }
+  return /* @__PURE__ */ jsxs7("div", { children: [
+    /* @__PURE__ */ jsxs7("h3", { className: "text-sm font-medium text-text-primary mb-3 flex items-center gap-2", children: [
+      /* @__PURE__ */ jsx7(Layout, { className: "size-3.5" }),
+      "State Layout"
+    ] }),
+    /* @__PURE__ */ jsxs7(
+      "div",
+      {
+        className: "relative bg-bg-tertiary border border-border-secondary rounded-lg",
+        style: { aspectRatio: "16 / 10" },
+        children: [
+          /* @__PURE__ */ jsxs7("div", { className: "absolute inset-0 pointer-events-none", children: [
+            /* @__PURE__ */ jsx7("div", { className: "absolute top-0 left-0 right-0 h-[10%] border-b border-dashed border-border-secondary/30" }),
+            /* @__PURE__ */ jsx7("div", { className: "absolute bottom-0 left-0 right-0 h-[10%] border-t border-dashed border-border-secondary/30" })
+          ] }),
+          positionedElements.map((el) => {
+            const isHovered = hoveredElement === el.id;
+            const colorClass = ELEMENT_COLORS[el.prefix] ?? "border-gray-400 bg-gray-500/10 text-gray-300";
+            const thumbSrc = el.thumbnail ? el.thumbnail.startsWith("data:") ? el.thumbnail : `data:image/png;base64,${el.thumbnail}` : void 0;
+            return /* @__PURE__ */ jsxs7(
+              "div",
+              {
+                className: "absolute group",
+                style: {
+                  top: `${el.position.top * 100}%`,
+                  left: `${el.position.left * 100}%`,
+                  transform: "translate(-50%, -50%)"
+                },
+                onMouseEnter: () => setHoveredElement(el.id),
+                onMouseLeave: () => setHoveredElement(null),
+                children: [
+                  /* @__PURE__ */ jsx7(
+                    "div",
+                    {
+                      className: `
+                  rounded border ${colorClass} overflow-hidden
+                  transition-all duration-100 cursor-default
+                  ${isHovered ? "ring-2 ring-brand-primary/50 shadow-lg z-20 scale-125" : "z-10"}
+                `,
+                      style: { width: thumbSrc ? 32 : void 0, height: thumbSrc ? 32 : void 0 },
+                      children: thumbSrc ? /* @__PURE__ */ jsx7(
+                        "img",
+                        {
+                          src: thumbSrc,
+                          alt: el.label,
+                          className: "w-full h-full object-contain"
+                        }
+                      ) : /* @__PURE__ */ jsx7("div", { className: "px-1 py-0.5 text-[8px] whitespace-nowrap max-w-[80px] truncate", children: el.label })
+                    }
+                  ),
+                  isHovered && /* @__PURE__ */ jsxs7("div", { className: "absolute top-full left-1/2 -translate-x-1/2 mt-1 z-30 bg-bg-primary/95 backdrop-blur-sm border border-border-secondary rounded px-2 py-1 shadow-md whitespace-nowrap", children: [
+                    /* @__PURE__ */ jsx7("div", { className: "text-[10px] font-medium text-text-primary", children: el.label }),
+                    el.tag && /* @__PURE__ */ jsx7("div", { className: "text-[9px] text-text-muted", children: [el.tag.tagName && `<${el.tag.tagName}>`, el.tag.role && `role="${el.tag.role}"`, el.tag.zone].filter(Boolean).join(" ") })
+                  ] })
+                ]
+              },
+              el.id
+            );
+          })
+        ]
+      }
+    ),
+    elementsWithoutPosition > 0 && /* @__PURE__ */ jsxs7("p", { className: "text-[10px] text-text-muted mt-1.5", children: [
+      elementsWithoutPosition,
+      " element",
+      elementsWithoutPosition !== 1 ? "s" : "",
+      " without position data"
+    ] })
+  ] });
+}
 function StateViewPanel({
   states,
   transitions,
   selectedStateId,
   onSelectState,
-  elementThumbnails
+  elementThumbnails,
+  fingerprintDetails
 }) {
   const [expandedStates, setExpandedStates] = useState5(/* @__PURE__ */ new Set());
   const [searchFilter, setSearchFilter] = useState5("");
@@ -2718,7 +2844,7 @@ function StateViewPanel({
             isExpanded && /* @__PURE__ */ jsxs7("div", { className: "ml-5 pl-2 border-l border-border-secondary mt-1 mb-2 space-y-0.5", children: [
               state.element_ids.slice(0, 20).map((eid) => {
                 const prefix = getElementTypePrefix2(eid);
-                const label = getElementLabel2(eid);
+                const label = resolveElementLabel(eid, fingerprintDetails, state);
                 const Icon = ELEMENT_ICONS[prefix] ?? Layers2;
                 const stateCount = sharedElements.get(eid)?.length ?? 1;
                 return /* @__PURE__ */ jsxs7(
@@ -2807,22 +2933,32 @@ function StateViewPanel({
               ] }),
               /* @__PURE__ */ jsx7("div", { className: "flex flex-wrap gap-1.5", children: elements.map((eid) => {
                 const stateCount = sharedElements.get(eid)?.length ?? 1;
-                const label = getElementLabel2(eid);
-                const thumb = elementThumbnails?.[eid] ?? elementThumbnails?.[label];
+                const rawLabel = getElementLabel2(eid);
+                const descriptiveLabel = resolveElementLabel(eid, fingerprintDetails, selectedState);
+                const thumb = elementThumbnails?.[eid] ?? elementThumbnails?.[rawLabel];
                 return /* @__PURE__ */ jsx7(
                   "div",
                   {
-                    className: `rounded border ${colorClass} overflow-hidden ${thumb ? "w-12 h-12" : "text-[11px] px-2 py-0.5 inline-flex items-center gap-1"}`,
+                    className: `rounded border ${colorClass} overflow-hidden ${thumb ? "flex flex-col items-center w-16" : "text-[11px] px-2 py-0.5 inline-flex items-center gap-1"}`,
                     title: `${eid}${stateCount > 1 ? ` (shared across ${stateCount} states)` : ""}`,
-                    children: thumb ? /* @__PURE__ */ jsx7(
-                      "img",
-                      {
-                        src: thumb.startsWith("data:") ? thumb : `data:image/png;base64,${thumb}`,
-                        alt: label,
-                        className: "w-full h-full object-cover"
-                      }
-                    ) : /* @__PURE__ */ jsxs7(Fragment4, { children: [
-                      label,
+                    children: thumb ? /* @__PURE__ */ jsxs7(Fragment4, { children: [
+                      /* @__PURE__ */ jsxs7("div", { className: "relative", children: [
+                        /* @__PURE__ */ jsx7(
+                          "img",
+                          {
+                            src: thumb.startsWith("data:") ? thumb : `data:image/png;base64,${thumb}`,
+                            alt: descriptiveLabel,
+                            className: "w-12 h-12 object-cover"
+                          }
+                        ),
+                        stateCount > 1 && /* @__PURE__ */ jsxs7("span", { className: "absolute -top-1 -right-1 text-[7px] bg-brand-primary/90 text-white px-1 rounded-full leading-tight", children: [
+                          "x",
+                          stateCount
+                        ] })
+                      ] }),
+                      /* @__PURE__ */ jsx7("span", { className: "text-[8px] text-center px-0.5 py-0.5 truncate w-full leading-tight", children: descriptiveLabel })
+                    ] }) : /* @__PURE__ */ jsxs7(Fragment4, { children: [
+                      descriptiveLabel,
                       stateCount > 1 && /* @__PURE__ */ jsxs7("span", { className: "text-[8px] opacity-70 bg-white/10 px-0.5 rounded", children: [
                         "x",
                         stateCount
@@ -2836,6 +2972,14 @@ function StateViewPanel({
           }
         ) })
       ] }),
+      /* @__PURE__ */ jsx7(
+        StateLayoutView,
+        {
+          state: selectedState,
+          elementThumbnails,
+          fingerprintDetails
+        }
+      ),
       /* @__PURE__ */ jsxs7("div", { children: [
         /* @__PURE__ */ jsx7("h3", { className: "text-sm font-medium text-text-primary mb-3", children: "Transitions" }),
         /* @__PURE__ */ jsxs7("div", { className: "space-y-2", children: [

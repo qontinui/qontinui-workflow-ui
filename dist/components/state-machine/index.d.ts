@@ -104,6 +104,18 @@ interface StateDetailPanelProps {
 }
 declare function StateDetailPanel({ state, onSave, onDelete, onClose, }: StateDetailPanelProps): react_jsx_runtime.JSX.Element;
 
+/** Fingerprint detail from discovery co-occurrence data. */
+interface FingerprintDetail {
+    tagName: string;
+    role: string;
+    accessibleName?: string;
+    positionZone: string;
+    relativePosition: {
+        top: number;
+        left: number;
+    };
+    sizeCategory?: string;
+}
 interface StateViewPanelProps {
     states: StateMachineState[];
     transitions: StateMachineTransition[];
@@ -111,8 +123,10 @@ interface StateViewPanelProps {
     onSelectState: (stateId: string | null) => void;
     /** Optional map of element ID (or fingerprint hash) → base64 PNG thumbnail. */
     elementThumbnails?: Record<string, string>;
+    /** Optional fingerprint details from discovery. Keys are fingerprint hashes. */
+    fingerprintDetails?: Record<string, FingerprintDetail>;
 }
-declare function StateViewPanel({ states, transitions, selectedStateId, onSelectState, elementThumbnails, }: StateViewPanelProps): react_jsx_runtime.JSX.Element;
+declare function StateViewPanel({ states, transitions, selectedStateId, onSelectState, elementThumbnails, fingerprintDetails, }: StateViewPanelProps): react_jsx_runtime.JSX.Element;
 
 interface PathfindingPanelProps {
     /** All states in the config */
@@ -136,4 +150,4 @@ interface StateViewTableProps {
 }
 declare function StateViewTable({ states, selectedStateId, onSelectState, }: StateViewTableProps): react_jsx_runtime.JSX.Element;
 
-export { PathfindingPanel, type PathfindingPanelProps, StateDetailPanel, type StateDetailPanelProps, StateMachineGraphView, type StateMachineGraphViewProps, StateMachineStateNode, StateMachineTransitionEdge, StateViewPanel, type StateViewPanelProps, StateViewTable, type StateViewTableProps, TransitionEditor, type TransitionEditorProps, TransitionsPanel, type TransitionsPanelProps };
+export { type FingerprintDetail, PathfindingPanel, type PathfindingPanelProps, StateDetailPanel, type StateDetailPanelProps, StateMachineGraphView, type StateMachineGraphViewProps, StateMachineStateNode, StateMachineTransitionEdge, StateViewPanel, type StateViewPanelProps, StateViewTable, type StateViewTableProps, TransitionEditor, type TransitionEditorProps, TransitionsPanel, type TransitionsPanelProps };

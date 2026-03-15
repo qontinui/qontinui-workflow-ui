@@ -33,7 +33,7 @@ export { StateDetailPanel } from "./StateDetailPanel";
 export type { StateDetailPanelProps } from "./StateDetailPanel";
 
 export { StateViewPanel } from "./StateViewPanel";
-export type { StateViewPanelProps } from "./StateViewPanel";
+export type { StateViewPanelProps, FingerprintDetail } from "./StateViewPanel";
 
 export { PathfindingPanel } from "./PathfindingPanel";
 export type { PathfindingPanelProps } from "./PathfindingPanel";

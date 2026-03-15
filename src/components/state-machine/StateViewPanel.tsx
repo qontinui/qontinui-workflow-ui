@@ -37,6 +37,7 @@ import {
   ArrowUpRight,
   ArrowDownLeft,
   Target,
+  Layout,
 } from "lucide-react";
 import type {
   StateMachineState,
@@ -57,6 +58,16 @@ import {
 
 type ViewMode = "list" | "spatial";
 
+/** Fingerprint detail from discovery co-occurrence data. */
+export interface FingerprintDetail {
+  tagName: string;
+  role: string;
+  accessibleName?: string;
+  positionZone: string;
+  relativePosition: { top: number; left: number };
+  sizeCategory?: string;
+}
+
 export interface StateViewPanelProps {
   states: StateMachineState[];
   transitions: StateMachineTransition[];
@@ -64,6 +75,8 @@ export interface StateViewPanelProps {
   onSelectState: (stateId: string | null) => void;
   /** Optional map of element ID (or fingerprint hash) → base64 PNG thumbnail. */
   elementThumbnails?: Record<string, string>;
+  /** Optional fingerprint details from discovery. Keys are fingerprint hashes. */
+  fingerprintDetails?: Record<string, FingerprintDetail>;
 }
 
 // =============================================================================
@@ -97,6 +110,79 @@ const ACTION_ICONS: Partial<
   wait: Layers,
   navigate: Globe,
 };
+
+// =============================================================================
+// Element Label Helpers
+// =============================================================================
+
+/**
+ * Resolve a descriptive label for an element ID.
+ *
+ * Priority:
+ * 1. fingerprintDetails (live discovery data)
+ * 2. state extra_metadata.elementLabels (persisted during save)
+ * 3. getElementLabel (prefix:label parsing)
+ */
+function resolveElementLabel(
+  elementId: string,
+  fingerprintDetails?: Record<string, FingerprintDetail>,
+  state?: StateMachineState,
+): string {
+  // Live fingerprint data
+  const fp = fingerprintDetails?.[elementId];
+  if (fp) {
+    if (fp.accessibleName) return fp.accessibleName;
+    const parts = [fp.tagName, fp.role].filter(Boolean);
+    if (parts.length > 0) return parts.join(" ");
+  }
+  // Persisted element labels from extra_metadata
+  const labels = state?.extra_metadata?.elementLabels as
+    | Record<string, string>
+    | undefined;
+  if (labels?.[elementId]) return labels[elementId];
+  // Fallback to prefix:label parsing
+  return getElementLabel(elementId);
+}
+
+/**
+ * Resolve position for an element on screen (0-1 viewport %).
+ */
+function resolveElementPosition(
+  elementId: string,
+  fingerprintDetails?: Record<string, FingerprintDetail>,
+  state?: StateMachineState,
+): { top: number; left: number } | null {
+  const fp = fingerprintDetails?.[elementId];
+  if (fp?.relativePosition) return fp.relativePosition;
+  const positions = state?.extra_metadata?.elementPositions as
+    | Record<string, { top: number; left: number }>
+    | undefined;
+  if (positions?.[elementId]) return positions[elementId];
+  return null;
+}
+
+/**
+ * Resolve tag metadata for an element.
+ */
+function resolveElementTag(
+  elementId: string,
+  fingerprintDetails?: Record<string, FingerprintDetail>,
+  state?: StateMachineState,
+): { tagName: string; role: string; zone: string } | null {
+  const fp = fingerprintDetails?.[elementId];
+  if (fp) {
+    return {
+      tagName: fp.tagName || "",
+      role: fp.role || "",
+      zone: fp.positionZone || "",
+    };
+  }
+  const tags = state?.extra_metadata?.elementTags as
+    | Record<string, { tagName: string; role: string; zone: string }>
+    | undefined;
+  if (tags?.[elementId]) return tags[elementId];
+  return null;
+}
 
 // =============================================================================
 // Spatial Visualization Canvas
@@ -453,6 +539,145 @@ function SpatialCanvas({
 }
 
 // =============================================================================
+// State Layout View — shows elements positioned on a viewport representation
+// =============================================================================
+
+interface StateLayoutViewProps {
+  state: StateMachineState;
+  elementThumbnails?: Record<string, string>;
+  fingerprintDetails?: Record<string, FingerprintDetail>;
+}
+
+function StateLayoutView({
+  state,
+  elementThumbnails,
+  fingerprintDetails,
+}: StateLayoutViewProps) {
+  const [hoveredElement, setHoveredElement] = useState<string | null>(null);
+
+  // Collect elements with positions
+  const positionedElements = useMemo(() => {
+    const items: Array<{
+      id: string;
+      label: string;
+      tag: { tagName: string; role: string; zone: string } | null;
+      position: { top: number; left: number };
+      thumbnail?: string;
+      prefix: string;
+    }> = [];
+
+    for (const eid of state.element_ids) {
+      const pos = resolveElementPosition(eid, fingerprintDetails, state);
+      if (!pos) continue;
+      const label = resolveElementLabel(eid, fingerprintDetails, state);
+      const tag = resolveElementTag(eid, fingerprintDetails, state);
+      const prefix = getElementTypePrefix(eid);
+      const thumb = elementThumbnails?.[eid] ?? elementThumbnails?.[getElementLabel(eid)];
+      items.push({ id: eid, label, tag, position: pos, thumbnail: thumb, prefix });
+    }
+    return items;
+  }, [state, fingerprintDetails, elementThumbnails]);
+
+  const elementsWithoutPosition = state.element_ids.length - positionedElements.length;
+
+  if (positionedElements.length === 0) {
+    return (
+      <div className="flex items-center justify-center h-48 text-text-muted text-xs">
+        No position data available for this state's elements.
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <h3 className="text-sm font-medium text-text-primary mb-3 flex items-center gap-2">
+        <Layout className="size-3.5" />
+        State Layout
+      </h3>
+      {/* Viewport representation */}
+      <div
+        className="relative bg-bg-tertiary border border-border-secondary rounded-lg"
+        style={{ aspectRatio: "16 / 10" }}
+      >
+        {/* Viewport zones overlay */}
+        <div className="absolute inset-0 pointer-events-none">
+          <div className="absolute top-0 left-0 right-0 h-[10%] border-b border-dashed border-border-secondary/30" />
+          <div className="absolute bottom-0 left-0 right-0 h-[10%] border-t border-dashed border-border-secondary/30" />
+        </div>
+
+        {/* Elements plotted at their positions */}
+        {positionedElements.map((el) => {
+          const isHovered = hoveredElement === el.id;
+          const colorClass =
+            ELEMENT_COLORS[el.prefix] ??
+            "border-gray-400 bg-gray-500/10 text-gray-300";
+          const thumbSrc = el.thumbnail
+            ? el.thumbnail.startsWith("data:")
+              ? el.thumbnail
+              : `data:image/png;base64,${el.thumbnail}`
+            : undefined;
+
+          return (
+            <div
+              key={el.id}
+              className="absolute group"
+              style={{
+                top: `${el.position.top * 100}%`,
+                left: `${el.position.left * 100}%`,
+                transform: "translate(-50%, -50%)",
+              }}
+              onMouseEnter={() => setHoveredElement(el.id)}
+              onMouseLeave={() => setHoveredElement(null)}
+            >
+              {/* Element marker */}
+              <div
+                className={`
+                  rounded border ${colorClass} overflow-hidden
+                  transition-all duration-100 cursor-default
+                  ${isHovered ? "ring-2 ring-brand-primary/50 shadow-lg z-20 scale-125" : "z-10"}
+                `}
+                style={{ width: thumbSrc ? 32 : undefined, height: thumbSrc ? 32 : undefined }}
+              >
+                {thumbSrc ? (
+                  <img
+                    src={thumbSrc}
+                    alt={el.label}
+                    className="w-full h-full object-contain"
+                  />
+                ) : (
+                  <div className="px-1 py-0.5 text-[8px] whitespace-nowrap max-w-[80px] truncate">
+                    {el.label}
+                  </div>
+                )}
+              </div>
+
+              {/* Tooltip on hover */}
+              {isHovered && (
+                <div className="absolute top-full left-1/2 -translate-x-1/2 mt-1 z-30 bg-bg-primary/95 backdrop-blur-sm border border-border-secondary rounded px-2 py-1 shadow-md whitespace-nowrap">
+                  <div className="text-[10px] font-medium text-text-primary">
+                    {el.label}
+                  </div>
+                  {el.tag && (
+                    <div className="text-[9px] text-text-muted">
+                      {[el.tag.tagName && `<${el.tag.tagName}>`, el.tag.role && `role="${el.tag.role}"`, el.tag.zone].filter(Boolean).join(" ")}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+      {elementsWithoutPosition > 0 && (
+        <p className="text-[10px] text-text-muted mt-1.5">
+          {elementsWithoutPosition} element{elementsWithoutPosition !== 1 ? "s" : ""} without position data
+        </p>
+      )}
+    </div>
+  );
+}
+
+// =============================================================================
 // Main Component
 // =============================================================================
 
@@ -462,6 +687,7 @@ export function StateViewPanel({
   selectedStateId,
   onSelectState,
   elementThumbnails,
+  fingerprintDetails,
 }: StateViewPanelProps) {
   const [expandedStates, setExpandedStates] = useState<Set<string>>(new Set());
   const [searchFilter, setSearchFilter] = useState("");
@@ -665,7 +891,7 @@ export function StateViewPanel({
                   <div className="ml-5 pl-2 border-l border-border-secondary mt-1 mb-2 space-y-0.5">
                     {state.element_ids.slice(0, 20).map((eid) => {
                       const prefix = getElementTypePrefix(eid);
-                      const label = getElementLabel(eid);
+                      const label = resolveElementLabel(eid, fingerprintDetails, state);
                       const Icon = ELEMENT_ICONS[prefix] ?? Layers;
                       const stateCount = sharedElements.get(eid)?.length ?? 1;
                       return (
@@ -785,24 +1011,37 @@ export function StateViewPanel({
                           {elements.map((eid) => {
                             const stateCount =
                               sharedElements.get(eid)?.length ?? 1;
-                            const label = getElementLabel(eid);
+                            const rawLabel = getElementLabel(eid);
+                            const descriptiveLabel = resolveElementLabel(eid, fingerprintDetails, selectedState);
                             // Look up thumbnail by full ID or by label (which is the hash suffix)
-                            const thumb = elementThumbnails?.[eid] ?? elementThumbnails?.[label];
+                            const thumb = elementThumbnails?.[eid] ?? elementThumbnails?.[rawLabel];
                             return (
                               <div
                                 key={eid}
-                                className={`rounded border ${colorClass} overflow-hidden ${thumb ? "w-12 h-12" : "text-[11px] px-2 py-0.5 inline-flex items-center gap-1"}`}
+                                className={`rounded border ${colorClass} overflow-hidden ${thumb ? "flex flex-col items-center w-16" : "text-[11px] px-2 py-0.5 inline-flex items-center gap-1"}`}
                                 title={`${eid}${stateCount > 1 ? ` (shared across ${stateCount} states)` : ""}`}
                               >
                                 {thumb ? (
-                                  <img
-                                    src={thumb.startsWith("data:") ? thumb : `data:image/png;base64,${thumb}`}
-                                    alt={label}
-                                    className="w-full h-full object-cover"
-                                  />
+                                  <>
+                                    <div className="relative">
+                                      <img
+                                        src={thumb.startsWith("data:") ? thumb : `data:image/png;base64,${thumb}`}
+                                        alt={descriptiveLabel}
+                                        className="w-12 h-12 object-cover"
+                                      />
+                                      {stateCount > 1 && (
+                                        <span className="absolute -top-1 -right-1 text-[7px] bg-brand-primary/90 text-white px-1 rounded-full leading-tight">
+                                          x{stateCount}
+                                        </span>
+                                      )}
+                                    </div>
+                                    <span className="text-[8px] text-center px-0.5 py-0.5 truncate w-full leading-tight">
+                                      {descriptiveLabel}
+                                    </span>
+                                  </>
                                 ) : (
                                   <>
-                                    {label}
+                                    {descriptiveLabel}
                                     {stateCount > 1 && (
                                       <span className="text-[8px] opacity-70 bg-white/10 px-0.5 rounded">
                                         x{stateCount}
@@ -820,6 +1059,13 @@ export function StateViewPanel({
                 )}
               </div>
             </div>
+
+            {/* State Layout — positional view of elements */}
+            <StateLayoutView
+              state={selectedState}
+              elementThumbnails={elementThumbnails}
+              fingerprintDetails={fingerprintDetails}
+            />
 
             {/* Transitions from/to this state */}
             <div>

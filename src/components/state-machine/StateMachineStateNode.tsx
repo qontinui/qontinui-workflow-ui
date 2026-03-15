@@ -245,7 +245,7 @@ function StateMachineStateNodeInner({ data }: NodeProps) {
                     <img
                       src={thumbnailSrc}
                       alt={style.label}
-                      className="w-full h-full object-cover rounded-sm"
+                      className="w-full h-full object-contain rounded-sm"
                       draggable={false}
                     />
                   ) : (
