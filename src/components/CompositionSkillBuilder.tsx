@@ -439,7 +439,7 @@ function MiniSkillPicker({
           skill.name.toLowerCase(),
           skill.description.toLowerCase(),
           skill.slug.toLowerCase(),
-          ...skill.tags.map((t) => t.toLowerCase()),
+          ...skill.tags.map((t: string) => t.toLowerCase()),
         ].join(" ");
         return words.every((word) => haystack.includes(word));
       });

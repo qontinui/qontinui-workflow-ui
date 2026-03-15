@@ -98,7 +98,8 @@ function StateMachineStateNodeInner({ data }) {
     isDropTarget,
     onStartElementDrag,
     outgoingCount,
-    incomingCount
+    incomingCount,
+    elementThumbnails
   } = nodeData;
   const confidencePercent = Math.round(confidence * 100);
   const cardSize = getCardSize(elementCount);
@@ -200,7 +201,21 @@ Drag to create transition` : elementId,
                         onStartElementDrag(stateId, elementId);
                       },
                       children: [
-                        /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "flex flex-col items-center justify-center h-full px-0.5 py-1", children: [
+                        (() => {
+                          const thumb = elementThumbnails?.[elementId] ?? elementThumbnails?.[style.label];
+                          return thumb;
+                        })() ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
+                          "img",
+                          {
+                            src: (() => {
+                              const t = elementThumbnails?.[elementId] ?? elementThumbnails?.[style.label] ?? "";
+                              return t.startsWith("data:") ? t : `data:image/png;base64,${t}`;
+                            })(),
+                            alt: style.label,
+                            className: "w-full h-full object-cover rounded-sm",
+                            draggable: false
+                          }
+                        ) : /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "flex flex-col items-center justify-center h-full px-0.5 py-1", children: [
                           /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Icon, { className: `size-3.5 ${style.color} shrink-0` }),
                           /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: `text-[7px] ${style.color} truncate w-full text-center mt-0.5 leading-tight`, children: style.label })
                         ] }),
@@ -396,7 +411,8 @@ function StateMachineGraphViewInner({
   isDragging,
   dropTargetStateId,
   resolveTransitionSelectionId,
-  extraShortcutEntries
+  extraShortcutEntries,
+  elementThumbnails
 }) {
   const [showShortcuts, setShowShortcuts] = (0, import_react5.useState)(false);
   const reactFlowInstance = (0, import_react6.useReactFlow)();
@@ -440,10 +456,11 @@ function StateMachineGraphViewInner({
         outgoingCount: transitionCounts.outgoing.get(state.state_id) ?? 0,
         incomingCount: transitionCounts.incoming.get(state.state_id) ?? 0,
         isDropTarget: isDragging && dropTargetStateId === state.state_id,
-        onStartElementDrag
+        onStartElementDrag,
+        elementThumbnails
       }
     })),
-    [states, selectedStateId, effectiveInitialStateId, transitionCounts, isDragging, dropTargetStateId, onStartElementDrag]
+    [states, selectedStateId, effectiveInitialStateId, transitionCounts, isDragging, dropTargetStateId, onStartElementDrag, elementThumbnails]
   );
   const getSelectionId = (0, import_react5.useCallback)(
     (trans) => {
@@ -2473,7 +2490,8 @@ function StateViewPanel({
   states,
   transitions,
   selectedStateId,
-  onSelectState
+  onSelectState,
+  elementThumbnails
 }) {
   const [expandedStates, setExpandedStates] = (0, import_react10.useState)(/* @__PURE__ */ new Set());
   const [searchFilter, setSearchFilter] = (0, import_react10.useState)("");
@@ -2733,20 +2751,29 @@ function StateViewPanel({
                   ")"
                 ] })
               ] }),
-              /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("div", { className: "flex flex-wrap gap-1", children: elements.map((eid) => {
+              /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("div", { className: "flex flex-wrap gap-1.5", children: elements.map((eid) => {
                 const stateCount = sharedElements.get(eid)?.length ?? 1;
-                return /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)(
+                const label = (0, import_workflow_utils4.getElementLabel)(eid);
+                const thumb = elementThumbnails?.[eid] ?? elementThumbnails?.[label];
+                return /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(
                   "div",
                   {
-                    className: `text-[11px] px-2 py-0.5 rounded border ${colorClass} inline-flex items-center gap-1`,
+                    className: `rounded border ${colorClass} overflow-hidden ${thumb ? "w-12 h-12" : "text-[11px] px-2 py-0.5 inline-flex items-center gap-1"}`,
                     title: `${eid}${stateCount > 1 ? ` (shared across ${stateCount} states)` : ""}`,
-                    children: [
-                      (0, import_workflow_utils4.getElementLabel)(eid),
+                    children: thumb ? /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(
+                      "img",
+                      {
+                        src: thumb.startsWith("data:") ? thumb : `data:image/png;base64,${thumb}`,
+                        alt: label,
+                        className: "w-full h-full object-cover"
+                      }
+                    ) : /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)(import_jsx_runtime7.Fragment, { children: [
+                      label,
                       stateCount > 1 && /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("span", { className: "text-[8px] opacity-70 bg-white/10 px-0.5 rounded", children: [
                         "x",
                         stateCount
                       ] })
-                    ]
+                    ] })
                   },
                   eid
                 );

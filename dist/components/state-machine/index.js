@@ -89,7 +89,8 @@ function StateMachineStateNodeInner({ data }) {
     isDropTarget,
     onStartElementDrag,
     outgoingCount,
-    incomingCount
+    incomingCount,
+    elementThumbnails
   } = nodeData;
   const confidencePercent = Math.round(confidence * 100);
   const cardSize = getCardSize(elementCount);
@@ -191,7 +192,21 @@ Drag to create transition` : elementId,
                         onStartElementDrag(stateId, elementId);
                       },
                       children: [
-                        /* @__PURE__ */ jsxs("div", { className: "flex flex-col items-center justify-center h-full px-0.5 py-1", children: [
+                        (() => {
+                          const thumb = elementThumbnails?.[elementId] ?? elementThumbnails?.[style.label];
+                          return thumb;
+                        })() ? /* @__PURE__ */ jsx(
+                          "img",
+                          {
+                            src: (() => {
+                              const t = elementThumbnails?.[elementId] ?? elementThumbnails?.[style.label] ?? "";
+                              return t.startsWith("data:") ? t : `data:image/png;base64,${t}`;
+                            })(),
+                            alt: style.label,
+                            className: "w-full h-full object-cover rounded-sm",
+                            draggable: false
+                          }
+                        ) : /* @__PURE__ */ jsxs("div", { className: "flex flex-col items-center justify-center h-full px-0.5 py-1", children: [
                           /* @__PURE__ */ jsx(Icon, { className: `size-3.5 ${style.color} shrink-0` }),
                           /* @__PURE__ */ jsx("span", { className: `text-[7px] ${style.color} truncate w-full text-center mt-0.5 leading-tight`, children: style.label })
                         ] }),
@@ -398,7 +413,8 @@ function StateMachineGraphViewInner({
   isDragging,
   dropTargetStateId,
   resolveTransitionSelectionId,
-  extraShortcutEntries
+  extraShortcutEntries,
+  elementThumbnails
 }) {
   const [showShortcuts, setShowShortcuts] = useState(false);
   const reactFlowInstance = useReactFlow();
@@ -442,10 +458,11 @@ function StateMachineGraphViewInner({
         outgoingCount: transitionCounts.outgoing.get(state.state_id) ?? 0,
         incomingCount: transitionCounts.incoming.get(state.state_id) ?? 0,
         isDropTarget: isDragging && dropTargetStateId === state.state_id,
-        onStartElementDrag
+        onStartElementDrag,
+        elementThumbnails
       }
     })),
-    [states, selectedStateId, effectiveInitialStateId, transitionCounts, isDragging, dropTargetStateId, onStartElementDrag]
+    [states, selectedStateId, effectiveInitialStateId, transitionCounts, isDragging, dropTargetStateId, onStartElementDrag, elementThumbnails]
   );
   const getSelectionId = useCallback(
     (trans) => {
@@ -2207,7 +2224,7 @@ import {
   STATE_COLORS,
   computeSpatialLayout
 } from "@qontinui/workflow-utils";
-import { jsx as jsx7, jsxs as jsxs7 } from "react/jsx-runtime";
+import { Fragment as Fragment4, jsx as jsx7, jsxs as jsxs7 } from "react/jsx-runtime";
 var ELEMENT_ICONS = {
   testid: Hash2,
   role: MousePointer4,
@@ -2531,7 +2548,8 @@ function StateViewPanel({
   states,
   transitions,
   selectedStateId,
-  onSelectState
+  onSelectState,
+  elementThumbnails
 }) {
   const [expandedStates, setExpandedStates] = useState5(/* @__PURE__ */ new Set());
   const [searchFilter, setSearchFilter] = useState5("");
@@ -2791,20 +2809,29 @@ function StateViewPanel({
                   ")"
                 ] })
               ] }),
-              /* @__PURE__ */ jsx7("div", { className: "flex flex-wrap gap-1", children: elements.map((eid) => {
+              /* @__PURE__ */ jsx7("div", { className: "flex flex-wrap gap-1.5", children: elements.map((eid) => {
                 const stateCount = sharedElements.get(eid)?.length ?? 1;
-                return /* @__PURE__ */ jsxs7(
+                const label = getElementLabel2(eid);
+                const thumb = elementThumbnails?.[eid] ?? elementThumbnails?.[label];
+                return /* @__PURE__ */ jsx7(
                   "div",
                   {
-                    className: `text-[11px] px-2 py-0.5 rounded border ${colorClass} inline-flex items-center gap-1`,
+                    className: `rounded border ${colorClass} overflow-hidden ${thumb ? "w-12 h-12" : "text-[11px] px-2 py-0.5 inline-flex items-center gap-1"}`,
                     title: `${eid}${stateCount > 1 ? ` (shared across ${stateCount} states)` : ""}`,
-                    children: [
-                      getElementLabel2(eid),
+                    children: thumb ? /* @__PURE__ */ jsx7(
+                      "img",
+                      {
+                        src: thumb.startsWith("data:") ? thumb : `data:image/png;base64,${thumb}`,
+                        alt: label,
+                        className: "w-full h-full object-cover"
+                      }
+                    ) : /* @__PURE__ */ jsxs7(Fragment4, { children: [
+                      label,
                       stateCount > 1 && /* @__PURE__ */ jsxs7("span", { className: "text-[8px] opacity-70 bg-white/10 px-0.5 rounded", children: [
                         "x",
                         stateCount
                       ] })
-                    ]
+                    ] })
                   },
                   eid
                 );
@@ -2956,7 +2983,7 @@ import { useState as useState6, useCallback as useCallback6 } from "react";
 import {
   findPath
 } from "@qontinui/workflow-utils";
-import { Fragment as Fragment4, jsx as jsx8, jsxs as jsxs8 } from "react/jsx-runtime";
+import { Fragment as Fragment5, jsx as jsx8, jsxs as jsxs8 } from "react/jsx-runtime";
 function PathfindingPanel({
   states,
   transitions,
@@ -3065,7 +3092,7 @@ function PathfindingPanel({
         }
       )
     ] }),
-    result && /* @__PURE__ */ jsx8("div", { className: "border-t border-border-secondary pt-3", children: result.found ? /* @__PURE__ */ jsxs8(Fragment4, { children: [
+    result && /* @__PURE__ */ jsx8("div", { className: "border-t border-border-secondary pt-3", children: result.found ? /* @__PURE__ */ jsxs8(Fragment5, { children: [
       /* @__PURE__ */ jsxs8("div", { className: "flex items-center justify-between mb-2", children: [
         /* @__PURE__ */ jsxs8("span", { className: "text-xs text-green-400 font-medium", children: [
           "Path found (",

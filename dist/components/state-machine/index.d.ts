@@ -58,6 +58,8 @@ interface StateMachineGraphViewProps {
      * Each entry is [label, keyDescription].
      */
     extraShortcutEntries?: [string, string][];
+    /** Map of element ID → base64 PNG thumbnail for rendering in state node tiles. */
+    elementThumbnails?: Record<string, string>;
 }
 declare function StateMachineGraphView(props: StateMachineGraphViewProps): react_jsx_runtime.JSX.Element;
 
@@ -107,8 +109,10 @@ interface StateViewPanelProps {
     transitions: StateMachineTransition[];
     selectedStateId: string | null;
     onSelectState: (stateId: string | null) => void;
+    /** Optional map of element ID (or fingerprint hash) → base64 PNG thumbnail. */
+    elementThumbnails?: Record<string, string>;
 }
-declare function StateViewPanel({ states, transitions, selectedStateId, onSelectState, }: StateViewPanelProps): react_jsx_runtime.JSX.Element;
+declare function StateViewPanel({ states, transitions, selectedStateId, onSelectState, elementThumbnails, }: StateViewPanelProps): react_jsx_runtime.JSX.Element;
 
 interface PathfindingPanelProps {
     /** All states in the config */

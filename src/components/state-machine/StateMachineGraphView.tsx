@@ -106,6 +106,10 @@ export interface StateMachineGraphViewProps {
    * Each entry is [label, keyDescription].
    */
   extraShortcutEntries?: [string, string][];
+
+  // --- Element thumbnails (optional) ---
+  /** Map of element ID → base64 PNG thumbnail for rendering in state node tiles. */
+  elementThumbnails?: Record<string, string>;
 }
 
 // =============================================================================
@@ -131,6 +135,7 @@ function StateMachineGraphViewInner({
   dropTargetStateId,
   resolveTransitionSelectionId,
   extraShortcutEntries,
+  elementThumbnails,
 }: StateMachineGraphViewProps) {
   const [showShortcuts, setShowShortcuts] = useState(false);
   const reactFlowInstance = useReactFlow();
@@ -183,9 +188,10 @@ function StateMachineGraphViewInner({
           incomingCount: transitionCounts.incoming.get(state.state_id) ?? 0,
           isDropTarget: isDragging && dropTargetStateId === state.state_id,
           onStartElementDrag,
+          elementThumbnails,
         } satisfies StateNodeData,
       })),
-    [states, selectedStateId, effectiveInitialStateId, transitionCounts, isDragging, dropTargetStateId, onStartElementDrag],
+    [states, selectedStateId, effectiveInitialStateId, transitionCounts, isDragging, dropTargetStateId, onStartElementDrag, elementThumbnails],
   );
 
   // Resolve transition selection ID

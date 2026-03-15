@@ -62,6 +62,8 @@ export interface StateViewPanelProps {
   transitions: StateMachineTransition[];
   selectedStateId: string | null;
   onSelectState: (stateId: string | null) => void;
+  /** Optional map of element ID (or fingerprint hash) → base64 PNG thumbnail. */
+  elementThumbnails?: Record<string, string>;
 }
 
 // =============================================================================
@@ -459,6 +461,7 @@ export function StateViewPanel({
   transitions,
   selectedStateId,
   onSelectState,
+  elementThumbnails,
 }: StateViewPanelProps) {
   const [expandedStates, setExpandedStates] = useState<Set<string>>(new Set());
   const [searchFilter, setSearchFilter] = useState("");
@@ -778,21 +781,34 @@ export function StateViewPanel({
                             ({elements.length})
                           </span>
                         </div>
-                        <div className="flex flex-wrap gap-1">
+                        <div className="flex flex-wrap gap-1.5">
                           {elements.map((eid) => {
                             const stateCount =
                               sharedElements.get(eid)?.length ?? 1;
+                            const label = getElementLabel(eid);
+                            // Look up thumbnail by full ID or by label (which is the hash suffix)
+                            const thumb = elementThumbnails?.[eid] ?? elementThumbnails?.[label];
                             return (
                               <div
                                 key={eid}
-                                className={`text-[11px] px-2 py-0.5 rounded border ${colorClass} inline-flex items-center gap-1`}
+                                className={`rounded border ${colorClass} overflow-hidden ${thumb ? "w-12 h-12" : "text-[11px] px-2 py-0.5 inline-flex items-center gap-1"}`}
                                 title={`${eid}${stateCount > 1 ? ` (shared across ${stateCount} states)` : ""}`}
                               >
-                                {getElementLabel(eid)}
-                                {stateCount > 1 && (
-                                  <span className="text-[8px] opacity-70 bg-white/10 px-0.5 rounded">
-                                    x{stateCount}
-                                  </span>
+                                {thumb ? (
+                                  <img
+                                    src={thumb.startsWith("data:") ? thumb : `data:image/png;base64,${thumb}`}
+                                    alt={label}
+                                    className="w-full h-full object-cover"
+                                  />
+                                ) : (
+                                  <>
+                                    {label}
+                                    {stateCount > 1 && (
+                                      <span className="text-[8px] opacity-70 bg-white/10 px-0.5 rounded">
+                                        x{stateCount}
+                                      </span>
+                                    )}
+                                  </>
                                 )}
                               </div>
                             );

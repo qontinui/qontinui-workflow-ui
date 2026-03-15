@@ -94,6 +94,7 @@ function StateMachineStateNodeInner({ data }: NodeProps) {
     onStartElementDrag,
     outgoingCount,
     incomingCount,
+    elementThumbnails,
   } = nodeData;
 
   const confidencePercent = Math.round(confidence * 100);
@@ -206,6 +207,10 @@ function StateMachineStateNodeInner({ data }: NodeProps) {
             {elementIds.slice(0, cardSize.maxElements).map((elementId) => {
               const style = getElementStyle(elementId);
               const Icon = style.icon;
+              const thumbnail = elementThumbnails?.[elementId] ?? elementThumbnails?.[style.label];
+              const thumbnailSrc = thumbnail
+                ? thumbnail.startsWith("data:") ? thumbnail : `data:image/png;base64,${thumbnail}`
+                : undefined;
               return (
                 <div
                   key={elementId}
@@ -235,12 +240,21 @@ function StateMachineStateNodeInner({ data }: NodeProps) {
                     onStartElementDrag(stateId, elementId);
                   }}
                 >
-                  <div className="flex flex-col items-center justify-center h-full px-0.5 py-1">
-                    <Icon className={`size-3.5 ${style.color} shrink-0`} />
-                    <span className={`text-[7px] ${style.color} truncate w-full text-center mt-0.5 leading-tight`}>
-                      {style.label}
-                    </span>
-                  </div>
+                  {thumbnailSrc ? (
+                    <img
+                      src={thumbnailSrc}
+                      alt={style.label}
+                      className="w-full h-full object-cover rounded-sm"
+                      draggable={false}
+                    />
+                  ) : (
+                    <div className="flex flex-col items-center justify-center h-full px-0.5 py-1">
+                      <Icon className={`size-3.5 ${style.color} shrink-0`} />
+                      <span className={`text-[7px] ${style.color} truncate w-full text-center mt-0.5 leading-tight`}>
+                        {style.label}
+                      </span>
+                    </div>
+                  )}
 
                   {/* Drag handle indicator - appears on hover */}
                   {onStartElementDrag && (

@@ -3,7 +3,7 @@ import {
   ChatInput,
   ChatMessageArea,
   WorkflowPreviewPanel
-} from "../../chunk-YPCWEOPL.js";
+} from "../../chunk-47XJDVC4.js";
 export {
   ChatHeader,
   ChatInput,
