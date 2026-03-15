@@ -102,6 +102,7 @@ function StateMachineStateNodeInner({ data }: NodeProps) {
   const elementSummary = useMemo(() => summarizeElementTypes(elementIds), [elementIds]);
   const hasConnections = (outgoingCount ?? 0) > 0 || (incomingCount ?? 0) > 0;
 
+
   return (
     <div style={{ width: cardSize.cardWidth }} data-id={stateId}>
       <Handle
