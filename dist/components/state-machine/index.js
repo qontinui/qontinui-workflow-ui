@@ -162,6 +162,8 @@ function StateMachineStateNodeInner({ data }) {
                 elementIds.slice(0, cardSize.maxElements).map((elementId) => {
                   const style = getElementStyle(elementId);
                   const Icon = style.icon;
+                  const thumbnail = elementThumbnails?.[elementId] ?? elementThumbnails?.[style.label];
+                  const thumbnailSrc = thumbnail ? thumbnail.startsWith("data:") ? thumbnail : `data:image/png;base64,${thumbnail}` : void 0;
                   return /* @__PURE__ */ jsxs(
                     "div",
                     {
@@ -192,16 +194,10 @@ Drag to create transition` : elementId,
                         onStartElementDrag(stateId, elementId);
                       },
                       children: [
-                        (() => {
-                          const thumb = elementThumbnails?.[elementId] ?? elementThumbnails?.[style.label];
-                          return thumb;
-                        })() ? /* @__PURE__ */ jsx(
+                        thumbnailSrc ? /* @__PURE__ */ jsx(
                           "img",
                           {
-                            src: (() => {
-                              const t = elementThumbnails?.[elementId] ?? elementThumbnails?.[style.label] ?? "";
-                              return t.startsWith("data:") ? t : `data:image/png;base64,${t}`;
-                            })(),
+                            src: thumbnailSrc,
                             alt: style.label,
                             className: "w-full h-full object-cover rounded-sm",
                             draggable: false
