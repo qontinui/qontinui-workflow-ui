@@ -123,13 +123,19 @@ const ACTION_ICONS: Partial<
  * 2. state extra_metadata.elementLabels (persisted during save)
  * 3. getElementLabel (prefix:label parsing)
  */
+function getFingerprintHash(elementId: string): string {
+  const idx = elementId.indexOf(":");
+  return idx > 0 ? elementId.slice(idx + 1) : elementId;
+}
+
 function resolveElementLabel(
   elementId: string,
   fingerprintDetails?: Record<string, FingerprintDetail>,
   state?: StateMachineState,
 ): string {
-  // Live fingerprint data
-  const fp = fingerprintDetails?.[elementId];
+  // Live fingerprint data — keys may be bare hashes while elementId is "prefix:hash"
+  const hash = getFingerprintHash(elementId);
+  const fp = fingerprintDetails?.[hash] ?? fingerprintDetails?.[elementId];
   if (fp) {
     if (fp.accessibleName) return fp.accessibleName;
     const parts = [fp.tagName, fp.role].filter(Boolean);
@@ -152,7 +158,8 @@ function resolveElementPosition(
   fingerprintDetails?: Record<string, FingerprintDetail>,
   state?: StateMachineState,
 ): { top: number; left: number } | null {
-  const fp = fingerprintDetails?.[elementId];
+  const hash = getFingerprintHash(elementId);
+  const fp = fingerprintDetails?.[hash] ?? fingerprintDetails?.[elementId];
   if (fp?.relativePosition) return fp.relativePosition;
   const positions = state?.extra_metadata?.elementPositions as
     | Record<string, { top: number; left: number }>
@@ -169,7 +176,8 @@ function resolveElementTag(
   fingerprintDetails?: Record<string, FingerprintDetail>,
   state?: StateMachineState,
 ): { tagName: string; role: string; zone: string } | null {
-  const fp = fingerprintDetails?.[elementId];
+  const hash = getFingerprintHash(elementId);
+  const fp = fingerprintDetails?.[hash] ?? fingerprintDetails?.[elementId];
   if (fp) {
     return {
       tagName: fp.tagName || "",
