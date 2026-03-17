@@ -38,6 +38,10 @@ import {
   ArrowDownLeft,
   Target,
   Layout,
+  Image,
+  ChevronLeft,
+  X,
+  Info,
 } from "lucide-react";
 import type {
   StateMachineState,
@@ -56,7 +60,7 @@ import {
 // Props
 // =============================================================================
 
-type ViewMode = "list" | "spatial";
+type ViewMode = "list" | "spatial" | "screenshot";
 
 /** Fingerprint detail from discovery co-occurrence data. */
 export interface FingerprintDetail {
@@ -68,6 +72,18 @@ export interface FingerprintDetail {
   sizeCategory?: string;
 }
 
+/** Metadata for a capture screenshot (without image data). */
+export interface CaptureScreenshotMeta {
+  id: string;
+  configId: string;
+  captureIndex: number;
+  width: number;
+  height: number;
+  elementBoundsJson: string;
+  fingerprintHashesJson: string;
+  capturedAt: string;
+}
+
 export interface StateViewPanelProps {
   states: StateMachineState[];
   transitions: StateMachineTransition[];
@@ -77,6 +93,10 @@ export interface StateViewPanelProps {
   elementThumbnails?: Record<string, string>;
   /** Optional fingerprint details from discovery. Keys are fingerprint hashes. */
   fingerprintDetails?: Record<string, FingerprintDetail>;
+  /** Optional capture screenshot metadata for screenshot view. */
+  captureScreenshots?: CaptureScreenshotMeta[];
+  /** Callback to load a screenshot image on demand. Returns data URL. */
+  onLoadScreenshotImage?: (screenshotId: string) => Promise<string>;
 }
 
 // =============================================================================
@@ -686,6 +706,950 @@ function StateLayoutView({
 }
 
 // =============================================================================
+// Screenshot State View — three-panel results viewer with bounding box overlays
+// =============================================================================
+
+type ScreenshotViewMode = "all" | "state" | "selected";
+type RightPanelTab = "element" | "state";
+
+interface ScreenshotStateViewProps {
+  captureScreenshots: CaptureScreenshotMeta[];
+  onLoadScreenshotImage: (screenshotId: string) => Promise<string>;
+  states: StateMachineState[];
+  selectedStateId: string | null;
+  onSelectState: (stateId: string | null) => void;
+  fingerprintDetails?: Record<string, FingerprintDetail>;
+  elementThumbnails?: Record<string, string>;
+}
+
+function ScreenshotStateView({
+  captureScreenshots,
+  onLoadScreenshotImage,
+  states,
+  selectedStateId,
+  onSelectState,
+  fingerprintDetails,
+  elementThumbnails,
+}: ScreenshotStateViewProps) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const imageCache = useRef<Map<string, HTMLImageElement>>(new Map());
+  const thumbnailLoadingRef = useRef<Set<string>>(new Set());
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const [userZoom, setUserZoom] = useState<number | null>(null);
+  const [autoFitZoom, setAutoFitZoom] = useState(1);
+  const zoom = userZoom ?? autoFitZoom;
+  const [hoveredElement, setHoveredElement] = useState<string | null>(null);
+  const [canvasSize, setCanvasSize] = useState({ width: 800, height: 600 });
+  const [isLoading, setIsLoading] = useState(false);
+
+  // New state for enhanced features
+  const [selectedElementHash, setSelectedElementHash] = useState<string | null>(null);
+  const [selectedElementHashes, setSelectedElementHashes] = useState<Set<string>>(new Set());
+  const [screenshotViewMode, setScreenshotViewMode] = useState<ScreenshotViewMode>("all");
+  const [rightPanelTab, setRightPanelTab] = useState<RightPanelTab>("state");
+  const [thumbnailCache, setThumbnailCache] = useState<Map<string, string>>(new Map());
+
+  const capture = captureScreenshots[currentIndex];
+
+  // Parse element bounds from the current capture
+  const elementBounds = useMemo(() => {
+    if (!capture) return {} as Record<string, { x: number; y: number; width: number; height: number }>;
+    try {
+      return JSON.parse(capture.elementBoundsJson) as Record<string, { x: number; y: number; width: number; height: number }>;
+    } catch {
+      return {} as Record<string, { x: number; y: number; width: number; height: number }>;
+    }
+  }, [capture]);
+
+  // Build map: hash → state IDs
+  const hashToStates = useMemo(() => {
+    const map = new Map<string, string[]>();
+    for (const state of states) {
+      for (const eid of state.element_ids) {
+        const hash = getFingerprintHash(eid);
+        if (!map.has(hash)) map.set(hash, []);
+        map.get(hash)!.push(state.state_id);
+      }
+    }
+    return map;
+  }, [states]);
+
+  // Build map: hash → capture indices where the element appears
+  const hashToCaptures = useMemo(() => {
+    const map = new Map<string, number[]>();
+    for (let i = 0; i < captureScreenshots.length; i++) {
+      try {
+        const hashes = JSON.parse(captureScreenshots[i]!.fingerprintHashesJson) as string[];
+        for (const h of hashes) {
+          if (!map.has(h)) map.set(h, []);
+          map.get(h)!.push(i);
+        }
+      } catch { /* skip */ }
+    }
+    return map;
+  }, [captureScreenshots]);
+
+  // Selected state hashes helper
+  const selectedStateHashes = useMemo(() => {
+    if (!selectedStateId) return new Set<string>();
+    const state = states.find(s => s.state_id === selectedStateId);
+    if (!state) return new Set<string>();
+    return new Set(state.element_ids.map(eid => getFingerprintHash(eid)));
+  }, [selectedStateId, states]);
+
+  // When selectedStateId changes, navigate to the best capture and switch view mode
+  useEffect(() => {
+    if (!selectedStateId) return;
+    setScreenshotViewMode("state");
+    setRightPanelTab("state");
+    const selectedState = states.find(s => s.state_id === selectedStateId);
+    if (!selectedState) return;
+    const hashes = new Set(selectedState.element_ids.map(eid => getFingerprintHash(eid)));
+    let bestIdx = -1;
+    let bestOverlap = 0;
+    for (let i = 0; i < captureScreenshots.length; i++) {
+      try {
+        const capHashes = JSON.parse(captureScreenshots[i]!.fingerprintHashesJson) as string[];
+        const overlap = capHashes.filter(h => hashes.has(h)).length;
+        if (overlap > bestOverlap) {
+          bestOverlap = overlap;
+          bestIdx = i;
+        }
+      } catch { /* skip */ }
+    }
+    if (bestIdx >= 0) setCurrentIndex(bestIdx);
+  }, [selectedStateId, states, captureScreenshots]);
+
+  // Resize observer
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+    const observer = new ResizeObserver(entries => {
+      const entry = entries[0];
+      if (entry) {
+        setCanvasSize({
+          width: Math.floor(entry.contentRect.width),
+          height: Math.floor(entry.contentRect.height),
+        });
+      }
+    });
+    observer.observe(container);
+    return () => observer.disconnect();
+  }, []);
+
+  // Load screenshot thumbnails lazily
+  useEffect(() => {
+    for (const cap of captureScreenshots) {
+      if (thumbnailLoadingRef.current.has(cap.id)) continue;
+      thumbnailLoadingRef.current.add(cap.id);
+      onLoadScreenshotImage(cap.id).then(dataUrl => {
+        setThumbnailCache(prev => {
+          const next = new Map(prev);
+          next.set(cap.id, dataUrl);
+          return next;
+        });
+      }).catch(() => { /* skip */ });
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [captureScreenshots, onLoadScreenshotImage]);
+
+  // Load and cache image on demand
+  useEffect(() => {
+    if (!capture) return;
+    const cached = imageCache.current.get(capture.id);
+    if (cached) {
+      const fitZoom = Math.min(canvasSize.width / cached.width, canvasSize.height / cached.height, 1);
+      setAutoFitZoom(fitZoom);
+      return;
+    }
+    let cancelled = false;
+    setIsLoading(true);
+    onLoadScreenshotImage(capture.id).then(dataUrl => {
+      if (cancelled) return;
+      const img = new window.Image();
+      img.onload = () => {
+        if (!cancelled) {
+          imageCache.current.set(capture.id, img);
+          const fitZoom = Math.min(canvasSize.width / img.width, canvasSize.height / img.height, 1);
+          setAutoFitZoom(fitZoom);
+          setUserZoom(null);
+          setIsLoading(false);
+        }
+      };
+      img.onerror = () => { if (!cancelled) setIsLoading(false); };
+      img.src = dataUrl;
+    }).catch(() => { if (!cancelled) setIsLoading(false); });
+    return () => { cancelled = true; };
+  }, [capture, onLoadScreenshotImage, canvasSize.width, canvasSize.height]);
+
+  // Determine visible hashes based on view mode
+  const visibleHashes = useMemo(() => {
+    if (screenshotViewMode === "all") return null; // null = show all
+    if (screenshotViewMode === "selected") {
+      return selectedElementHashes.size > 0 ? selectedElementHashes : new Set<string>();
+    }
+    // "state" mode
+    if (!selectedStateId) return null;
+    return selectedStateHashes;
+  }, [screenshotViewMode, selectedStateId, selectedStateHashes, selectedElementHashes]);
+
+  // Draw canvas
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas || !capture) return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = canvasSize.width * dpr;
+    canvas.height = canvasSize.height * dpr;
+    ctx.scale(dpr, dpr);
+    ctx.clearRect(0, 0, canvasSize.width, canvasSize.height);
+
+    const img = imageCache.current.get(capture.id);
+    if (!img) return;
+
+    const drawWidth = img.width * zoom;
+    const drawHeight = img.height * zoom;
+    const offsetX = Math.max(0, (canvasSize.width - drawWidth) / 2);
+    const offsetY = Math.max(0, (canvasSize.height - drawHeight) / 2);
+    ctx.drawImage(img, offsetX, offsetY, drawWidth, drawHeight);
+
+    // Filter elements to draw based on view mode
+    const allEntries = Object.entries(elementBounds);
+    const elementsToDraw = visibleHashes
+      ? allEntries.filter(([hash]) => visibleHashes.has(hash))
+      : allEntries;
+
+    for (const [hash, bounds] of elementsToDraw) {
+      const isHovered = hash === hoveredElement;
+      const isSelected = hash === selectedElementHash;
+      const isMultiSelected = selectedElementHashes.has(hash);
+      const isStateHighlighted = selectedStateId && selectedStateHashes.has(hash);
+
+      // Determine colors per spec
+      let borderColor: string;
+      let fillOpacity: number;
+      let lineWidth: number;
+
+      if (isSelected) {
+        borderColor = "#3B82F6"; // blue
+        fillOpacity = 0.2;
+        lineWidth = 3;
+      } else if (isHovered) {
+        borderColor = "#00FF00"; // bright green
+        fillOpacity = 0.15;
+        lineWidth = 2;
+      } else if (isMultiSelected) {
+        borderColor = "#10B981"; // green
+        fillOpacity = 0.2;
+        lineWidth = 2;
+      } else if (isStateHighlighted) {
+        borderColor = "#F59E0B"; // amber
+        fillOpacity = 0.25;
+        lineWidth = 3;
+      } else {
+        // Default: color by state membership
+        const stateIds = hashToStates.get(hash) ?? [];
+        const stateIdx = stateIds.length > 0
+          ? states.findIndex(s => s.state_id === stateIds[0])
+          : -1;
+        borderColor = stateIdx >= 0
+          ? STATE_COLORS[stateIdx % STATE_COLORS.length]!.border
+          : "#22C55E";
+        fillOpacity = 0.1;
+        lineWidth = 1;
+      }
+
+      const x = offsetX + bounds.x * zoom;
+      const y = offsetY + bounds.y * zoom;
+      const w = bounds.width * zoom;
+      const h = bounds.height * zoom;
+
+      // Fill
+      const r = parseInt(borderColor.slice(1, 3), 16);
+      const g = parseInt(borderColor.slice(3, 5), 16);
+      const b = parseInt(borderColor.slice(5, 7), 16);
+      ctx.fillStyle = `rgba(${r}, ${g}, ${b}, ${fillOpacity})`;
+      ctx.fillRect(x, y, w, h);
+
+      // Border
+      ctx.strokeStyle = borderColor;
+      ctx.lineWidth = lineWidth;
+      ctx.strokeRect(x, y, w, h);
+
+      // Element label on selected/hovered elements
+      if (isSelected || isHovered) {
+        const label = resolveElementLabel(hash, fingerprintDetails);
+        if (label && label !== hash) {
+          ctx.font = "12px sans-serif";
+          ctx.fillStyle = borderColor;
+          const textMetrics = ctx.measureText(label);
+          const textBgPadding = 2;
+          ctx.fillStyle = "rgba(0, 0, 0, 0.7)";
+          ctx.fillRect(
+            x,
+            y - 16,
+            textMetrics.width + textBgPadding * 2,
+            14
+          );
+          ctx.fillStyle = borderColor;
+          ctx.fillText(label, x + textBgPadding, y - 4);
+        }
+      }
+    }
+  }, [canvasSize, capture, zoom, elementBounds, hoveredElement, selectedStateId, states, hashToStates, selectedElementHash, selectedElementHashes, screenshotViewMode, visibleHashes, selectedStateHashes, fingerprintDetails]);
+
+  // Hit-test: return the topmost (smallest area) element under the cursor
+  const getElementAtPoint = useCallback(
+    (clientX: number, clientY: number): string | null => {
+      const canvas = canvasRef.current;
+      if (!canvas || !capture) return null;
+      const rect = canvas.getBoundingClientRect();
+      const mx = clientX - rect.left;
+      const my = clientY - rect.top;
+
+      const img = imageCache.current.get(capture.id);
+      if (!img) return null;
+
+      const drawWidth = img.width * zoom;
+      const drawHeight = img.height * zoom;
+      const offsetX = Math.max(0, (canvasSize.width - drawWidth) / 2);
+      const offsetY = Math.max(0, (canvasSize.height - drawHeight) / 2);
+
+      let bestHash: string | null = null;
+      let bestArea = Infinity;
+
+      for (const [hash, bounds] of Object.entries(elementBounds)) {
+        if (visibleHashes && !visibleHashes.has(hash)) continue;
+        const x = offsetX + bounds.x * zoom;
+        const y = offsetY + bounds.y * zoom;
+        const w = bounds.width * zoom;
+        const h = bounds.height * zoom;
+        if (mx >= x && mx <= x + w && my >= y && my <= y + h) {
+          const area = w * h;
+          if (area < bestArea) {
+            bestArea = area;
+            bestHash = hash;
+          }
+        }
+      }
+      return bestHash;
+    },
+    [capture, zoom, canvasSize, elementBounds, visibleHashes],
+  );
+
+  const handleMouseMove = useCallback(
+    (e: React.MouseEvent) => {
+      setHoveredElement(getElementAtPoint(e.clientX, e.clientY));
+    },
+    [getElementAtPoint],
+  );
+
+  const handleCanvasClick = useCallback(
+    (e: React.MouseEvent) => {
+      const hash = getElementAtPoint(e.clientX, e.clientY);
+      const isCtrl = e.ctrlKey || e.metaKey;
+
+      if (!hash) {
+        // Click empty area — deselect
+        if (!isCtrl) {
+          setSelectedElementHash(null);
+        }
+        return;
+      }
+
+      if (isCtrl) {
+        // Multi-selection toggle
+        setSelectedElementHashes(prev => {
+          const next = new Set(prev);
+          if (next.has(hash)) {
+            next.delete(hash);
+          } else {
+            next.add(hash);
+          }
+          return next;
+        });
+      } else {
+        // Single selection
+        setSelectedElementHash(hash);
+        setRightPanelTab("element");
+      }
+    },
+    [getElementAtPoint],
+  );
+
+  const handlePrev = () => setCurrentIndex(i => Math.max(0, i - 1));
+  const handleNext = () => setCurrentIndex(i => Math.min(captureScreenshots.length - 1, i + 1));
+
+  // Keyboard navigation
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === "ArrowLeft") handlePrev();
+      if (e.key === "ArrowRight") handleNext();
+      if (e.key === "Escape") {
+        setSelectedElementHash(null);
+        setSelectedElementHashes(new Set());
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [captureScreenshots.length]);
+
+  if (captureScreenshots.length === 0) {
+    return (
+      <div className="flex items-center justify-center h-full text-text-muted">
+        <div className="text-center">
+          <Image className="size-12 mx-auto mb-3 opacity-30" />
+          <p className="text-sm">No capture screenshots available</p>
+          <p className="text-xs mt-1 text-text-muted/70">
+            Run a state discovery to capture screenshots
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  // Get selected state for right panel
+  const currentSelectedState = states.find(s => s.state_id === selectedStateId);
+  // Get fingerprint info for selected element
+  const selectedFp = selectedElementHash ? (fingerprintDetails?.[selectedElementHash] ?? null) : null;
+
+  return (
+    <div className="flex h-full">
+      {/* Left panel — Screenshot Navigator + State List */}
+      <div className="w-64 border-r border-border-secondary bg-bg-primary overflow-y-auto shrink-0 flex flex-col">
+        {/* Filmstrip */}
+        <div className="shrink-0">
+          <div className="p-2 border-b border-border-secondary">
+            <h4 className="text-[10px] font-semibold text-text-muted uppercase tracking-wider">Screenshots</h4>
+          </div>
+          <div className="p-1.5 flex gap-1.5 overflow-x-auto">
+            {captureScreenshots.map((cap, idx) => (
+              <button
+                key={cap.id}
+                onClick={() => setCurrentIndex(idx)}
+                className={`shrink-0 w-[100px] rounded border-2 transition-colors overflow-hidden ${
+                  idx === currentIndex
+                    ? "border-blue-500"
+                    : "border-transparent hover:border-border-secondary"
+                }`}
+              >
+                {thumbnailCache.has(cap.id) ? (
+                  <img
+                    src={thumbnailCache.get(cap.id)}
+                    alt={`Capture ${cap.captureIndex + 1}`}
+                    className="w-full h-auto object-cover"
+                    style={{ maxHeight: 60 }}
+                  />
+                ) : (
+                  <div className="w-full h-12 bg-bg-tertiary flex items-center justify-center">
+                    <Image className="size-4 text-text-muted opacity-30" />
+                  </div>
+                )}
+                <div className="text-[9px] text-text-muted px-1 py-0.5 text-center truncate">
+                  #{cap.captureIndex + 1} &middot; {new Date(cap.capturedAt).toLocaleTimeString()}
+                </div>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* State List */}
+        <div className="flex-1 overflow-y-auto border-t border-border-secondary">
+          <div className="p-2 border-b border-border-secondary">
+            <h4 className="text-[10px] font-semibold text-text-muted uppercase tracking-wider">States</h4>
+          </div>
+          <div className="p-1.5 space-y-0.5">
+            {states.map((state, stateIdx) => {
+              const color = STATE_COLORS[stateIdx % STATE_COLORS.length]!;
+              const isActive = state.state_id === selectedStateId;
+              const elementCount = state.element_ids.length;
+              return (
+                <button
+                  key={state.state_id}
+                  onClick={() => onSelectState(isActive ? null : state.state_id)}
+                  className={`w-full flex items-center gap-2 text-left px-2 py-1.5 rounded text-[11px] transition-colors ${
+                    isActive
+                      ? "bg-brand-primary/10 text-brand-primary"
+                      : "text-text-primary hover:bg-bg-secondary"
+                  }`}
+                >
+                  <div
+                    className="w-2 h-2 rounded-full shrink-0"
+                    style={{ backgroundColor: color.border }}
+                  />
+                  <span className="truncate flex-1">{state.name}</span>
+                  <span className="text-[9px] text-text-muted shrink-0">{elementCount}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+
+      {/* Center panel — Canvas */}
+      <div className="flex-1 flex flex-col overflow-hidden">
+        {/* Toolbar */}
+        <div className="flex items-center gap-2 px-3 py-1.5 border-b border-border-secondary bg-bg-primary shrink-0">
+          {/* View mode tabs */}
+          <div className="flex items-center border border-border-secondary rounded overflow-hidden text-[10px]">
+            {(["all", "state", "selected"] as ScreenshotViewMode[]).map(mode => (
+              <button
+                key={mode}
+                onClick={() => setScreenshotViewMode(mode)}
+                className={`px-2 py-1 capitalize ${
+                  screenshotViewMode === mode
+                    ? "bg-brand-primary/20 text-brand-primary font-medium"
+                    : "text-text-muted hover:text-text-primary"
+                }`}
+              >
+                {mode}
+              </button>
+            ))}
+          </div>
+
+          {/* Multi-selection badge */}
+          {selectedElementHashes.size > 0 && (
+            <div className="flex items-center gap-1 text-[10px] text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded">
+              <span>{selectedElementHashes.size} selected</span>
+              <button
+                onClick={() => setSelectedElementHashes(new Set())}
+                className="hover:text-emerald-300"
+                title="Clear selection"
+              >
+                <X className="size-3" />
+              </button>
+            </div>
+          )}
+
+          <div className="flex-1" />
+
+          {/* Navigation */}
+          <button
+            className="h-6 w-6 p-0 inline-flex items-center justify-center rounded text-text-secondary hover:text-text-primary disabled:opacity-30"
+            onClick={handlePrev}
+            disabled={currentIndex === 0}
+            title="Previous capture"
+          >
+            <ChevronLeft className="size-4" />
+          </button>
+          <span className="text-[10px] text-text-primary min-w-[70px] text-center">
+            {currentIndex + 1} / {captureScreenshots.length}
+          </span>
+          <button
+            className="h-6 w-6 p-0 inline-flex items-center justify-center rounded text-text-secondary hover:text-text-primary disabled:opacity-30"
+            onClick={handleNext}
+            disabled={currentIndex === captureScreenshots.length - 1}
+            title="Next capture"
+          >
+            <ChevronRight className="size-4" />
+          </button>
+
+          {/* Zoom */}
+          <div className="flex items-center gap-0.5 ml-2">
+            <button
+              className="h-6 w-6 p-0 inline-flex items-center justify-center rounded text-text-secondary hover:text-text-primary"
+              onClick={() => setUserZoom(Math.max(0.1, zoom - 0.25))}
+              title="Zoom out"
+            >
+              <ZoomOut className="size-3" />
+            </button>
+            <span className="text-[10px] text-text-muted w-8 text-center">{Math.round(zoom * 100)}%</span>
+            <button
+              className="h-6 w-6 p-0 inline-flex items-center justify-center rounded text-text-secondary hover:text-text-primary"
+              onClick={() => setUserZoom(Math.min(3, zoom + 0.25))}
+              title="Zoom in"
+            >
+              <ZoomIn className="size-3" />
+            </button>
+            <button
+              className="h-6 w-6 p-0 inline-flex items-center justify-center rounded text-text-secondary hover:text-text-primary"
+              onClick={() => setUserZoom(null)}
+              title="Fit to view"
+            >
+              <Maximize className="size-3" />
+            </button>
+          </div>
+        </div>
+
+        {/* Canvas area */}
+        <div ref={containerRef} className="relative flex-1 bg-bg-secondary overflow-hidden">
+          <canvas
+            ref={canvasRef}
+            style={{
+              width: canvasSize.width,
+              height: canvasSize.height,
+              cursor: hoveredElement ? "pointer" : "default",
+            }}
+            onMouseMove={handleMouseMove}
+            onMouseLeave={() => setHoveredElement(null)}
+            onClick={handleCanvasClick}
+          />
+
+          {isLoading && (
+            <div className="absolute inset-0 flex items-center justify-center bg-bg-secondary/50">
+              <div className="animate-spin size-6 border-2 border-brand-primary border-t-transparent rounded-full" />
+            </div>
+          )}
+
+          {/* Rich hover tooltip */}
+          {hoveredElement && hoveredElement !== selectedElementHash && (
+            <div className="absolute top-3 left-3 text-xs bg-bg-primary/95 backdrop-blur-sm px-3 py-2 rounded-lg border border-border-secondary shadow-md max-w-[280px] pointer-events-none">
+              <div className="font-medium text-text-primary truncate">
+                {resolveElementLabel(hoveredElement, fingerprintDetails) || hoveredElement}
+              </div>
+              {(() => {
+                const fp = fingerprintDetails?.[hoveredElement];
+                if (!fp) return null;
+                return (
+                  <>
+                    <div className="text-text-muted mt-0.5">
+                      &lt;{fp.tagName}&gt;{fp.role ? ` role="${fp.role}"` : ""}
+                    </div>
+                    {fp.positionZone && (
+                      <div className="text-text-muted">Zone: {fp.positionZone}</div>
+                    )}
+                  </>
+                );
+              })()}
+              {hashToStates.get(hoveredElement) && (
+                <div className="text-text-muted mt-0.5">
+                  States: {hashToStates.get(hoveredElement)!.map(sid =>
+                    states.find(s => s.state_id === sid)?.name ?? sid
+                  ).join(", ")}
+                </div>
+              )}
+              {(() => {
+                const stateIds = hashToStates.get(hoveredElement) ?? [];
+                if (stateIds.length === 0) return null;
+                const confidences = stateIds.map(sid => {
+                  const s = states.find(st => st.state_id === sid);
+                  return s ? Math.round(s.confidence * 100) : 0;
+                }).filter(c => c > 0);
+                if (confidences.length === 0) return null;
+                const avg = Math.round(confidences.reduce((a, b) => a + b, 0) / confidences.length);
+                return <div className="text-text-muted">Confidence: {avg}%</div>;
+              })()}
+            </div>
+          )}
+
+          {/* Element count legend */}
+          <div className="absolute bottom-2 right-2 text-[9px] text-text-muted bg-bg-primary/80 backdrop-blur-sm px-2 py-1 rounded border border-border-secondary/50">
+            {visibleHashes
+              ? `${Object.keys(elementBounds).filter(h => visibleHashes.has(h)).length} / ${Object.keys(elementBounds).length} elements`
+              : `${Object.keys(elementBounds).length} elements`}
+          </div>
+        </div>
+      </div>
+
+      {/* Right panel — Details */}
+      <div className="w-80 border-l border-border-secondary bg-bg-primary overflow-y-auto shrink-0">
+        {/* Tab header */}
+        <div className="flex border-b border-border-secondary">
+          <button
+            onClick={() => setRightPanelTab("state")}
+            className={`flex-1 text-[10px] py-2 font-medium ${
+              rightPanelTab === "state"
+                ? "text-brand-primary border-b-2 border-brand-primary"
+                : "text-text-muted hover:text-text-primary"
+            }`}
+          >
+            State Details
+          </button>
+          <button
+            onClick={() => setRightPanelTab("element")}
+            className={`flex-1 text-[10px] py-2 font-medium ${
+              rightPanelTab === "element"
+                ? "text-brand-primary border-b-2 border-brand-primary"
+                : "text-text-muted hover:text-text-primary"
+            }`}
+          >
+            Element Details
+          </button>
+        </div>
+
+        <div className="p-3">
+          {rightPanelTab === "element" && selectedElementHash ? (
+            /* Element Details Tab */
+            <div className="space-y-3">
+              <div>
+                <h4 className="text-sm font-semibold text-text-primary">
+                  {resolveElementLabel(selectedElementHash, fingerprintDetails) || selectedElementHash}
+                </h4>
+                {selectedFp && (
+                  <div className="text-[10px] text-text-muted mt-0.5">
+                    &lt;{selectedFp.tagName}&gt;{selectedFp.role ? ` role="${selectedFp.role}"` : ""}
+                  </div>
+                )}
+              </div>
+
+              {/* Thumbnail */}
+              {elementThumbnails?.[selectedElementHash] && (
+                <div>
+                  <img
+                    src={elementThumbnails[selectedElementHash]!.startsWith("data:")
+                      ? elementThumbnails[selectedElementHash]!
+                      : `data:image/png;base64,${elementThumbnails[selectedElementHash]}`}
+                    alt="Element thumbnail"
+                    className="w-full rounded border border-border-secondary"
+                  />
+                </div>
+              )}
+
+              {/* Position */}
+              {elementBounds[selectedElementHash] && (
+                <div>
+                  <h5 className="text-[10px] font-medium text-text-muted uppercase tracking-wider mb-1">Position</h5>
+                  <div className="grid grid-cols-2 gap-1 text-[10px]">
+                    <div className="bg-bg-secondary rounded px-2 py-1">
+                      <span className="text-text-muted">x:</span>{" "}
+                      <span className="text-text-primary">{Math.round(elementBounds[selectedElementHash]!.x)}</span>
+                    </div>
+                    <div className="bg-bg-secondary rounded px-2 py-1">
+                      <span className="text-text-muted">y:</span>{" "}
+                      <span className="text-text-primary">{Math.round(elementBounds[selectedElementHash]!.y)}</span>
+                    </div>
+                    <div className="bg-bg-secondary rounded px-2 py-1">
+                      <span className="text-text-muted">w:</span>{" "}
+                      <span className="text-text-primary">{Math.round(elementBounds[selectedElementHash]!.width)}</span>
+                    </div>
+                    <div className="bg-bg-secondary rounded px-2 py-1">
+                      <span className="text-text-muted">h:</span>{" "}
+                      <span className="text-text-primary">{Math.round(elementBounds[selectedElementHash]!.height)}</span>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Fingerprint info */}
+              {selectedFp && (
+                <div>
+                  <h5 className="text-[10px] font-medium text-text-muted uppercase tracking-wider mb-1">Fingerprint</h5>
+                  <div className="space-y-1 text-[10px]">
+                    <div className="bg-bg-secondary rounded px-2 py-1">
+                      <span className="text-text-muted">Hash:</span>{" "}
+                      <code className="text-text-primary font-mono text-[9px]">{selectedElementHash.slice(0, 16)}...</code>
+                    </div>
+                    {selectedFp.positionZone && (
+                      <div className="bg-bg-secondary rounded px-2 py-1">
+                        <span className="text-text-muted">Zone:</span>{" "}
+                        <span className="text-text-primary">{selectedFp.positionZone}</span>
+                      </div>
+                    )}
+                    {selectedFp.sizeCategory && (
+                      <div className="bg-bg-secondary rounded px-2 py-1">
+                        <span className="text-text-muted">Size:</span>{" "}
+                        <span className="text-text-primary">{selectedFp.sizeCategory}</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* States membership */}
+              {hashToStates.get(selectedElementHash) && (
+                <div>
+                  <h5 className="text-[10px] font-medium text-text-muted uppercase tracking-wider mb-1">States Membership</h5>
+                  <div className="space-y-1">
+                    {hashToStates.get(selectedElementHash)!.map(sid => {
+                      const s = states.find(st => st.state_id === sid);
+                      if (!s) return null;
+                      const colorIdx = states.indexOf(s);
+                      const color = STATE_COLORS[colorIdx % STATE_COLORS.length]!;
+                      return (
+                        <button
+                          key={sid}
+                          onClick={() => { onSelectState(sid); setRightPanelTab("state"); }}
+                          className="w-full flex items-center gap-2 text-[10px] px-2 py-1 rounded bg-bg-secondary hover:bg-bg-tertiary text-left"
+                        >
+                          <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: color.border }} />
+                          <span className="text-text-primary truncate">{s.name}</span>
+                          <span className={`ml-auto shrink-0 ${
+                            Math.round(s.confidence * 100) >= 80 ? "text-green-400" : "text-amber-400"
+                          }`}>
+                            {Math.round(s.confidence * 100)}%
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* Screenshot presence */}
+              {hashToCaptures.get(selectedElementHash) && (
+                <div>
+                  <h5 className="text-[10px] font-medium text-text-muted uppercase tracking-wider mb-1">Screenshot Presence</h5>
+                  <div className="flex flex-wrap gap-1">
+                    {captureScreenshots.map((cap, idx) => {
+                      const present = hashToCaptures.get(selectedElementHash)?.includes(idx);
+                      return (
+                        <button
+                          key={cap.id}
+                          onClick={() => setCurrentIndex(idx)}
+                          className={`text-[9px] px-1.5 py-0.5 rounded ${
+                            present
+                              ? idx === currentIndex
+                                ? "bg-brand-primary/20 text-brand-primary border border-brand-primary/30"
+                                : "bg-green-500/10 text-green-400 border border-green-500/20"
+                              : "bg-bg-secondary text-text-muted border border-border-secondary opacity-50"
+                          }`}
+                        >
+                          #{idx + 1} {present ? "\u2713" : ""}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
+          ) : rightPanelTab === "element" ? (
+            <div className="text-center text-text-muted py-8">
+              <Info className="size-8 mx-auto mb-2 opacity-30" />
+              <p className="text-xs">Click an element on the canvas to inspect it</p>
+            </div>
+          ) : currentSelectedState ? (
+            /* State Details Tab */
+            <div className="space-y-3">
+              <div>
+                <div className="flex items-center gap-2">
+                  <h4 className="text-sm font-semibold text-text-primary truncate">{currentSelectedState.name}</h4>
+                  <span className={`text-[10px] px-1.5 py-0.5 rounded-full shrink-0 ${
+                    Math.round(currentSelectedState.confidence * 100) >= 80
+                      ? "bg-green-500/10 text-green-400 border border-green-500/30"
+                      : "bg-amber-500/10 text-amber-400 border border-amber-500/30"
+                  }`}>
+                    {Math.round(currentSelectedState.confidence * 100)}%
+                  </span>
+                </div>
+                {currentSelectedState.description && (
+                  <p className="text-[10px] text-text-muted mt-1">{currentSelectedState.description}</p>
+                )}
+                <div className="flex items-center gap-2 mt-1.5 text-[10px] text-text-muted">
+                  <span>{currentSelectedState.element_ids.length} elements</span>
+                  <span>&middot;</span>
+                  <span>{currentSelectedState.render_ids.length} renders</span>
+                </div>
+              </div>
+
+              {/* Elements list */}
+              <div>
+                <h5 className="text-[10px] font-medium text-text-muted uppercase tracking-wider mb-1">Elements</h5>
+                <div className="space-y-0.5 max-h-60 overflow-y-auto">
+                  {currentSelectedState.element_ids.map(eid => {
+                    const hash = getFingerprintHash(eid);
+                    const label = resolveElementLabel(eid, fingerprintDetails, currentSelectedState);
+                    const thumb = elementThumbnails?.[hash] ?? elementThumbnails?.[eid];
+                    const isActive = hash === selectedElementHash;
+                    return (
+                      <button
+                        key={eid}
+                        onClick={() => {
+                          setSelectedElementHash(hash);
+                          setRightPanelTab("element");
+                        }}
+                        className={`w-full flex items-center gap-1.5 text-[10px] px-2 py-1 rounded text-left ${
+                          isActive ? "bg-brand-primary/10 text-brand-primary" : "hover:bg-bg-secondary text-text-primary"
+                        }`}
+                      >
+                        {thumb ? (
+                          <img
+                            src={thumb.startsWith("data:") ? thumb : `data:image/png;base64,${thumb}`}
+                            alt={label}
+                            className="w-5 h-5 object-cover rounded shrink-0"
+                          />
+                        ) : (
+                          <Layers className="size-3 text-text-muted shrink-0" />
+                        )}
+                        <span className="truncate">{label}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Screenshots containing this state */}
+              <div>
+                <h5 className="text-[10px] font-medium text-text-muted uppercase tracking-wider mb-1">Screenshots</h5>
+                <div className="flex flex-wrap gap-1">
+                  {captureScreenshots.map((cap, idx) => {
+                    let hasElements = false;
+                    try {
+                      const hashes = JSON.parse(cap.fingerprintHashesJson) as string[];
+                      hasElements = hashes.some(h => selectedStateHashes.has(h));
+                    } catch { /* skip */ }
+                    if (!hasElements) return null;
+                    return (
+                      <button
+                        key={cap.id}
+                        onClick={() => setCurrentIndex(idx)}
+                        className={`text-[9px] px-1.5 py-0.5 rounded border ${
+                          idx === currentIndex
+                            ? "bg-brand-primary/20 text-brand-primary border-brand-primary/30"
+                            : "bg-bg-secondary text-text-muted border-border-secondary hover:border-text-muted"
+                        }`}
+                      >
+                        Capture #{idx + 1}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Acceptance criteria */}
+              {currentSelectedState.acceptance_criteria.length > 0 && (
+                <div>
+                  <h5 className="text-[10px] font-medium text-text-muted uppercase tracking-wider mb-1">Acceptance Criteria</h5>
+                  <ul className="space-y-0.5">
+                    {currentSelectedState.acceptance_criteria.map((ac, i) => (
+                      <li key={i} className="flex items-start gap-1 text-[10px] text-text-muted">
+                        <CheckCircle className="size-3 text-green-500 mt-0.5 shrink-0" />
+                        <span>{ac}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {/* Domain knowledge */}
+              {currentSelectedState.domain_knowledge.length > 0 && (
+                <div>
+                  <h5 className="text-[10px] font-medium text-text-muted uppercase tracking-wider mb-1">Domain Knowledge</h5>
+                  <div className="space-y-1.5">
+                    {currentSelectedState.domain_knowledge.map(dk => (
+                      <div key={dk.id} className="p-2 rounded bg-bg-secondary border border-border-secondary">
+                        <div className="text-[10px] font-medium text-text-primary">{dk.title}</div>
+                        <div className="text-[9px] text-text-muted mt-0.5 line-clamp-3">{dk.content}</div>
+                        {dk.tags.length > 0 && (
+                          <div className="flex flex-wrap gap-0.5 mt-1">
+                            {dk.tags.map(tag => (
+                              <span key={tag} className="text-[8px] px-1 py-0.5 rounded-full bg-brand-primary/10 text-brand-primary">
+                                {tag}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="text-center text-text-muted py-8">
+              <Layers className="size-8 mx-auto mb-2 opacity-30" />
+              <p className="text-xs">Select a state to view details</p>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// =============================================================================
 // Main Component
 // =============================================================================
 
@@ -696,14 +1660,26 @@ export function StateViewPanel({
   onSelectState,
   elementThumbnails,
   fingerprintDetails,
+  captureScreenshots,
+  onLoadScreenshotImage,
 }: StateViewPanelProps) {
   const [expandedStates, setExpandedStates] = useState<Set<string>>(new Set());
   const [searchFilter, setSearchFilter] = useState("");
   const [viewMode, setViewMode] = useState<ViewMode>("list");
 
+  // Local selection state — the page-level selectedStateId gets clobbered by the
+  // ReactFlow graph component in a hidden tab (fires onSelectionChange → null).
+  // We maintain our own selection that only changes from user clicks in this panel.
+  const [localSelectedStateId, setLocalSelectedStateId] = useState<string | null>(
+    selectedStateId,
+  );
+
+  // Use local selection for everything in this component
+  const effectiveSelectedStateId = localSelectedStateId;
+
   const selectedState = useMemo(
-    () => states.find((s) => s.state_id === selectedStateId),
-    [states, selectedStateId],
+    () => states.find((s) => s.state_id === effectiveSelectedStateId),
+    [states, effectiveSelectedStateId],
   );
 
   // Build outgoing/incoming transition map
@@ -813,6 +1789,14 @@ export function StateViewPanel({
               >
                 <BarChart3 className="size-3.5" />
               </button>
+              <button
+                onClick={() => setViewMode("screenshot")}
+                className={`p-1 ${viewMode === "screenshot" ? "bg-brand-primary/20 text-brand-primary" : "text-text-muted hover:text-text-primary"}`}
+                title="Screenshot view"
+                disabled={!captureScreenshots || captureScreenshots.length === 0}
+              >
+                <Image className="size-3.5" />
+              </button>
             </div>
           </div>
         </div>
@@ -821,7 +1805,7 @@ export function StateViewPanel({
           {filteredStates.map((state) => {
             const colorIdx = states.indexOf(state);
             const color = STATE_COLORS[colorIdx % STATE_COLORS.length]!;
-            const isSelected = state.state_id === selectedStateId;
+            const isSelected = state.state_id === effectiveSelectedStateId;
             const isExpanded = expandedStates.has(state.state_id);
             const stateOutgoing =
               transitionMap.outgoing.get(state.state_id) ?? [];
@@ -833,8 +1817,9 @@ export function StateViewPanel({
             return (
               <div key={state.state_id}>
                 <button
+                  data-ui-id={`state-item-${state.state_id}`}
                   onClick={() => {
-                    onSelectState(isSelected ? null : state.state_id);
+                    setLocalSelectedStateId(isSelected ? null : state.state_id);
                     if (!isExpanded) toggleExpanded(state.state_id);
                   }}
                   className={`
@@ -937,14 +1922,24 @@ export function StateViewPanel({
         </div>
       </div>
 
-      {/* Right Panel: Spatial Canvas or State Details */}
+      {/* Right Panel: Screenshot / Spatial Canvas / State Details */}
       <div className="flex-1 overflow-hidden">
-        {viewMode === "spatial" ? (
+        {viewMode === "screenshot" && captureScreenshots && onLoadScreenshotImage ? (
+          <ScreenshotStateView
+            captureScreenshots={captureScreenshots}
+            onLoadScreenshotImage={onLoadScreenshotImage}
+            states={states}
+            selectedStateId={effectiveSelectedStateId}
+            onSelectState={setLocalSelectedStateId}
+            fingerprintDetails={fingerprintDetails}
+            elementThumbnails={elementThumbnails}
+          />
+        ) : viewMode === "spatial" ? (
           <SpatialCanvas
             states={states}
             transitions={transitions}
-            selectedStateId={selectedStateId}
-            onSelectState={onSelectState}
+            selectedStateId={effectiveSelectedStateId}
+            onSelectState={setLocalSelectedStateId}
           />
         ) : selectedState ? (
           <div className="p-6 space-y-6 overflow-y-auto h-full">

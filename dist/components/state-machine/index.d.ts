@@ -116,6 +116,17 @@ interface FingerprintDetail {
     };
     sizeCategory?: string;
 }
+/** Metadata for a capture screenshot (without image data). */
+interface CaptureScreenshotMeta {
+    id: string;
+    configId: string;
+    captureIndex: number;
+    width: number;
+    height: number;
+    elementBoundsJson: string;
+    fingerprintHashesJson: string;
+    capturedAt: string;
+}
 interface StateViewPanelProps {
     states: StateMachineState[];
     transitions: StateMachineTransition[];
@@ -125,8 +136,12 @@ interface StateViewPanelProps {
     elementThumbnails?: Record<string, string>;
     /** Optional fingerprint details from discovery. Keys are fingerprint hashes. */
     fingerprintDetails?: Record<string, FingerprintDetail>;
+    /** Optional capture screenshot metadata for screenshot view. */
+    captureScreenshots?: CaptureScreenshotMeta[];
+    /** Callback to load a screenshot image on demand. Returns data URL. */
+    onLoadScreenshotImage?: (screenshotId: string) => Promise<string>;
 }
-declare function StateViewPanel({ states, transitions, selectedStateId, onSelectState, elementThumbnails, fingerprintDetails, }: StateViewPanelProps): react_jsx_runtime.JSX.Element;
+declare function StateViewPanel({ states, transitions, selectedStateId, onSelectState, elementThumbnails, fingerprintDetails, captureScreenshots, onLoadScreenshotImage, }: StateViewPanelProps): react_jsx_runtime.JSX.Element;
 
 interface PathfindingPanelProps {
     /** All states in the config */
@@ -150,4 +165,4 @@ interface StateViewTableProps {
 }
 declare function StateViewTable({ states, selectedStateId, onSelectState, }: StateViewTableProps): react_jsx_runtime.JSX.Element;
 
-export { type FingerprintDetail, PathfindingPanel, type PathfindingPanelProps, StateDetailPanel, type StateDetailPanelProps, StateMachineGraphView, type StateMachineGraphViewProps, StateMachineStateNode, StateMachineTransitionEdge, StateViewPanel, type StateViewPanelProps, StateViewTable, type StateViewTableProps, TransitionEditor, type TransitionEditorProps, TransitionsPanel, type TransitionsPanelProps };
+export { type CaptureScreenshotMeta, type FingerprintDetail, PathfindingPanel, type PathfindingPanelProps, StateDetailPanel, type StateDetailPanelProps, StateMachineGraphView, type StateMachineGraphViewProps, StateMachineStateNode, StateMachineTransitionEdge, StateViewPanel, type StateViewPanelProps, StateViewTable, type StateViewTableProps, TransitionEditor, type TransitionEditorProps, TransitionsPanel, type TransitionsPanelProps };
