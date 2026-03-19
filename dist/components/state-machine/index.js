@@ -2215,8 +2215,7 @@ import {
   Layout,
   Image,
   ChevronLeft,
-  X,
-  Info
+  X
 } from "lucide-react";
 import {
   getElementTypePrefix as getElementTypePrefix2,
@@ -2680,8 +2679,7 @@ function ScreenshotStateView({
   captureScreenshots,
   onLoadScreenshotImage,
   states,
-  selectedStateId,
-  onSelectState,
+  selectedStateIds,
   fingerprintDetails,
   elementThumbnails
 }) {
@@ -2697,9 +2695,6 @@ function ScreenshotStateView({
   const [canvasSize, setCanvasSize] = useState5({ width: 800, height: 600 });
   const [isLoading, setIsLoading] = useState5(false);
   const [selectedElementHash, setSelectedElementHash] = useState5(null);
-  const [selectedElementHashes, setSelectedElementHashes] = useState5(/* @__PURE__ */ new Set());
-  const [screenshotViewMode, setScreenshotViewMode] = useState5("all");
-  const [rightPanelTab, setRightPanelTab] = useState5("state");
   const [thumbnailCache, setThumbnailCache] = useState5(/* @__PURE__ */ new Map());
   const capture = captureScreenshots[currentIndex];
   const elementBounds = useMemo4(() => {
@@ -2710,50 +2705,55 @@ function ScreenshotStateView({
       return {};
     }
   }, [capture]);
-  const hashToStates = useMemo4(() => {
+  const selectedStateHashes = useMemo4(() => {
+    const hashes = /* @__PURE__ */ new Set();
+    for (const state of states) {
+      if (selectedStateIds.has(state.state_id)) {
+        for (const eid of state.element_ids) {
+          hashes.add(getFingerprintHash(eid));
+        }
+      }
+    }
+    return hashes;
+  }, [selectedStateIds, states]);
+  const selectedStates = useMemo4(
+    () => states.filter((s) => selectedStateIds.has(s.state_id)),
+    [states, selectedStateIds]
+  );
+  const hashToElement = useMemo4(() => {
     const map = /* @__PURE__ */ new Map();
     for (const state of states) {
       for (const eid of state.element_ids) {
         const hash = getFingerprintHash(eid);
-        if (!map.has(hash)) map.set(hash, []);
-        map.get(hash).push(state.state_id);
+        if (!map.has(hash)) {
+          map.set(hash, { elementId: eid, state });
+        }
       }
     }
     return map;
   }, [states]);
-  const hashToCaptures = useMemo4(() => {
-    const map = /* @__PURE__ */ new Map();
+  const matchingScreenshotIndices = useMemo4(() => {
+    if (selectedStateIds.size === 0) return captureScreenshots.map((_, i) => i);
+    const indices = [];
     for (let i = 0; i < captureScreenshots.length; i++) {
       try {
         const hashes = JSON.parse(captureScreenshots[i].fingerprintHashesJson);
-        for (const h of hashes) {
-          if (!map.has(h)) map.set(h, []);
-          map.get(h).push(i);
+        if (hashes.some((h) => selectedStateHashes.has(h))) {
+          indices.push(i);
         }
       } catch {
       }
     }
-    return map;
-  }, [captureScreenshots]);
-  const selectedStateHashes = useMemo4(() => {
-    if (!selectedStateId) return /* @__PURE__ */ new Set();
-    const state = states.find((s) => s.state_id === selectedStateId);
-    if (!state) return /* @__PURE__ */ new Set();
-    return new Set(state.element_ids.map((eid) => getFingerprintHash(eid)));
-  }, [selectedStateId, states]);
+    return indices;
+  }, [captureScreenshots, selectedStateIds, selectedStateHashes]);
   useEffect5(() => {
-    if (!selectedStateId) return;
-    setScreenshotViewMode("state");
-    setRightPanelTab("state");
-    const selectedState = states.find((s) => s.state_id === selectedStateId);
-    if (!selectedState) return;
-    const hashes = new Set(selectedState.element_ids.map((eid) => getFingerprintHash(eid)));
+    if (selectedStateIds.size === 0) return;
     let bestIdx = -1;
     let bestOverlap = 0;
     for (let i = 0; i < captureScreenshots.length; i++) {
       try {
         const capHashes = JSON.parse(captureScreenshots[i].fingerprintHashesJson);
-        const overlap = capHashes.filter((h) => hashes.has(h)).length;
+        const overlap = capHashes.filter((h) => selectedStateHashes.has(h)).length;
         if (overlap > bestOverlap) {
           bestOverlap = overlap;
           bestIdx = i;
@@ -2762,7 +2762,7 @@ function ScreenshotStateView({
       }
     }
     if (bestIdx >= 0) setCurrentIndex(bestIdx);
-  }, [selectedStateId, states, captureScreenshots]);
+  }, [selectedStateIds, selectedStateHashes, captureScreenshots]);
   useEffect5(() => {
     const container = containerRef.current;
     if (!container) return;
@@ -2825,14 +2825,6 @@ function ScreenshotStateView({
       cancelled = true;
     };
   }, [capture, onLoadScreenshotImage, canvasSize.width, canvasSize.height]);
-  const visibleHashes = useMemo4(() => {
-    if (screenshotViewMode === "all") return null;
-    if (screenshotViewMode === "selected") {
-      return selectedElementHashes.size > 0 ? selectedElementHashes : /* @__PURE__ */ new Set();
-    }
-    if (!selectedStateId) return null;
-    return selectedStateHashes;
-  }, [screenshotViewMode, selectedStateId, selectedStateHashes, selectedElementHashes]);
   useEffect5(() => {
     const canvas = canvasRef.current;
     if (!canvas || !capture) return;
@@ -2851,12 +2843,10 @@ function ScreenshotStateView({
     const offsetY = Math.max(0, (canvasSize.height - drawHeight) / 2);
     ctx.drawImage(img, offsetX, offsetY, drawWidth, drawHeight);
     const allEntries = Object.entries(elementBounds);
-    const elementsToDraw = visibleHashes ? allEntries.filter(([hash]) => visibleHashes.has(hash)) : allEntries;
+    const elementsToDraw = selectedStateIds.size > 0 ? allEntries.filter(([hash]) => selectedStateHashes.has(hash)) : allEntries;
     for (const [hash, bounds] of elementsToDraw) {
       const isHovered = hash === hoveredElement;
       const isSelected = hash === selectedElementHash;
-      const isMultiSelected = selectedElementHashes.has(hash);
-      const isStateHighlighted = selectedStateId && selectedStateHashes.has(hash);
       let borderColor;
       let fillOpacity;
       let lineWidth;
@@ -2868,18 +2858,8 @@ function ScreenshotStateView({
         borderColor = "#00FF00";
         fillOpacity = 0.15;
         lineWidth = 2;
-      } else if (isMultiSelected) {
-        borderColor = "#10B981";
-        fillOpacity = 0.2;
-        lineWidth = 2;
-      } else if (isStateHighlighted) {
-        borderColor = "#F59E0B";
-        fillOpacity = 0.25;
-        lineWidth = 3;
       } else {
-        const stateIds = hashToStates.get(hash) ?? [];
-        const stateIdx = stateIds.length > 0 ? states.findIndex((s) => s.state_id === stateIds[0]) : -1;
-        borderColor = stateIdx >= 0 ? STATE_COLORS[stateIdx % STATE_COLORS.length].border : "#22C55E";
+        borderColor = "#F59E0B";
         fillOpacity = 0.1;
         lineWidth = 1;
       }
@@ -2896,25 +2876,20 @@ function ScreenshotStateView({
       ctx.lineWidth = lineWidth;
       ctx.strokeRect(x, y, w, h);
       if (isSelected || isHovered) {
-        const label = resolveElementLabel(hash, fingerprintDetails);
+        const entry = hashToElement.get(hash);
+        const label = entry ? resolveElementLabel(entry.elementId, fingerprintDetails, entry.state) : resolveElementLabel(hash, fingerprintDetails);
         if (label && label !== hash) {
           ctx.font = "12px sans-serif";
-          ctx.fillStyle = borderColor;
           const textMetrics = ctx.measureText(label);
           const textBgPadding = 2;
           ctx.fillStyle = "rgba(0, 0, 0, 0.7)";
-          ctx.fillRect(
-            x,
-            y - 16,
-            textMetrics.width + textBgPadding * 2,
-            14
-          );
+          ctx.fillRect(x, y - 16, textMetrics.width + textBgPadding * 2, 14);
           ctx.fillStyle = borderColor;
           ctx.fillText(label, x + textBgPadding, y - 4);
         }
       }
     }
-  }, [canvasSize, capture, zoom, elementBounds, hoveredElement, selectedStateId, states, hashToStates, selectedElementHash, selectedElementHashes, screenshotViewMode, visibleHashes, selectedStateHashes, fingerprintDetails]);
+  }, [canvasSize, capture, zoom, elementBounds, hoveredElement, selectedStateIds, selectedStateHashes, selectedElementHash, fingerprintDetails, hashToElement]);
   const getElementAtPoint = useCallback5(
     (clientX, clientY) => {
       const canvas = canvasRef.current;
@@ -2931,7 +2906,7 @@ function ScreenshotStateView({
       let bestHash = null;
       let bestArea = Infinity;
       for (const [hash, bounds] of Object.entries(elementBounds)) {
-        if (visibleHashes && !visibleHashes.has(hash)) continue;
+        if (selectedStateIds.size > 0 && !selectedStateHashes.has(hash)) continue;
         const x = offsetX + bounds.x * zoom;
         const y = offsetY + bounds.y * zoom;
         const w = bounds.width * zoom;
@@ -2946,7 +2921,7 @@ function ScreenshotStateView({
       }
       return bestHash;
     },
-    [capture, zoom, canvasSize, elementBounds, visibleHashes]
+    [capture, zoom, canvasSize, elementBounds, selectedStateIds, selectedStateHashes]
   );
   const handleMouseMove = useCallback5(
     (e) => {
@@ -2957,27 +2932,11 @@ function ScreenshotStateView({
   const handleCanvasClick = useCallback5(
     (e) => {
       const hash = getElementAtPoint(e.clientX, e.clientY);
-      const isCtrl = e.ctrlKey || e.metaKey;
       if (!hash) {
-        if (!isCtrl) {
-          setSelectedElementHash(null);
-        }
+        setSelectedElementHash(null);
         return;
       }
-      if (isCtrl) {
-        setSelectedElementHashes((prev) => {
-          const next = new Set(prev);
-          if (next.has(hash)) {
-            next.delete(hash);
-          } else {
-            next.add(hash);
-          }
-          return next;
-        });
-      } else {
-        setSelectedElementHash(hash);
-        setRightPanelTab("element");
-      }
+      setSelectedElementHash(hash);
     },
     [getElementAtPoint]
   );
@@ -2987,10 +2946,7 @@ function ScreenshotStateView({
     const handler = (e) => {
       if (e.key === "ArrowLeft") handlePrev();
       if (e.key === "ArrowRight") handleNext();
-      if (e.key === "Escape") {
-        setSelectedElementHash(null);
-        setSelectedElementHashes(/* @__PURE__ */ new Set());
-      }
+      if (e.key === "Escape") setSelectedElementHash(null);
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
@@ -3002,93 +2958,49 @@ function ScreenshotStateView({
       /* @__PURE__ */ jsx7("p", { className: "text-xs mt-1 text-text-muted/70", children: "Run a state discovery to capture screenshots" })
     ] }) });
   }
-  const currentSelectedState = states.find((s) => s.state_id === selectedStateId);
   const selectedFp = selectedElementHash ? fingerprintDetails?.[selectedElementHash] ?? null : null;
   return /* @__PURE__ */ jsxs7("div", { className: "flex h-full", children: [
-    /* @__PURE__ */ jsxs7("div", { className: "w-64 border-r border-border-secondary bg-bg-primary overflow-y-auto shrink-0 flex flex-col", children: [
-      /* @__PURE__ */ jsxs7("div", { className: "shrink-0", children: [
-        /* @__PURE__ */ jsx7("div", { className: "p-2 border-b border-border-secondary", children: /* @__PURE__ */ jsx7("h4", { className: "text-[10px] font-semibold text-text-muted uppercase tracking-wider", children: "Screenshots" }) }),
-        /* @__PURE__ */ jsx7("div", { className: "p-1.5 flex gap-1.5 overflow-x-auto", children: captureScreenshots.map((cap, idx) => /* @__PURE__ */ jsxs7(
-          "button",
-          {
-            onClick: () => setCurrentIndex(idx),
-            className: `shrink-0 w-[100px] rounded border-2 transition-colors overflow-hidden ${idx === currentIndex ? "border-blue-500" : "border-transparent hover:border-border-secondary"}`,
-            children: [
-              thumbnailCache.has(cap.id) ? /* @__PURE__ */ jsx7(
-                "img",
-                {
-                  src: thumbnailCache.get(cap.id),
-                  alt: `Capture ${cap.captureIndex + 1}`,
-                  className: "w-full h-auto object-cover",
-                  style: { maxHeight: 60 }
-                }
-              ) : /* @__PURE__ */ jsx7("div", { className: "w-full h-12 bg-bg-tertiary flex items-center justify-center", children: /* @__PURE__ */ jsx7(Image, { className: "size-4 text-text-muted opacity-30" }) }),
-              /* @__PURE__ */ jsxs7("div", { className: "text-[9px] text-text-muted px-1 py-0.5 text-center truncate", children: [
-                "#",
-                cap.captureIndex + 1,
-                " \xB7 ",
-                new Date(cap.capturedAt).toLocaleTimeString()
-              ] })
-            ]
-          },
-          cap.id
-        )) })
-      ] }),
-      /* @__PURE__ */ jsxs7("div", { className: "flex-1 overflow-y-auto border-t border-border-secondary", children: [
-        /* @__PURE__ */ jsx7("div", { className: "p-2 border-b border-border-secondary", children: /* @__PURE__ */ jsx7("h4", { className: "text-[10px] font-semibold text-text-muted uppercase tracking-wider", children: "States" }) }),
-        /* @__PURE__ */ jsx7("div", { className: "p-1.5 space-y-0.5", children: states.map((state, stateIdx) => {
-          const color = STATE_COLORS[stateIdx % STATE_COLORS.length];
-          const isActive = state.state_id === selectedStateId;
-          const elementCount = state.element_ids.length;
+    /* @__PURE__ */ jsx7("div", { className: "w-56 border-r border-border-secondary bg-bg-primary overflow-y-auto shrink-0", children: selectedStates.length > 0 ? /* @__PURE__ */ jsx7("div", { className: "flex flex-col", children: selectedStates.map((state, stateIdx) => {
+      const colorIdx = states.indexOf(state);
+      const color = STATE_COLORS[colorIdx % STATE_COLORS.length];
+      return /* @__PURE__ */ jsxs7("div", { className: stateIdx > 0 ? "border-t border-border-secondary" : "", children: [
+        /* @__PURE__ */ jsxs7("div", { className: "p-2 border-b border-border-secondary flex items-center gap-2", children: [
+          /* @__PURE__ */ jsx7("div", { className: "w-2 h-2 rounded-full shrink-0", style: { backgroundColor: color.border } }),
+          /* @__PURE__ */ jsx7("h4", { className: "text-[10px] font-semibold text-text-primary uppercase tracking-wider truncate", children: state.name }),
+          /* @__PURE__ */ jsx7("span", { className: "text-[9px] text-text-muted ml-auto shrink-0", children: state.element_ids.length })
+        ] }),
+        /* @__PURE__ */ jsx7("div", { className: "p-1.5 space-y-0.5", children: state.element_ids.map((eid) => {
+          const hash = getFingerprintHash(eid);
+          const label = resolveElementLabel(eid, fingerprintDetails, state);
+          const thumb = elementThumbnails?.[hash] ?? elementThumbnails?.[eid];
+          const isActive = hash === selectedElementHash;
           return /* @__PURE__ */ jsxs7(
             "button",
             {
-              onClick: () => onSelectState(isActive ? null : state.state_id),
-              className: `w-full flex items-center gap-2 text-left px-2 py-1.5 rounded text-[11px] transition-colors ${isActive ? "bg-brand-primary/10 text-brand-primary" : "text-text-primary hover:bg-bg-secondary"}`,
+              onClick: () => setSelectedElementHash(isActive ? null : hash),
+              className: `w-full flex items-center gap-1.5 text-[10px] px-2 py-1 rounded text-left ${isActive ? "bg-brand-primary/10 text-brand-primary" : "hover:bg-bg-secondary text-text-primary"}`,
               children: [
-                /* @__PURE__ */ jsx7(
-                  "div",
+                thumb ? /* @__PURE__ */ jsx7(
+                  "img",
                   {
-                    className: "w-2 h-2 rounded-full shrink-0",
-                    style: { backgroundColor: color.border }
+                    src: thumb.startsWith("data:") ? thumb : `data:image/png;base64,${thumb}`,
+                    alt: label,
+                    className: "w-5 h-5 object-cover rounded shrink-0"
                   }
-                ),
-                /* @__PURE__ */ jsx7("span", { className: "truncate flex-1", children: state.name }),
-                /* @__PURE__ */ jsx7("span", { className: "text-[9px] text-text-muted shrink-0", children: elementCount })
+                ) : /* @__PURE__ */ jsx7(Layers2, { className: "size-3 text-text-muted shrink-0" }),
+                /* @__PURE__ */ jsx7("span", { className: "truncate", children: label })
               ]
             },
-            state.state_id
+            eid
           );
         }) })
-      ] })
-    ] }),
+      ] }, state.state_id);
+    }) }) : /* @__PURE__ */ jsx7("div", { className: "flex items-center justify-center h-full text-text-muted", children: /* @__PURE__ */ jsxs7("div", { className: "text-center px-4", children: [
+      /* @__PURE__ */ jsx7(Layers2, { className: "size-8 mx-auto mb-2 opacity-30" }),
+      /* @__PURE__ */ jsx7("p", { className: "text-xs", children: "Select a state to see its elements" })
+    ] }) }) }),
     /* @__PURE__ */ jsxs7("div", { className: "flex-1 flex flex-col overflow-hidden", children: [
       /* @__PURE__ */ jsxs7("div", { className: "flex items-center gap-2 px-3 py-1.5 border-b border-border-secondary bg-bg-primary shrink-0", children: [
-        /* @__PURE__ */ jsx7("div", { className: "flex items-center border border-border-secondary rounded overflow-hidden text-[10px]", children: ["all", "state", "selected"].map((mode) => /* @__PURE__ */ jsx7(
-          "button",
-          {
-            onClick: () => setScreenshotViewMode(mode),
-            className: `px-2 py-1 capitalize ${screenshotViewMode === mode ? "bg-brand-primary/20 text-brand-primary font-medium" : "text-text-muted hover:text-text-primary"}`,
-            children: mode
-          },
-          mode
-        )) }),
-        selectedElementHashes.size > 0 && /* @__PURE__ */ jsxs7("div", { className: "flex items-center gap-1 text-[10px] text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded", children: [
-          /* @__PURE__ */ jsxs7("span", { children: [
-            selectedElementHashes.size,
-            " selected"
-          ] }),
-          /* @__PURE__ */ jsx7(
-            "button",
-            {
-              onClick: () => setSelectedElementHashes(/* @__PURE__ */ new Set()),
-              className: "hover:text-emerald-300",
-              title: "Clear selection",
-              children: /* @__PURE__ */ jsx7(X, { className: "size-3" })
-            }
-          )
-        ] }),
-        /* @__PURE__ */ jsx7("div", { className: "flex-1" }),
         /* @__PURE__ */ jsx7(
           "button",
           {
@@ -3114,7 +3026,8 @@ function ScreenshotStateView({
             children: /* @__PURE__ */ jsx7(ChevronRight2, { className: "size-4" })
           }
         ),
-        /* @__PURE__ */ jsxs7("div", { className: "flex items-center gap-0.5 ml-2", children: [
+        /* @__PURE__ */ jsx7("div", { className: "flex-1" }),
+        /* @__PURE__ */ jsxs7("div", { className: "flex items-center gap-0.5", children: [
           /* @__PURE__ */ jsx7(
             "button",
             {
@@ -3165,286 +3078,101 @@ function ScreenshotStateView({
         ),
         isLoading && /* @__PURE__ */ jsx7("div", { className: "absolute inset-0 flex items-center justify-center bg-bg-secondary/50", children: /* @__PURE__ */ jsx7("div", { className: "animate-spin size-6 border-2 border-brand-primary border-t-transparent rounded-full" }) }),
         hoveredElement && hoveredElement !== selectedElementHash && /* @__PURE__ */ jsxs7("div", { className: "absolute top-3 left-3 text-xs bg-bg-primary/95 backdrop-blur-sm px-3 py-2 rounded-lg border border-border-secondary shadow-md max-w-[280px] pointer-events-none", children: [
-          /* @__PURE__ */ jsx7("div", { className: "font-medium text-text-primary truncate", children: resolveElementLabel(hoveredElement, fingerprintDetails) || hoveredElement }),
+          /* @__PURE__ */ jsx7("div", { className: "font-medium text-text-primary truncate", children: (() => {
+            const entry = hashToElement.get(hoveredElement);
+            return entry ? resolveElementLabel(entry.elementId, fingerprintDetails, entry.state) : hoveredElement;
+          })() }),
           (() => {
             const fp = fingerprintDetails?.[hoveredElement];
             if (!fp) return null;
-            return /* @__PURE__ */ jsxs7(Fragment4, { children: [
-              /* @__PURE__ */ jsxs7("div", { className: "text-text-muted mt-0.5", children: [
-                "<",
-                fp.tagName,
-                ">",
-                fp.role ? ` role="${fp.role}"` : ""
-              ] }),
-              fp.positionZone && /* @__PURE__ */ jsxs7("div", { className: "text-text-muted", children: [
-                "Zone: ",
-                fp.positionZone
-              ] })
-            ] });
-          })(),
-          hashToStates.get(hoveredElement) && /* @__PURE__ */ jsxs7("div", { className: "text-text-muted mt-0.5", children: [
-            "States: ",
-            hashToStates.get(hoveredElement).map(
-              (sid) => states.find((s) => s.state_id === sid)?.name ?? sid
-            ).join(", ")
-          ] }),
-          (() => {
-            const stateIds = hashToStates.get(hoveredElement) ?? [];
-            if (stateIds.length === 0) return null;
-            const confidences = stateIds.map((sid) => {
-              const s = states.find((st) => st.state_id === sid);
-              return s ? Math.round(s.confidence * 100) : 0;
-            }).filter((c) => c > 0);
-            if (confidences.length === 0) return null;
-            const avg = Math.round(confidences.reduce((a, b) => a + b, 0) / confidences.length);
-            return /* @__PURE__ */ jsxs7("div", { className: "text-text-muted", children: [
-              "Confidence: ",
-              avg,
-              "%"
+            return /* @__PURE__ */ jsxs7("div", { className: "text-text-muted mt-0.5", children: [
+              "<",
+              fp.tagName,
+              ">",
+              fp.role ? ` role="${fp.role}"` : ""
             ] });
           })()
         ] }),
-        /* @__PURE__ */ jsx7("div", { className: "absolute bottom-2 right-2 text-[9px] text-text-muted bg-bg-primary/80 backdrop-blur-sm px-2 py-1 rounded border border-border-secondary/50", children: visibleHashes ? `${Object.keys(elementBounds).filter((h) => visibleHashes.has(h)).length} / ${Object.keys(elementBounds).length} elements` : `${Object.keys(elementBounds).length} elements` })
-      ] })
-    ] }),
-    /* @__PURE__ */ jsxs7("div", { className: "w-80 border-l border-border-secondary bg-bg-primary overflow-y-auto shrink-0", children: [
-      /* @__PURE__ */ jsxs7("div", { className: "flex border-b border-border-secondary", children: [
-        /* @__PURE__ */ jsx7(
-          "button",
-          {
-            onClick: () => setRightPanelTab("state"),
-            className: `flex-1 text-[10px] py-2 font-medium ${rightPanelTab === "state" ? "text-brand-primary border-b-2 border-brand-primary" : "text-text-muted hover:text-text-primary"}`,
-            children: "State Details"
-          }
-        ),
-        /* @__PURE__ */ jsx7(
-          "button",
-          {
-            onClick: () => setRightPanelTab("element"),
-            className: `flex-1 text-[10px] py-2 font-medium ${rightPanelTab === "element" ? "text-brand-primary border-b-2 border-brand-primary" : "text-text-muted hover:text-text-primary"}`,
-            children: "Element Details"
-          }
-        )
-      ] }),
-      /* @__PURE__ */ jsx7("div", { className: "p-3", children: rightPanelTab === "element" && selectedElementHash ? (
-        /* Element Details Tab */
-        /* @__PURE__ */ jsxs7("div", { className: "space-y-3", children: [
-          /* @__PURE__ */ jsxs7("div", { children: [
-            /* @__PURE__ */ jsx7("h4", { className: "text-sm font-semibold text-text-primary", children: resolveElementLabel(selectedElementHash, fingerprintDetails) || selectedElementHash }),
+        selectedElementHash && /* @__PURE__ */ jsx7("div", { className: "absolute bottom-2 left-2 right-2 text-xs bg-bg-primary/95 backdrop-blur-sm px-3 py-2 rounded-lg border border-border-secondary shadow-md", children: /* @__PURE__ */ jsxs7("div", { className: "flex items-start gap-3", children: [
+          /* @__PURE__ */ jsxs7("div", { className: "flex-1 min-w-0", children: [
+            /* @__PURE__ */ jsx7("div", { className: "font-medium text-text-primary truncate", children: (() => {
+              const entry = hashToElement.get(selectedElementHash);
+              return entry ? resolveElementLabel(entry.elementId, fingerprintDetails, entry.state) : selectedElementHash;
+            })() }),
             selectedFp && /* @__PURE__ */ jsxs7("div", { className: "text-[10px] text-text-muted mt-0.5", children: [
               "<",
               selectedFp.tagName,
               ">",
-              selectedFp.role ? ` role="${selectedFp.role}"` : ""
+              selectedFp.role ? ` role="${selectedFp.role}"` : "",
+              selectedFp.positionZone ? ` \xB7 ${selectedFp.positionZone}` : ""
+            ] }),
+            elementBounds[selectedElementHash] && /* @__PURE__ */ jsxs7("div", { className: "text-[10px] text-text-muted mt-0.5", children: [
+              Math.round(elementBounds[selectedElementHash].x),
+              ", ",
+              Math.round(elementBounds[selectedElementHash].y),
+              " \xB7 ",
+              Math.round(elementBounds[selectedElementHash].width),
+              "\xD7",
+              Math.round(elementBounds[selectedElementHash].height)
             ] })
           ] }),
-          elementThumbnails?.[selectedElementHash] && /* @__PURE__ */ jsx7("div", { children: /* @__PURE__ */ jsx7(
+          elementThumbnails?.[selectedElementHash] && /* @__PURE__ */ jsx7(
             "img",
             {
               src: elementThumbnails[selectedElementHash].startsWith("data:") ? elementThumbnails[selectedElementHash] : `data:image/png;base64,${elementThumbnails[selectedElementHash]}`,
               alt: "Element thumbnail",
-              className: "w-full rounded border border-border-secondary"
+              className: "w-12 h-12 object-cover rounded border border-border-secondary shrink-0"
             }
-          ) }),
-          elementBounds[selectedElementHash] && /* @__PURE__ */ jsxs7("div", { children: [
-            /* @__PURE__ */ jsx7("h5", { className: "text-[10px] font-medium text-text-muted uppercase tracking-wider mb-1", children: "Position" }),
-            /* @__PURE__ */ jsxs7("div", { className: "grid grid-cols-2 gap-1 text-[10px]", children: [
-              /* @__PURE__ */ jsxs7("div", { className: "bg-bg-secondary rounded px-2 py-1", children: [
-                /* @__PURE__ */ jsx7("span", { className: "text-text-muted", children: "x:" }),
-                " ",
-                /* @__PURE__ */ jsx7("span", { className: "text-text-primary", children: Math.round(elementBounds[selectedElementHash].x) })
-              ] }),
-              /* @__PURE__ */ jsxs7("div", { className: "bg-bg-secondary rounded px-2 py-1", children: [
-                /* @__PURE__ */ jsx7("span", { className: "text-text-muted", children: "y:" }),
-                " ",
-                /* @__PURE__ */ jsx7("span", { className: "text-text-primary", children: Math.round(elementBounds[selectedElementHash].y) })
-              ] }),
-              /* @__PURE__ */ jsxs7("div", { className: "bg-bg-secondary rounded px-2 py-1", children: [
-                /* @__PURE__ */ jsx7("span", { className: "text-text-muted", children: "w:" }),
-                " ",
-                /* @__PURE__ */ jsx7("span", { className: "text-text-primary", children: Math.round(elementBounds[selectedElementHash].width) })
-              ] }),
-              /* @__PURE__ */ jsxs7("div", { className: "bg-bg-secondary rounded px-2 py-1", children: [
-                /* @__PURE__ */ jsx7("span", { className: "text-text-muted", children: "h:" }),
-                " ",
-                /* @__PURE__ */ jsx7("span", { className: "text-text-primary", children: Math.round(elementBounds[selectedElementHash].height) })
-              ] })
-            ] })
-          ] }),
-          selectedFp && /* @__PURE__ */ jsxs7("div", { children: [
-            /* @__PURE__ */ jsx7("h5", { className: "text-[10px] font-medium text-text-muted uppercase tracking-wider mb-1", children: "Fingerprint" }),
-            /* @__PURE__ */ jsxs7("div", { className: "space-y-1 text-[10px]", children: [
-              /* @__PURE__ */ jsxs7("div", { className: "bg-bg-secondary rounded px-2 py-1", children: [
-                /* @__PURE__ */ jsx7("span", { className: "text-text-muted", children: "Hash:" }),
-                " ",
-                /* @__PURE__ */ jsxs7("code", { className: "text-text-primary font-mono text-[9px]", children: [
-                  selectedElementHash.slice(0, 16),
-                  "..."
+          ),
+          /* @__PURE__ */ jsx7(
+            "button",
+            {
+              onClick: () => setSelectedElementHash(null),
+              className: "text-text-muted hover:text-text-primary shrink-0",
+              children: /* @__PURE__ */ jsx7(X, { className: "size-3.5" })
+            }
+          )
+        ] }) }),
+        !selectedElementHash && /* @__PURE__ */ jsx7("div", { className: "absolute bottom-2 right-2 text-[9px] text-text-muted bg-bg-primary/80 backdrop-blur-sm px-2 py-1 rounded border border-border-secondary/50", children: selectedStateIds.size > 0 ? `${Object.keys(elementBounds).filter((h) => selectedStateHashes.has(h)).length} / ${Object.keys(elementBounds).length} elements` : `${Object.keys(elementBounds).length} elements` })
+      ] })
+    ] }),
+    /* @__PURE__ */ jsxs7("div", { className: "w-48 border-l border-border-secondary bg-bg-primary overflow-y-auto shrink-0", children: [
+      /* @__PURE__ */ jsx7("div", { className: "p-2 border-b border-border-secondary", children: /* @__PURE__ */ jsxs7("h4", { className: "text-[10px] font-semibold text-text-muted uppercase tracking-wider", children: [
+        "Screenshots ",
+        selectedStateIds.size > 0 && `(${matchingScreenshotIndices.length})`
+      ] }) }),
+      /* @__PURE__ */ jsxs7("div", { className: "p-1.5 space-y-1.5", children: [
+        matchingScreenshotIndices.map((idx) => {
+          const cap = captureScreenshots[idx];
+          const isCurrent = idx === currentIndex;
+          return /* @__PURE__ */ jsxs7(
+            "button",
+            {
+              onClick: () => setCurrentIndex(idx),
+              className: `w-full rounded border-2 transition-colors overflow-hidden ${isCurrent ? "border-blue-500" : "border-transparent hover:border-border-secondary"}`,
+              children: [
+                thumbnailCache.has(cap.id) ? /* @__PURE__ */ jsx7(
+                  "img",
+                  {
+                    src: thumbnailCache.get(cap.id),
+                    alt: `Capture ${cap.captureIndex + 1}`,
+                    className: "w-full h-auto object-cover",
+                    style: { maxHeight: 100 }
+                  }
+                ) : /* @__PURE__ */ jsx7("div", { className: "w-full h-16 bg-bg-tertiary flex items-center justify-center", children: /* @__PURE__ */ jsx7(Image, { className: "size-4 text-text-muted opacity-30" }) }),
+                /* @__PURE__ */ jsxs7("div", { className: "text-[9px] text-text-muted px-1 py-0.5 text-center truncate", children: [
+                  "#",
+                  cap.captureIndex + 1,
+                  " \xB7 ",
+                  new Date(cap.capturedAt).toLocaleTimeString()
                 ] })
-              ] }),
-              selectedFp.positionZone && /* @__PURE__ */ jsxs7("div", { className: "bg-bg-secondary rounded px-2 py-1", children: [
-                /* @__PURE__ */ jsx7("span", { className: "text-text-muted", children: "Zone:" }),
-                " ",
-                /* @__PURE__ */ jsx7("span", { className: "text-text-primary", children: selectedFp.positionZone })
-              ] }),
-              selectedFp.sizeCategory && /* @__PURE__ */ jsxs7("div", { className: "bg-bg-secondary rounded px-2 py-1", children: [
-                /* @__PURE__ */ jsx7("span", { className: "text-text-muted", children: "Size:" }),
-                " ",
-                /* @__PURE__ */ jsx7("span", { className: "text-text-primary", children: selectedFp.sizeCategory })
-              ] })
-            ] })
-          ] }),
-          hashToStates.get(selectedElementHash) && /* @__PURE__ */ jsxs7("div", { children: [
-            /* @__PURE__ */ jsx7("h5", { className: "text-[10px] font-medium text-text-muted uppercase tracking-wider mb-1", children: "States Membership" }),
-            /* @__PURE__ */ jsx7("div", { className: "space-y-1", children: hashToStates.get(selectedElementHash).map((sid) => {
-              const s = states.find((st) => st.state_id === sid);
-              if (!s) return null;
-              const colorIdx = states.indexOf(s);
-              const color = STATE_COLORS[colorIdx % STATE_COLORS.length];
-              return /* @__PURE__ */ jsxs7(
-                "button",
-                {
-                  onClick: () => {
-                    onSelectState(sid);
-                    setRightPanelTab("state");
-                  },
-                  className: "w-full flex items-center gap-2 text-[10px] px-2 py-1 rounded bg-bg-secondary hover:bg-bg-tertiary text-left",
-                  children: [
-                    /* @__PURE__ */ jsx7("div", { className: "w-2 h-2 rounded-full shrink-0", style: { backgroundColor: color.border } }),
-                    /* @__PURE__ */ jsx7("span", { className: "text-text-primary truncate", children: s.name }),
-                    /* @__PURE__ */ jsxs7("span", { className: `ml-auto shrink-0 ${Math.round(s.confidence * 100) >= 80 ? "text-green-400" : "text-amber-400"}`, children: [
-                      Math.round(s.confidence * 100),
-                      "%"
-                    ] })
-                  ]
-                },
-                sid
-              );
-            }) })
-          ] }),
-          hashToCaptures.get(selectedElementHash) && /* @__PURE__ */ jsxs7("div", { children: [
-            /* @__PURE__ */ jsx7("h5", { className: "text-[10px] font-medium text-text-muted uppercase tracking-wider mb-1", children: "Screenshot Presence" }),
-            /* @__PURE__ */ jsx7("div", { className: "flex flex-wrap gap-1", children: captureScreenshots.map((cap, idx) => {
-              const present = hashToCaptures.get(selectedElementHash)?.includes(idx);
-              return /* @__PURE__ */ jsxs7(
-                "button",
-                {
-                  onClick: () => setCurrentIndex(idx),
-                  className: `text-[9px] px-1.5 py-0.5 rounded ${present ? idx === currentIndex ? "bg-brand-primary/20 text-brand-primary border border-brand-primary/30" : "bg-green-500/10 text-green-400 border border-green-500/20" : "bg-bg-secondary text-text-muted border border-border-secondary opacity-50"}`,
-                  children: [
-                    "#",
-                    idx + 1,
-                    " ",
-                    present ? "\u2713" : ""
-                  ]
-                },
-                cap.id
-              );
-            }) })
-          ] })
-        ] })
-      ) : rightPanelTab === "element" ? /* @__PURE__ */ jsxs7("div", { className: "text-center text-text-muted py-8", children: [
-        /* @__PURE__ */ jsx7(Info, { className: "size-8 mx-auto mb-2 opacity-30" }),
-        /* @__PURE__ */ jsx7("p", { className: "text-xs", children: "Click an element on the canvas to inspect it" })
-      ] }) : currentSelectedState ? (
-        /* State Details Tab */
-        /* @__PURE__ */ jsxs7("div", { className: "space-y-3", children: [
-          /* @__PURE__ */ jsxs7("div", { children: [
-            /* @__PURE__ */ jsxs7("div", { className: "flex items-center gap-2", children: [
-              /* @__PURE__ */ jsx7("h4", { className: "text-sm font-semibold text-text-primary truncate", children: currentSelectedState.name }),
-              /* @__PURE__ */ jsxs7("span", { className: `text-[10px] px-1.5 py-0.5 rounded-full shrink-0 ${Math.round(currentSelectedState.confidence * 100) >= 80 ? "bg-green-500/10 text-green-400 border border-green-500/30" : "bg-amber-500/10 text-amber-400 border border-amber-500/30"}`, children: [
-                Math.round(currentSelectedState.confidence * 100),
-                "%"
-              ] })
-            ] }),
-            currentSelectedState.description && /* @__PURE__ */ jsx7("p", { className: "text-[10px] text-text-muted mt-1", children: currentSelectedState.description }),
-            /* @__PURE__ */ jsxs7("div", { className: "flex items-center gap-2 mt-1.5 text-[10px] text-text-muted", children: [
-              /* @__PURE__ */ jsxs7("span", { children: [
-                currentSelectedState.element_ids.length,
-                " elements"
-              ] }),
-              /* @__PURE__ */ jsx7("span", { children: "\xB7" }),
-              /* @__PURE__ */ jsxs7("span", { children: [
-                currentSelectedState.render_ids.length,
-                " renders"
-              ] })
-            ] })
-          ] }),
-          /* @__PURE__ */ jsxs7("div", { children: [
-            /* @__PURE__ */ jsx7("h5", { className: "text-[10px] font-medium text-text-muted uppercase tracking-wider mb-1", children: "Elements" }),
-            /* @__PURE__ */ jsx7("div", { className: "space-y-0.5 max-h-60 overflow-y-auto", children: currentSelectedState.element_ids.map((eid) => {
-              const hash = getFingerprintHash(eid);
-              const label = resolveElementLabel(eid, fingerprintDetails, currentSelectedState);
-              const thumb = elementThumbnails?.[hash] ?? elementThumbnails?.[eid];
-              const isActive = hash === selectedElementHash;
-              return /* @__PURE__ */ jsxs7(
-                "button",
-                {
-                  onClick: () => {
-                    setSelectedElementHash(hash);
-                    setRightPanelTab("element");
-                  },
-                  className: `w-full flex items-center gap-1.5 text-[10px] px-2 py-1 rounded text-left ${isActive ? "bg-brand-primary/10 text-brand-primary" : "hover:bg-bg-secondary text-text-primary"}`,
-                  children: [
-                    thumb ? /* @__PURE__ */ jsx7(
-                      "img",
-                      {
-                        src: thumb.startsWith("data:") ? thumb : `data:image/png;base64,${thumb}`,
-                        alt: label,
-                        className: "w-5 h-5 object-cover rounded shrink-0"
-                      }
-                    ) : /* @__PURE__ */ jsx7(Layers2, { className: "size-3 text-text-muted shrink-0" }),
-                    /* @__PURE__ */ jsx7("span", { className: "truncate", children: label })
-                  ]
-                },
-                eid
-              );
-            }) })
-          ] }),
-          /* @__PURE__ */ jsxs7("div", { children: [
-            /* @__PURE__ */ jsx7("h5", { className: "text-[10px] font-medium text-text-muted uppercase tracking-wider mb-1", children: "Screenshots" }),
-            /* @__PURE__ */ jsx7("div", { className: "flex flex-wrap gap-1", children: captureScreenshots.map((cap, idx) => {
-              let hasElements = false;
-              try {
-                const hashes = JSON.parse(cap.fingerprintHashesJson);
-                hasElements = hashes.some((h) => selectedStateHashes.has(h));
-              } catch {
-              }
-              if (!hasElements) return null;
-              return /* @__PURE__ */ jsxs7(
-                "button",
-                {
-                  onClick: () => setCurrentIndex(idx),
-                  className: `text-[9px] px-1.5 py-0.5 rounded border ${idx === currentIndex ? "bg-brand-primary/20 text-brand-primary border-brand-primary/30" : "bg-bg-secondary text-text-muted border-border-secondary hover:border-text-muted"}`,
-                  children: [
-                    "Capture #",
-                    idx + 1
-                  ]
-                },
-                cap.id
-              );
-            }) })
-          ] }),
-          currentSelectedState.acceptance_criteria.length > 0 && /* @__PURE__ */ jsxs7("div", { children: [
-            /* @__PURE__ */ jsx7("h5", { className: "text-[10px] font-medium text-text-muted uppercase tracking-wider mb-1", children: "Acceptance Criteria" }),
-            /* @__PURE__ */ jsx7("ul", { className: "space-y-0.5", children: currentSelectedState.acceptance_criteria.map((ac, i) => /* @__PURE__ */ jsxs7("li", { className: "flex items-start gap-1 text-[10px] text-text-muted", children: [
-              /* @__PURE__ */ jsx7(CheckCircle, { className: "size-3 text-green-500 mt-0.5 shrink-0" }),
-              /* @__PURE__ */ jsx7("span", { children: ac })
-            ] }, i)) })
-          ] }),
-          currentSelectedState.domain_knowledge.length > 0 && /* @__PURE__ */ jsxs7("div", { children: [
-            /* @__PURE__ */ jsx7("h5", { className: "text-[10px] font-medium text-text-muted uppercase tracking-wider mb-1", children: "Domain Knowledge" }),
-            /* @__PURE__ */ jsx7("div", { className: "space-y-1.5", children: currentSelectedState.domain_knowledge.map((dk) => /* @__PURE__ */ jsxs7("div", { className: "p-2 rounded bg-bg-secondary border border-border-secondary", children: [
-              /* @__PURE__ */ jsx7("div", { className: "text-[10px] font-medium text-text-primary", children: dk.title }),
-              /* @__PURE__ */ jsx7("div", { className: "text-[9px] text-text-muted mt-0.5 line-clamp-3", children: dk.content }),
-              dk.tags.length > 0 && /* @__PURE__ */ jsx7("div", { className: "flex flex-wrap gap-0.5 mt-1", children: dk.tags.map((tag) => /* @__PURE__ */ jsx7("span", { className: "text-[8px] px-1 py-0.5 rounded-full bg-brand-primary/10 text-brand-primary", children: tag }, tag)) })
-            ] }, dk.id)) })
-          ] })
-        ] })
-      ) : /* @__PURE__ */ jsxs7("div", { className: "text-center text-text-muted py-8", children: [
-        /* @__PURE__ */ jsx7(Layers2, { className: "size-8 mx-auto mb-2 opacity-30" }),
-        /* @__PURE__ */ jsx7("p", { className: "text-xs", children: "Select a state to view details" })
-      ] }) })
+              ]
+            },
+            cap.id
+          );
+        }),
+        matchingScreenshotIndices.length === 0 && /* @__PURE__ */ jsx7("p", { className: "text-[10px] text-text-muted text-center py-4", children: "No screenshots match selected state(s)" })
+      ] })
     ] })
   ] });
 }
@@ -3464,6 +3192,7 @@ function StateViewPanel({
   const [localSelectedStateId, setLocalSelectedStateId] = useState5(
     selectedStateId
   );
+  const [selectedStateIds, setSelectedStateIds] = useState5(/* @__PURE__ */ new Set());
   const effectiveSelectedStateId = localSelectedStateId;
   const selectedState = useMemo4(
     () => states.find((s) => s.state_id === effectiveSelectedStateId),
@@ -3581,7 +3310,7 @@ function StateViewPanel({
         filteredStates.map((state) => {
           const colorIdx = states.indexOf(state);
           const color = STATE_COLORS[colorIdx % STATE_COLORS.length];
-          const isSelected = state.state_id === effectiveSelectedStateId;
+          const isSelected = viewMode === "screenshot" ? selectedStateIds.has(state.state_id) : state.state_id === effectiveSelectedStateId;
           const isExpanded = expandedStates.has(state.state_id);
           const stateOutgoing = transitionMap.outgoing.get(state.state_id) ?? [];
           const stateIncoming = transitionMap.incoming.get(state.state_id) ?? [];
@@ -3592,8 +3321,23 @@ function StateViewPanel({
               "button",
               {
                 "data-ui-id": `state-item-${state.state_id}`,
-                onClick: () => {
-                  setLocalSelectedStateId(isSelected ? null : state.state_id);
+                onClick: (e) => {
+                  if (viewMode === "screenshot" && (e.ctrlKey || e.metaKey)) {
+                    setSelectedStateIds((prev) => {
+                      const next = new Set(prev);
+                      if (next.has(state.state_id)) {
+                        next.delete(state.state_id);
+                      } else {
+                        next.add(state.state_id);
+                      }
+                      return next;
+                    });
+                  } else if (viewMode === "screenshot") {
+                    setSelectedStateIds(isSelected ? /* @__PURE__ */ new Set() : /* @__PURE__ */ new Set([state.state_id]));
+                    setLocalSelectedStateId(isSelected ? null : state.state_id);
+                  } else {
+                    setLocalSelectedStateId(isSelected ? null : state.state_id);
+                  }
                   if (!isExpanded) toggleExpanded(state.state_id);
                 },
                 className: `
@@ -3678,8 +3422,7 @@ function StateViewPanel({
         captureScreenshots,
         onLoadScreenshotImage,
         states,
-        selectedStateId: effectiveSelectedStateId,
-        onSelectState: setLocalSelectedStateId,
+        selectedStateIds,
         fingerprintDetails,
         elementThumbnails
       }
