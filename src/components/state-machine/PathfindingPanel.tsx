@@ -105,7 +105,8 @@ export function PathfindingPanel({
           <select
             value={fromStateId}
             onChange={(e) => setFromStateId(e.target.value)}
-            className="w-full px-2 py-1.5 text-sm bg-bg-tertiary border border-border-secondary rounded text-text-primary"
+            className="w-full px-2 py-1.5 text-sm bg-bg-tertiary border border-border-secondary rounded text-text-primary [&>option]:text-black [&>option]:bg-white"
+            style={{ colorScheme: "dark" }}
           >
             <option value="">Select state...</option>
             {states.map((s) => (
@@ -120,7 +121,8 @@ export function PathfindingPanel({
           <select
             value={targetStateId}
             onChange={(e) => setTargetStateId(e.target.value)}
-            className="w-full px-2 py-1.5 text-sm bg-bg-tertiary border border-border-secondary rounded text-text-primary"
+            className="w-full px-2 py-1.5 text-sm bg-bg-tertiary border border-border-secondary rounded text-text-primary [&>option]:text-black [&>option]:bg-white"
+            style={{ colorScheme: "dark" }}
           >
             <option value="">Select state...</option>
             {states.map((s) => (
@@ -140,7 +142,8 @@ export function PathfindingPanel({
             onChange={(e) =>
               setAlgorithm(e.target.value as PathfindingAlgorithm)
             }
-            className="px-2 py-1.5 text-sm bg-bg-tertiary border border-border-secondary rounded text-text-primary"
+            className="px-2 py-1.5 text-sm bg-bg-tertiary border border-border-secondary rounded text-text-primary [&>option]:text-black [&>option]:bg-white"
+            style={{ colorScheme: "dark" }}
           >
             <option value="dijkstra">Dijkstra (cheapest)</option>
             <option value="bfs">BFS (shortest)</option>

@@ -391,7 +391,8 @@ function ActionField({
           onChange={(e) =>
             onUpdate(index, { type: e.target.value as StandardActionType })
           }
-          className="flex-1 px-2 py-1 text-xs bg-bg-secondary border border-border-secondary rounded text-text-primary"
+          className="flex-1 px-2 py-1 text-xs bg-bg-secondary border border-border-secondary rounded text-text-primary [&>option]:text-black [&>option]:bg-white"
+          style={{ colorScheme: "dark" }}
         >
           {ACTION_TYPES.map((t) => (
             <option key={t.value} value={t.value}>
@@ -522,7 +523,8 @@ function ActionField({
                   | "right",
               })
             }
-            className="flex-1 px-2 py-1 text-xs bg-bg-secondary border border-border-secondary rounded text-text-primary"
+            className="flex-1 px-2 py-1 text-xs bg-bg-secondary border border-border-secondary rounded text-text-primary [&>option]:text-black [&>option]:bg-white"
+            style={{ colorScheme: "dark" }}
           >
             <option value="up">Up</option>
             <option value="down">Down</option>

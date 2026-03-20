@@ -289,7 +289,8 @@ export function TransitionsPanel({
             <select
               value={filterFromState ?? ""}
               onChange={(e) => setFilterFromState(e.target.value || null)}
-              className="text-[10px] h-6 flex-1 px-1 bg-bg-tertiary border border-border-secondary rounded text-text-primary"
+              className="text-[10px] h-6 flex-1 px-1 bg-bg-tertiary border border-border-secondary rounded text-text-primary [&>option]:text-black [&>option]:bg-white"
+              style={{ colorScheme: "dark" }}
             >
               <option value="">All from states</option>
               {states.map((s) => (
@@ -301,7 +302,8 @@ export function TransitionsPanel({
             <select
               value={filterToState ?? ""}
               onChange={(e) => setFilterToState(e.target.value || null)}
-              className="text-[10px] h-6 flex-1 px-1 bg-bg-tertiary border border-border-secondary rounded text-text-primary"
+              className="text-[10px] h-6 flex-1 px-1 bg-bg-tertiary border border-border-secondary rounded text-text-primary [&>option]:text-black [&>option]:bg-white"
+              style={{ colorScheme: "dark" }}
             >
               <option value="">All target states</option>
               {states.map((s) => (
@@ -442,7 +444,8 @@ export function TransitionsPanel({
                           speed: parseFloat(e.target.value),
                         }))
                       }
-                      className="text-[10px] h-5 w-16 px-1 bg-bg-tertiary border border-border-secondary rounded text-text-primary"
+                      className="text-[10px] h-5 w-16 px-1 bg-bg-tertiary border border-border-secondary rounded text-text-primary [&>option]:text-black [&>option]:bg-white"
+                      style={{ colorScheme: "dark" }}
                     >
                       <option value="0.5">0.5x</option>
                       <option value="1">1x</option>

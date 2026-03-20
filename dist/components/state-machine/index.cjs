@@ -1045,7 +1045,8 @@ function ActionField({
         {
           value: action.type,
           onChange: (e) => onUpdate(index, { type: e.target.value }),
-          className: "flex-1 px-2 py-1 text-xs bg-bg-secondary border border-border-secondary rounded text-text-primary",
+          className: "flex-1 px-2 py-1 text-xs bg-bg-secondary border border-border-secondary rounded text-text-primary [&>option]:text-black [&>option]:bg-white",
+          style: { colorScheme: "dark" },
           children: ACTION_TYPES.map((t) => /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("option", { value: t.value, children: t.label }, t.value))
         }
       ),
@@ -1153,7 +1154,8 @@ function ActionField({
           onChange: (e) => onUpdate(index, {
             scroll_direction: e.target.value
           }),
-          className: "flex-1 px-2 py-1 text-xs bg-bg-secondary border border-border-secondary rounded text-text-primary",
+          className: "flex-1 px-2 py-1 text-xs bg-bg-secondary border border-border-secondary rounded text-text-primary [&>option]:text-black [&>option]:bg-white",
+          style: { colorScheme: "dark" },
           children: [
             /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("option", { value: "up", children: "Up" }),
             /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("option", { value: "down", children: "Down" }),
@@ -1377,7 +1379,8 @@ function TransitionsPanel({
             {
               value: filterFromState ?? "",
               onChange: (e) => setFilterFromState(e.target.value || null),
-              className: "text-[10px] h-6 flex-1 px-1 bg-bg-tertiary border border-border-secondary rounded text-text-primary",
+              className: "text-[10px] h-6 flex-1 px-1 bg-bg-tertiary border border-border-secondary rounded text-text-primary [&>option]:text-black [&>option]:bg-white",
+              style: { colorScheme: "dark" },
               children: [
                 /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("option", { value: "", children: "All from states" }),
                 states.map((s) => /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("option", { value: s.state_id, children: s.name }, s.state_id))
@@ -1389,7 +1392,8 @@ function TransitionsPanel({
             {
               value: filterToState ?? "",
               onChange: (e) => setFilterToState(e.target.value || null),
-              className: "text-[10px] h-6 flex-1 px-1 bg-bg-tertiary border border-border-secondary rounded text-text-primary",
+              className: "text-[10px] h-6 flex-1 px-1 bg-bg-tertiary border border-border-secondary rounded text-text-primary [&>option]:text-black [&>option]:bg-white",
+              style: { colorScheme: "dark" },
               children: [
                 /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("option", { value: "", children: "All target states" }),
                 states.map((s) => /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("option", { value: s.state_id, children: s.name }, s.state_id))
@@ -1481,7 +1485,8 @@ function TransitionsPanel({
                 ...prev,
                 speed: parseFloat(e.target.value)
               })),
-              className: "text-[10px] h-5 w-16 px-1 bg-bg-tertiary border border-border-secondary rounded text-text-primary",
+              className: "text-[10px] h-5 w-16 px-1 bg-bg-tertiary border border-border-secondary rounded text-text-primary [&>option]:text-black [&>option]:bg-white",
+              style: { colorScheme: "dark" },
               children: [
                 /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("option", { value: "0.5", children: "0.5x" }),
                 /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("option", { value: "1", children: "1x" }),
@@ -3667,7 +3672,8 @@ function PathfindingPanel({
           {
             value: fromStateId,
             onChange: (e) => setFromStateId(e.target.value),
-            className: "w-full px-2 py-1.5 text-sm bg-bg-tertiary border border-border-secondary rounded text-text-primary",
+            className: "w-full px-2 py-1.5 text-sm bg-bg-tertiary border border-border-secondary rounded text-text-primary [&>option]:text-black [&>option]:bg-white",
+            style: { colorScheme: "dark" },
             children: [
               /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("option", { value: "", children: "Select state..." }),
               states.map((s) => /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("option", { value: s.state_id, children: s.name }, s.state_id))
@@ -3682,7 +3688,8 @@ function PathfindingPanel({
           {
             value: targetStateId,
             onChange: (e) => setTargetStateId(e.target.value),
-            className: "w-full px-2 py-1.5 text-sm bg-bg-tertiary border border-border-secondary rounded text-text-primary",
+            className: "w-full px-2 py-1.5 text-sm bg-bg-tertiary border border-border-secondary rounded text-text-primary [&>option]:text-black [&>option]:bg-white",
+            style: { colorScheme: "dark" },
             children: [
               /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("option", { value: "", children: "Select state..." }),
               states.map((s) => /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("option", { value: s.state_id, children: s.name }, s.state_id))
@@ -3697,7 +3704,8 @@ function PathfindingPanel({
         {
           value: algorithm,
           onChange: (e) => setAlgorithm(e.target.value),
-          className: "px-2 py-1.5 text-sm bg-bg-tertiary border border-border-secondary rounded text-text-primary",
+          className: "px-2 py-1.5 text-sm bg-bg-tertiary border border-border-secondary rounded text-text-primary [&>option]:text-black [&>option]:bg-white",
+          style: { colorScheme: "dark" },
           children: [
             /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("option", { value: "dijkstra", children: "Dijkstra (cheapest)" }),
             /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("option", { value: "bfs", children: "BFS (shortest)" })

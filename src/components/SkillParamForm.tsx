@@ -83,7 +83,7 @@ interface SkillParamFieldProps {
 
 function SkillParamField({ param, value, onChange }: SkillParamFieldProps) {
   const inputClasses =
-    "w-full bg-zinc-800 border border-zinc-700 rounded px-2.5 py-1.5 text-sm text-zinc-200 " +
+    "w-full bg-zinc-800 border border-zinc-700 rounded px-2.5 py-1.5 text-sm text-zinc-200 [&>option]:text-black [&>option]:bg-white " +
     "placeholder:text-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500 focus:border-zinc-500";
 
   return (
@@ -164,6 +164,7 @@ function SkillParamField({ param, value, onChange }: SkillParamFieldProps) {
       {param.type === "select" && param.options && (
         <select
           className={inputClasses}
+          style={{ colorScheme: "dark" }}
           value={(value as string) ?? ""}
           onChange={(e) => onChange(e.target.value)}
         >

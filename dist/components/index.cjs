@@ -488,7 +488,7 @@ function SkillParamForm({
   ] });
 }
 function SkillParamField({ param, value, onChange }) {
-  const inputClasses = "w-full bg-zinc-800 border border-zinc-700 rounded px-2.5 py-1.5 text-sm text-zinc-200 placeholder:text-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500 focus:border-zinc-500";
+  const inputClasses = "w-full bg-zinc-800 border border-zinc-700 rounded px-2.5 py-1.5 text-sm text-zinc-200 [&>option]:text-black [&>option]:bg-white placeholder:text-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500 focus:border-zinc-500";
   return /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("div", { children: [
     /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("label", { className: "flex items-center gap-1 text-sm text-zinc-300 mb-1", children: [
       param.label,
@@ -557,6 +557,7 @@ function SkillParamField({ param, value, onChange }) {
       "select",
       {
         className: inputClasses,
+        style: { colorScheme: "dark" },
         value: value ?? "",
         onChange: (e) => onChange(e.target.value),
         children: [
