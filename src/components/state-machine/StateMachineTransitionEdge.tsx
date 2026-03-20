@@ -94,12 +94,12 @@ function StateMachineTransitionEdgeInner(props: EdgeProps) {
           >
             <div
               className={`
-                flex items-center gap-1.5 text-[10px] px-2.5 py-1 rounded-full border shadow-sm
+                flex items-center gap-1.5 text-[10px] px-2.5 py-1 rounded-full border shadow-xs
                 transition-all duration-150
                 ${
                   isActive
                     ? "bg-brand-primary text-white border-brand-primary shadow-brand-primary/20"
-                    : "bg-bg-primary/95 text-text-muted border-border-secondary hover:border-brand-primary/40 backdrop-blur-sm"
+                    : "bg-bg-primary/95 text-text-muted border-border-secondary hover:border-brand-primary/40 backdrop-blur-xs"
                 }
               `}
             >

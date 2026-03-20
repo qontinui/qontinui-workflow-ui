@@ -415,7 +415,7 @@ export function TransitionsPanel({
                     .join(", ")}
                 </span>
                 {selectedTransition.exit_states.length > 0 && (
-                  <span className="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] border bg-red-500/10 text-red-400 border-red-500/30">
+                  <span className="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] border status-error text-red-400 border-red-500/30">
                     Exit:{" "}
                     {selectedTransition.exit_states
                       .map((s) => stateNameMap.get(s) ?? s)
@@ -531,7 +531,7 @@ export function TransitionsPanel({
                           flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[9px] border transition-all
                           ${
                             isCurrentAction
-                              ? `${color.bg} ${color.border} ${color.text} shadow-sm`
+                              ? `${color.bg} ${color.border} ${color.text} shadow-xs`
                               : isPastAction
                                 ? "bg-green-500/10 border-green-500/30 text-green-400"
                                 : "bg-bg-primary border-border-secondary text-text-muted hover:border-brand-primary/30"
@@ -580,7 +580,7 @@ export function TransitionsPanel({
                           flex items-start gap-3 p-3 rounded-lg border transition-all duration-200
                           ${
                             isCurrent
-                              ? `${color.border} ${color.bg} shadow-sm`
+                              ? `${color.border} ${color.bg} shadow-xs`
                               : isPast
                                 ? "border-green-500/30 bg-green-500/5"
                                 : "border-border-secondary bg-bg-secondary"

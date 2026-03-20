@@ -515,21 +515,21 @@ function SpatialCanvas({
       {/* Zoom controls */}
       <div className="absolute top-3 right-3 flex items-center gap-1">
         <button
-          className="h-7 w-7 p-0 inline-flex items-center justify-center rounded bg-bg-primary/80 backdrop-blur-sm text-text-secondary hover:text-text-primary"
+          className="h-7 w-7 p-0 inline-flex items-center justify-center rounded bg-bg-primary/80 backdrop-blur-xs text-text-secondary hover:text-text-primary"
           onClick={() => setZoom((z) => Math.min(3, z + 0.25))}
           title="Zoom in"
         >
           <ZoomIn className="size-3.5" />
         </button>
         <button
-          className="h-7 w-7 p-0 inline-flex items-center justify-center rounded bg-bg-primary/80 backdrop-blur-sm text-text-secondary hover:text-text-primary"
+          className="h-7 w-7 p-0 inline-flex items-center justify-center rounded bg-bg-primary/80 backdrop-blur-xs text-text-secondary hover:text-text-primary"
           onClick={() => setZoom((z) => Math.max(0.5, z - 0.25))}
           title="Zoom out"
         >
           <ZoomOut className="size-3.5" />
         </button>
         <button
-          className="h-7 w-7 p-0 inline-flex items-center justify-center rounded bg-bg-primary/80 backdrop-blur-sm text-text-secondary hover:text-text-primary"
+          className="h-7 w-7 p-0 inline-flex items-center justify-center rounded bg-bg-primary/80 backdrop-blur-xs text-text-secondary hover:text-text-primary"
           onClick={() => setZoom(1)}
           title="Reset zoom"
         >
@@ -538,7 +538,7 @@ function SpatialCanvas({
       </div>
 
       {/* Legend */}
-      <div className="absolute bottom-3 left-3 text-[10px] text-text-muted bg-bg-primary/80 backdrop-blur-sm px-2.5 py-1.5 rounded border border-border-secondary/50">
+      <div className="absolute bottom-3 left-3 text-[10px] text-text-muted bg-bg-primary/80 backdrop-blur-xs px-2.5 py-1.5 rounded border border-border-secondary/50">
         <div className="flex items-center gap-3">
           <span>{states.length} states</span>
           <span>{transitions.length} transitions</span>
@@ -548,7 +548,7 @@ function SpatialCanvas({
 
       {/* Hovered state tooltip */}
       {hoveredStateId && (
-        <div className="absolute top-3 left-3 text-xs bg-bg-primary/95 backdrop-blur-sm px-3 py-2 rounded-lg border border-border-secondary shadow-md">
+        <div className="absolute top-3 left-3 text-xs bg-bg-primary/95 backdrop-blur-xs px-3 py-2 rounded-lg border border-border-secondary shadow-md">
           <div className="font-medium text-text-primary">
             {states.find((s) => s.state_id === hoveredStateId)?.name}
           </div>
@@ -680,7 +680,7 @@ function StateLayoutView({
 
               {/* Tooltip on hover */}
               {isHovered && (
-                <div className="absolute top-full left-1/2 -translate-x-1/2 mt-1 z-30 bg-bg-primary/95 backdrop-blur-sm border border-border-secondary rounded px-2 py-1 shadow-md whitespace-nowrap">
+                <div className="absolute top-full left-1/2 -translate-x-1/2 mt-1 z-30 bg-bg-primary/95 backdrop-blur-xs border border-border-secondary rounded px-2 py-1 shadow-md whitespace-nowrap">
                   <div className="text-[10px] font-medium text-text-primary">
                     {el.label}
                   </div>
@@ -1185,7 +1185,7 @@ function ScreenshotStateView({
 
           {/* Hover tooltip */}
           {hoveredElement && hoveredElement !== selectedElementHash && (
-            <div className="absolute top-3 left-3 text-xs bg-bg-primary/95 backdrop-blur-sm px-3 py-2 rounded-lg border border-border-secondary shadow-md max-w-[280px] pointer-events-none">
+            <div className="absolute top-3 left-3 text-xs bg-bg-primary/95 backdrop-blur-xs px-3 py-2 rounded-lg border border-border-secondary shadow-md max-w-[280px] pointer-events-none">
               <div className="font-medium text-text-primary truncate">
                 {(() => {
                   const entry = hashToElement.get(hoveredElement);
@@ -1208,7 +1208,7 @@ function ScreenshotStateView({
 
           {/* Selected element detail overlay */}
           {selectedElementHash && (
-            <div className="absolute bottom-2 left-2 right-2 text-xs bg-bg-primary/95 backdrop-blur-sm px-3 py-2 rounded-lg border border-border-secondary shadow-md">
+            <div className="absolute bottom-2 left-2 right-2 text-xs bg-bg-primary/95 backdrop-blur-xs px-3 py-2 rounded-lg border border-border-secondary shadow-md">
               <div className="flex items-start gap-3">
                 <div className="flex-1 min-w-0">
                   <div className="font-medium text-text-primary truncate">
@@ -1252,7 +1252,7 @@ function ScreenshotStateView({
 
           {/* Element count legend */}
           {!selectedElementHash && (
-            <div className="absolute bottom-2 right-2 text-[9px] text-text-muted bg-bg-primary/80 backdrop-blur-sm px-2 py-1 rounded border border-border-secondary/50">
+            <div className="absolute bottom-2 right-2 text-[9px] text-text-muted bg-bg-primary/80 backdrop-blur-xs px-2 py-1 rounded border border-border-secondary/50">
               {selectedStateIds.size > 0
                 ? `${Object.keys(elementBounds).filter(h => selectedStateHashes.has(h)).length} / ${Object.keys(elementBounds).length} elements`
                 : `${Object.keys(elementBounds).length} elements`}

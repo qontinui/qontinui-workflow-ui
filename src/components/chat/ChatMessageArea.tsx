@@ -54,7 +54,7 @@ export function ChatMessageArea({
   const renderContent = (content: string) => {
     if (renderMarkdown) return renderMarkdown(content);
     return (
-      <p className="text-sm text-text-primary whitespace-pre-wrap break-words">
+      <p className="text-sm text-text-primary whitespace-pre-wrap wrap-break-word">
         {content}
       </p>
     );

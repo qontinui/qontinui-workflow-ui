@@ -118,7 +118,7 @@ export function StepItemConcrete({
       className={`
         group flex items-center gap-2 px-2 py-1.5 rounded-md cursor-pointer transition-all
         ${isSelectionMode && isSelectedForDelete
-          ? "border border-red-500/50 bg-red-500/10"
+          ? "border border-red-500/50 status-error"
           : isSelected
             ? "bg-zinc-700/80 ring-1 ring-zinc-500"
             : "hover:bg-zinc-800/60"

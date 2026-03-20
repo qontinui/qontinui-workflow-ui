@@ -90,7 +90,7 @@ export function ChatHeader({
   );
 
   return (
-    <div className="flex items-center justify-between px-4 py-3 border-b border-border-subtle/50 bg-surface-canvas/80 backdrop-blur-sm">
+    <div className="flex items-center justify-between px-4 py-3 border-b border-border-subtle/50 bg-surface-canvas/80 backdrop-blur-xs">
       <div className="flex items-center gap-3">
         <svg
           className="size-5 text-purple-400"
@@ -112,7 +112,7 @@ export function ChatHeader({
               onChange={(e) => setEditValue(e.target.value)}
               onKeyDown={handleKeyDown}
               onBlur={handleSave}
-              className="bg-surface-canvas border border-border-subtle/50 rounded px-2 py-0.5 text-sm text-text-primary focus:outline-none focus:border-brand-primary/50"
+              className="bg-surface-canvas border border-border-subtle/50 rounded px-2 py-0.5 text-sm text-text-primary focus:outline-hidden focus:border-brand-primary/50"
               maxLength={60}
             />
             <button

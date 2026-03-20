@@ -457,7 +457,7 @@ function StateMachineGraphViewInner({
 
         {/* Bottom left stats */}
         <Panel position="bottom-left">
-          <div className="text-[10px] text-text-muted/70 bg-bg-primary/80 backdrop-blur-sm px-2.5 py-1.5 rounded border border-border-secondary/50 flex items-center gap-2">
+          <div className="text-[10px] text-text-muted/70 bg-bg-primary/80 backdrop-blur-xs px-2.5 py-1.5 rounded border border-border-secondary/50 flex items-center gap-2">
             <span>{graphStats.stateCount} states</span>
             <span className="text-text-muted/30">|</span>
             <span>{graphStats.transitionCount} transitions</span>
@@ -476,7 +476,7 @@ function StateMachineGraphViewInner({
         {/* Keyboard shortcuts overlay */}
         {showShortcuts && (
           <Panel position="bottom-right">
-            <div className="bg-bg-primary/95 border border-border-secondary rounded-lg p-4 text-xs shadow-lg backdrop-blur-sm min-w-[200px]">
+            <div className="bg-bg-primary/95 border border-border-secondary rounded-lg p-4 text-xs shadow-lg backdrop-blur-xs min-w-[200px]">
               <h4 className="font-semibold text-text-primary mb-2.5">Keyboard Shortcuts</h4>
               <div className="space-y-1.5 text-text-muted">
                 {[

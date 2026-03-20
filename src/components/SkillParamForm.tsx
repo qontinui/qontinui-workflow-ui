@@ -84,7 +84,7 @@ interface SkillParamFieldProps {
 function SkillParamField({ param, value, onChange }: SkillParamFieldProps) {
   const inputClasses =
     "w-full bg-zinc-800 border border-zinc-700 rounded px-2.5 py-1.5 text-sm text-zinc-200 [&>option]:text-black [&>option]:bg-white " +
-    "placeholder:text-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500 focus:border-zinc-500";
+    "placeholder:text-zinc-500 focus:outline-hidden focus:ring-1 focus:ring-zinc-500 focus:border-zinc-500";
 
   return (
     <div>
@@ -146,7 +146,7 @@ function SkillParamField({ param, value, onChange }: SkillParamFieldProps) {
           aria-checked={!!value}
           className={`
             relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full
-            transition-colors focus:outline-none focus:ring-1 focus:ring-zinc-500
+            transition-colors focus:outline-hidden focus:ring-1 focus:ring-zinc-500
             ${value ? "bg-blue-500" : "bg-zinc-700"}
           `}
           onClick={() => onChange(!value)}
