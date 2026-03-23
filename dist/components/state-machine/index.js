@@ -3196,6 +3196,15 @@ function StateViewPanel({
   const [viewMode, setViewMode] = useState5(
     captureScreenshots && captureScreenshots.length > 0 ? "screenshot" : "list"
   );
+  const [hasAutoSwitched, setHasAutoSwitched] = useState5(
+    () => !!(captureScreenshots && captureScreenshots.length > 0)
+  );
+  useEffect5(() => {
+    if (!hasAutoSwitched && captureScreenshots && captureScreenshots.length > 0) {
+      setViewMode("screenshot");
+      setHasAutoSwitched(true);
+    }
+  }, [captureScreenshots, hasAutoSwitched]);
   const [localSelectedStateId, setLocalSelectedStateId] = useState5(
     selectedStateId
   );

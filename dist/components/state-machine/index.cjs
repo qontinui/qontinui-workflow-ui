@@ -3134,6 +3134,15 @@ function StateViewPanel({
   const [viewMode, setViewMode] = (0, import_react10.useState)(
     captureScreenshots && captureScreenshots.length > 0 ? "screenshot" : "list"
   );
+  const [hasAutoSwitched, setHasAutoSwitched] = (0, import_react10.useState)(
+    () => !!(captureScreenshots && captureScreenshots.length > 0)
+  );
+  (0, import_react10.useEffect)(() => {
+    if (!hasAutoSwitched && captureScreenshots && captureScreenshots.length > 0) {
+      setViewMode("screenshot");
+      setHasAutoSwitched(true);
+    }
+  }, [captureScreenshots, hasAutoSwitched]);
   const [localSelectedStateId, setLocalSelectedStateId] = (0, import_react10.useState)(
     selectedStateId
   );

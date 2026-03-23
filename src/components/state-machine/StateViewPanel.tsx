@@ -1331,6 +1331,17 @@ export function StateViewPanel({
     captureScreenshots && captureScreenshots.length > 0 ? "screenshot" : "list",
   );
 
+  // Auto-switch to screenshot view when captures become available after mount
+  const [hasAutoSwitched, setHasAutoSwitched] = useState(
+    () => !!(captureScreenshots && captureScreenshots.length > 0),
+  );
+  useEffect(() => {
+    if (!hasAutoSwitched && captureScreenshots && captureScreenshots.length > 0) {
+      setViewMode("screenshot");
+      setHasAutoSwitched(true);
+    }
+  }, [captureScreenshots, hasAutoSwitched]);
+
   // Local selection state — the page-level selectedStateId gets clobbered by the
   // ReactFlow graph component in a hidden tab (fires onSelectionChange → null).
   // We maintain our own selection that only changes from user clicks in this panel.
