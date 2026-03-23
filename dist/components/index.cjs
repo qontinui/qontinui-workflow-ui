@@ -200,7 +200,7 @@ function PhaseSectionConcrete({
           steps.length > 3 && ` +${steps.length - 3} more`
         ] }),
         /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(CollapsibleContent, { children: /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("div", { className: "p-3 space-y-2", children: [
-          isSelectionMode && /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("div", { className: "flex items-center justify-between px-3 py-2 bg-red-500/10 border border-red-500/30 rounded-md", children: [
+          isSelectionMode && /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("div", { className: "flex items-center justify-between px-3 py-2 status-error border border-red-500/30 rounded-md", children: [
             /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("span", { className: "text-sm text-red-400", children: [
               selectedIds.size,
               " selected"
@@ -291,7 +291,7 @@ function StepItemConcrete({
       "data-step-type": step.type,
       className: `
         group flex items-center gap-2 px-2 py-1.5 rounded-md cursor-pointer transition-all
-        ${isSelectionMode && isSelectedForDelete ? "border border-red-500/50 bg-red-500/10" : isSelected ? "bg-zinc-700/80 ring-1 ring-zinc-500" : "hover:bg-zinc-800/60"}
+        ${isSelectionMode && isSelectedForDelete ? "border border-red-500/50 status-error" : isSelected ? "bg-zinc-700/80 ring-1 ring-zinc-500" : "hover:bg-zinc-800/60"}
       `,
       onClick,
       children: [
@@ -488,7 +488,7 @@ function SkillParamForm({
   ] });
 }
 function SkillParamField({ param, value, onChange }) {
-  const inputClasses = "w-full bg-zinc-800 border border-zinc-700 rounded px-2.5 py-1.5 text-sm text-zinc-200 [&>option]:text-black [&>option]:bg-white placeholder:text-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500 focus:border-zinc-500";
+  const inputClasses = "w-full bg-zinc-800 border border-zinc-700 rounded px-2.5 py-1.5 text-sm text-zinc-200 [&>option]:text-black [&>option]:bg-white placeholder:text-zinc-500 focus:outline-hidden focus:ring-1 focus:ring-zinc-500 focus:border-zinc-500";
   return /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("div", { children: [
     /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("label", { className: "flex items-center gap-1 text-sm text-zinc-300 mb-1", children: [
       param.label,
@@ -537,7 +537,7 @@ function SkillParamField({ param, value, onChange }) {
         "aria-checked": !!value,
         className: `
             relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full
-            transition-colors focus:outline-none focus:ring-1 focus:ring-zinc-500
+            transition-colors focus:outline-hidden focus:ring-1 focus:ring-zinc-500
             ${value ? "bg-blue-500" : "bg-zinc-700"}
           `,
         onClick: () => onChange(!value),
@@ -644,7 +644,7 @@ function BrowseView({
           value: searchQuery,
           onChange: (e) => setSearchQuery(e.target.value),
           placeholder: "Search skills...",
-          className: "w-full bg-zinc-800 border border-zinc-700 rounded pl-8 pr-3 py-1.5 text-sm text-zinc-200 placeholder:text-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500",
+          className: "w-full bg-zinc-800 border border-zinc-700 rounded pl-8 pr-3 py-1.5 text-sm text-zinc-200 placeholder:text-zinc-500 focus:outline-hidden focus:ring-1 focus:ring-zinc-500",
           autoFocus: true
         }
       )
@@ -1254,7 +1254,7 @@ function ChatHeader({
     },
     [handleSave, sessionName]
   );
-  return /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)("div", { className: "flex items-center justify-between px-4 py-3 border-b border-border-subtle/50 bg-surface-canvas/80 backdrop-blur-sm", children: [
+  return /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)("div", { className: "flex items-center justify-between px-4 py-3 border-b border-border-subtle/50 bg-surface-canvas/80 backdrop-blur-xs", children: [
     /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)("div", { className: "flex items-center gap-3", children: [
       /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(
         "svg",
@@ -1278,7 +1278,7 @@ function ChatHeader({
             onChange: (e) => setEditValue(e.target.value),
             onKeyDown: handleKeyDown,
             onBlur: handleSave,
-            className: "bg-surface-canvas border border-border-subtle/50 rounded px-2 py-0.5 text-sm text-text-primary focus:outline-none focus:border-brand-primary/50",
+            className: "bg-surface-canvas border border-border-subtle/50 rounded px-2 py-0.5 text-sm text-text-primary focus:outline-hidden focus:border-brand-primary/50",
             maxLength: 60
           }
         ),
@@ -1588,7 +1588,7 @@ function ChatMessageArea({
   }, []);
   const renderContent = (content) => {
     if (renderMarkdown) return renderMarkdown(content);
-    return /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("p", { className: "text-sm text-text-primary whitespace-pre-wrap break-words", children: content });
+    return /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("p", { className: "text-sm text-text-primary whitespace-pre-wrap wrap-break-word", children: content });
   };
   return /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)(
     "div",

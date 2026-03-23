@@ -73,7 +73,7 @@ function ChatHeader({
     },
     [handleSave, sessionName]
   );
-  return /* @__PURE__ */ jsxs("div", { className: "flex items-center justify-between px-4 py-3 border-b border-border-subtle/50 bg-surface-canvas/80 backdrop-blur-sm", children: [
+  return /* @__PURE__ */ jsxs("div", { className: "flex items-center justify-between px-4 py-3 border-b border-border-subtle/50 bg-surface-canvas/80 backdrop-blur-xs", children: [
     /* @__PURE__ */ jsxs("div", { className: "flex items-center gap-3", children: [
       /* @__PURE__ */ jsx(
         "svg",
@@ -97,7 +97,7 @@ function ChatHeader({
             onChange: (e) => setEditValue(e.target.value),
             onKeyDown: handleKeyDown,
             onBlur: handleSave,
-            className: "bg-surface-canvas border border-border-subtle/50 rounded px-2 py-0.5 text-sm text-text-primary focus:outline-none focus:border-brand-primary/50",
+            className: "bg-surface-canvas border border-border-subtle/50 rounded px-2 py-0.5 text-sm text-text-primary focus:outline-hidden focus:border-brand-primary/50",
             maxLength: 60
           }
         ),
@@ -407,7 +407,7 @@ function ChatMessageArea({
   }, []);
   const renderContent = (content) => {
     if (renderMarkdown) return renderMarkdown(content);
-    return /* @__PURE__ */ jsx3("p", { className: "text-sm text-text-primary whitespace-pre-wrap break-words", children: content });
+    return /* @__PURE__ */ jsx3("p", { className: "text-sm text-text-primary whitespace-pre-wrap wrap-break-word", children: content });
   };
   return /* @__PURE__ */ jsxs3(
     "div",
@@ -1010,4 +1010,4 @@ export {
   ChatMessageArea,
   WorkflowPreviewPanel
 };
-//# sourceMappingURL=chunk-MNJFISLA.js.map
+//# sourceMappingURL=chunk-EW6Q36TR.js.map

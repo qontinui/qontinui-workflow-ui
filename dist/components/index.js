@@ -10,7 +10,7 @@ import {
   ChatInput,
   ChatMessageArea,
   WorkflowPreviewPanel
-} from "../chunk-MNJFISLA.js";
+} from "../chunk-EW6Q36TR.js";
 
 // src/components/PhaseSection.tsx
 import { useState, useCallback } from "react";
@@ -99,7 +99,7 @@ function PhaseSectionConcrete({
           steps.length > 3 && ` +${steps.length - 3} more`
         ] }),
         /* @__PURE__ */ jsx(CollapsibleContent, { children: /* @__PURE__ */ jsxs("div", { className: "p-3 space-y-2", children: [
-          isSelectionMode && /* @__PURE__ */ jsxs("div", { className: "flex items-center justify-between px-3 py-2 bg-red-500/10 border border-red-500/30 rounded-md", children: [
+          isSelectionMode && /* @__PURE__ */ jsxs("div", { className: "flex items-center justify-between px-3 py-2 status-error border border-red-500/30 rounded-md", children: [
             /* @__PURE__ */ jsxs("span", { className: "text-sm text-red-400", children: [
               selectedIds.size,
               " selected"
@@ -196,7 +196,7 @@ function StepItemConcrete({
       "data-step-type": step.type,
       className: `
         group flex items-center gap-2 px-2 py-1.5 rounded-md cursor-pointer transition-all
-        ${isSelectionMode && isSelectedForDelete ? "border border-red-500/50 bg-red-500/10" : isSelected ? "bg-zinc-700/80 ring-1 ring-zinc-500" : "hover:bg-zinc-800/60"}
+        ${isSelectionMode && isSelectedForDelete ? "border border-red-500/50 status-error" : isSelected ? "bg-zinc-700/80 ring-1 ring-zinc-500" : "hover:bg-zinc-800/60"}
       `,
       onClick,
       children: [
@@ -295,7 +295,7 @@ function SkillParamForm({
   ] });
 }
 function SkillParamField({ param, value, onChange }) {
-  const inputClasses = "w-full bg-zinc-800 border border-zinc-700 rounded px-2.5 py-1.5 text-sm text-zinc-200 [&>option]:text-black [&>option]:bg-white placeholder:text-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500 focus:border-zinc-500";
+  const inputClasses = "w-full bg-zinc-800 border border-zinc-700 rounded px-2.5 py-1.5 text-sm text-zinc-200 [&>option]:text-black [&>option]:bg-white placeholder:text-zinc-500 focus:outline-hidden focus:ring-1 focus:ring-zinc-500 focus:border-zinc-500";
   return /* @__PURE__ */ jsxs3("div", { children: [
     /* @__PURE__ */ jsxs3("label", { className: "flex items-center gap-1 text-sm text-zinc-300 mb-1", children: [
       param.label,
@@ -344,7 +344,7 @@ function SkillParamField({ param, value, onChange }) {
         "aria-checked": !!value,
         className: `
             relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full
-            transition-colors focus:outline-none focus:ring-1 focus:ring-zinc-500
+            transition-colors focus:outline-hidden focus:ring-1 focus:ring-zinc-500
             ${value ? "bg-blue-500" : "bg-zinc-700"}
           `,
         onClick: () => onChange(!value),
@@ -451,7 +451,7 @@ function BrowseView({
           value: searchQuery,
           onChange: (e) => setSearchQuery(e.target.value),
           placeholder: "Search skills...",
-          className: "w-full bg-zinc-800 border border-zinc-700 rounded pl-8 pr-3 py-1.5 text-sm text-zinc-200 placeholder:text-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500",
+          className: "w-full bg-zinc-800 border border-zinc-700 rounded pl-8 pr-3 py-1.5 text-sm text-zinc-200 placeholder:text-zinc-500 focus:outline-hidden focus:ring-1 focus:ring-zinc-500",
           autoFocus: true
         }
       )

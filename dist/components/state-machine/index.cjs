@@ -358,9 +358,9 @@ function StateMachineTransitionEdgeInner(props) {
           "div",
           {
             className: `
-                flex items-center gap-1.5 text-[10px] px-2.5 py-1 rounded-full border shadow-sm
+                flex items-center gap-1.5 text-[10px] px-2.5 py-1 rounded-full border shadow-xs
                 transition-all duration-150
-                ${isActive ? "bg-brand-primary text-white border-brand-primary shadow-brand-primary/20" : "bg-bg-primary/95 text-text-muted border-border-secondary hover:border-brand-primary/40 backdrop-blur-sm"}
+                ${isActive ? "bg-brand-primary text-white border-brand-primary shadow-brand-primary/20" : "bg-bg-primary/95 text-text-muted border-border-secondary hover:border-brand-primary/40 backdrop-blur-xs"}
               `,
             children: [
               uniqueActionTypes.length > 0 && /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("span", { className: "flex items-center gap-0.5", children: uniqueActionTypes.slice(0, 3).map((actionType) => {
@@ -693,7 +693,7 @@ function StateMachineGraphViewInner({
             }
           )
         ] }) }),
-        /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(import_react6.Panel, { position: "bottom-left", children: /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "text-[10px] text-text-muted/70 bg-bg-primary/80 backdrop-blur-sm px-2.5 py-1.5 rounded border border-border-secondary/50 flex items-center gap-2", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(import_react6.Panel, { position: "bottom-left", children: /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "text-[10px] text-text-muted/70 bg-bg-primary/80 backdrop-blur-xs px-2.5 py-1.5 rounded border border-border-secondary/50 flex items-center gap-2", children: [
           /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("span", { children: [
             graphStats.stateCount,
             " states"
@@ -711,7 +711,7 @@ function StateMachineGraphViewInner({
             ] })
           ] })
         ] }) }),
-        showShortcuts && /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(import_react6.Panel, { position: "bottom-right", children: /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "bg-bg-primary/95 border border-border-secondary rounded-lg p-4 text-xs shadow-lg backdrop-blur-sm min-w-[200px]", children: [
+        showShortcuts && /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(import_react6.Panel, { position: "bottom-right", children: /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "bg-bg-primary/95 border border-border-secondary rounded-lg p-4 text-xs shadow-lg backdrop-blur-xs min-w-[200px]", children: [
           /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("h4", { className: "font-semibold text-text-primary mb-2.5", children: "Keyboard Shortcuts" }),
           /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "space-y-1.5 text-text-muted", children: [
             [
@@ -1464,7 +1464,7 @@ function TransitionsPanel({
             " ",
             selectedTransition.activate_states.map((s) => stateNameMap.get(s) ?? s).join(", ")
           ] }),
-          selectedTransition.exit_states.length > 0 && /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("span", { className: "inline-flex items-center rounded-full px-2 py-0.5 text-[10px] border bg-red-500/10 text-red-400 border-red-500/30", children: [
+          selectedTransition.exit_states.length > 0 && /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("span", { className: "inline-flex items-center rounded-full px-2 py-0.5 text-[10px] border status-error text-red-400 border-red-500/30", children: [
             "Exit:",
             " ",
             selectedTransition.exit_states.map((s) => stateNameMap.get(s) ?? s).join(", ")
@@ -1562,7 +1562,7 @@ function TransitionsPanel({
               },
               className: `
                           flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[9px] border transition-all
-                          ${isCurrentAction ? `${color.bg} ${color.border} ${color.text} shadow-sm` : isPastAction ? "bg-green-500/10 border-green-500/30 text-green-400" : "bg-bg-primary border-border-secondary text-text-muted hover:border-brand-primary/30"}
+                          ${isCurrentAction ? `${color.bg} ${color.border} ${color.text} shadow-xs` : isPastAction ? "bg-green-500/10 border-green-500/30 text-green-400" : "bg-bg-primary border-border-secondary text-text-muted hover:border-brand-primary/30"}
                         `,
               title: `${import_workflow_utils2.ACTION_LABELS[action.type] ?? action.type}: ${action.target || action.url || action.text || ""}`,
               children: [
@@ -1591,7 +1591,7 @@ function TransitionsPanel({
             {
               className: `
                           flex items-start gap-3 p-3 rounded-lg border transition-all duration-200
-                          ${isCurrent ? `${color.border} ${color.bg} shadow-sm` : isPast ? "border-green-500/30 bg-green-500/5" : "border-border-secondary bg-bg-secondary"}
+                          ${isCurrent ? `${color.border} ${color.bg} shadow-xs` : isPast ? "border-green-500/30 bg-green-500/5" : "border-border-secondary bg-bg-secondary"}
                         `,
               children: [
                 /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("div", { className: "flex items-center gap-2 shrink-0", children: [
@@ -2473,7 +2473,7 @@ function SpatialCanvas({
           /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(
             "button",
             {
-              className: "h-7 w-7 p-0 inline-flex items-center justify-center rounded bg-bg-primary/80 backdrop-blur-sm text-text-secondary hover:text-text-primary",
+              className: "h-7 w-7 p-0 inline-flex items-center justify-center rounded bg-bg-primary/80 backdrop-blur-xs text-text-secondary hover:text-text-primary",
               onClick: () => setZoom((z) => Math.min(3, z + 0.25)),
               title: "Zoom in",
               children: /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(import_lucide_react5.ZoomIn, { className: "size-3.5" })
@@ -2482,7 +2482,7 @@ function SpatialCanvas({
           /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(
             "button",
             {
-              className: "h-7 w-7 p-0 inline-flex items-center justify-center rounded bg-bg-primary/80 backdrop-blur-sm text-text-secondary hover:text-text-primary",
+              className: "h-7 w-7 p-0 inline-flex items-center justify-center rounded bg-bg-primary/80 backdrop-blur-xs text-text-secondary hover:text-text-primary",
               onClick: () => setZoom((z) => Math.max(0.5, z - 0.25)),
               title: "Zoom out",
               children: /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(import_lucide_react5.ZoomOut, { className: "size-3.5" })
@@ -2491,14 +2491,14 @@ function SpatialCanvas({
           /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(
             "button",
             {
-              className: "h-7 w-7 p-0 inline-flex items-center justify-center rounded bg-bg-primary/80 backdrop-blur-sm text-text-secondary hover:text-text-primary",
+              className: "h-7 w-7 p-0 inline-flex items-center justify-center rounded bg-bg-primary/80 backdrop-blur-xs text-text-secondary hover:text-text-primary",
               onClick: () => setZoom(1),
               title: "Reset zoom",
               children: /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(import_lucide_react5.Maximize, { className: "size-3.5" })
             }
           )
         ] }),
-        /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("div", { className: "absolute bottom-3 left-3 text-[10px] text-text-muted bg-bg-primary/80 backdrop-blur-sm px-2.5 py-1.5 rounded border border-border-secondary/50", children: /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: "flex items-center gap-3", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("div", { className: "absolute bottom-3 left-3 text-[10px] text-text-muted bg-bg-primary/80 backdrop-blur-xs px-2.5 py-1.5 rounded border border-border-secondary/50", children: /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: "flex items-center gap-3", children: [
           /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("span", { children: [
             states.length,
             " states"
@@ -2513,7 +2513,7 @@ function SpatialCanvas({
             "%"
           ] })
         ] }) }),
-        hoveredStateId && /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: "absolute top-3 left-3 text-xs bg-bg-primary/95 backdrop-blur-sm px-3 py-2 rounded-lg border border-border-secondary shadow-md", children: [
+        hoveredStateId && /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: "absolute top-3 left-3 text-xs bg-bg-primary/95 backdrop-blur-xs px-3 py-2 rounded-lg border border-border-secondary shadow-md", children: [
           /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("div", { className: "font-medium text-text-primary", children: states.find((s) => s.state_id === hoveredStateId)?.name }),
           /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: "text-text-muted mt-0.5", children: [
             states.find((s) => s.state_id === hoveredStateId)?.element_ids.length,
@@ -2598,7 +2598,7 @@ function StateLayoutView({
                       ) : /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("div", { className: "px-1 py-0.5 text-[8px] whitespace-nowrap max-w-[80px] truncate", children: el.label })
                     }
                   ),
-                  isHovered && /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: "absolute top-full left-1/2 -translate-x-1/2 mt-1 z-30 bg-bg-primary/95 backdrop-blur-sm border border-border-secondary rounded px-2 py-1 shadow-md whitespace-nowrap", children: [
+                  isHovered && /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: "absolute top-full left-1/2 -translate-x-1/2 mt-1 z-30 bg-bg-primary/95 backdrop-blur-xs border border-border-secondary rounded px-2 py-1 shadow-md whitespace-nowrap", children: [
                     /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("div", { className: "text-[10px] font-medium text-text-primary", children: el.label }),
                     el.tag && /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("div", { className: "text-[9px] text-text-muted", children: [el.tag.tagName && `<${el.tag.tagName}>`, el.tag.role && `role="${el.tag.role}"`, el.tag.zone].filter(Boolean).join(" ") })
                   ] })
@@ -3020,7 +3020,7 @@ function ScreenshotStateView({
           }
         ),
         isLoading && /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("div", { className: "absolute inset-0 flex items-center justify-center bg-bg-secondary/50", children: /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("div", { className: "animate-spin size-6 border-2 border-brand-primary border-t-transparent rounded-full" }) }),
-        hoveredElement && hoveredElement !== selectedElementHash && /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: "absolute top-3 left-3 text-xs bg-bg-primary/95 backdrop-blur-sm px-3 py-2 rounded-lg border border-border-secondary shadow-md max-w-[280px] pointer-events-none", children: [
+        hoveredElement && hoveredElement !== selectedElementHash && /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: "absolute top-3 left-3 text-xs bg-bg-primary/95 backdrop-blur-xs px-3 py-2 rounded-lg border border-border-secondary shadow-md max-w-[280px] pointer-events-none", children: [
           /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("div", { className: "font-medium text-text-primary truncate", children: (() => {
             const entry = hashToElement.get(hoveredElement);
             return entry ? resolveElementLabel(entry.elementId, fingerprintDetails, entry.state) : hoveredElement;
@@ -3036,7 +3036,7 @@ function ScreenshotStateView({
             ] });
           })()
         ] }),
-        selectedElementHash && /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("div", { className: "absolute bottom-2 left-2 right-2 text-xs bg-bg-primary/95 backdrop-blur-sm px-3 py-2 rounded-lg border border-border-secondary shadow-md", children: /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: "flex items-start gap-3", children: [
+        selectedElementHash && /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("div", { className: "absolute bottom-2 left-2 right-2 text-xs bg-bg-primary/95 backdrop-blur-xs px-3 py-2 rounded-lg border border-border-secondary shadow-md", children: /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: "flex items-start gap-3", children: [
           /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: "flex-1 min-w-0", children: [
             /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("div", { className: "font-medium text-text-primary truncate", children: (() => {
               const entry = hashToElement.get(selectedElementHash);
@@ -3076,7 +3076,7 @@ function ScreenshotStateView({
             }
           )
         ] }) }),
-        !selectedElementHash && /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("div", { className: "absolute bottom-2 right-2 text-[9px] text-text-muted bg-bg-primary/80 backdrop-blur-sm px-2 py-1 rounded border border-border-secondary/50", children: selectedStateIds.size > 0 ? `${Object.keys(elementBounds).filter((h) => selectedStateHashes.has(h)).length} / ${Object.keys(elementBounds).length} elements` : `${Object.keys(elementBounds).length} elements` })
+        !selectedElementHash && /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("div", { className: "absolute bottom-2 right-2 text-[9px] text-text-muted bg-bg-primary/80 backdrop-blur-xs px-2 py-1 rounded border border-border-secondary/50", children: selectedStateIds.size > 0 ? `${Object.keys(elementBounds).filter((h) => selectedStateHashes.has(h)).length} / ${Object.keys(elementBounds).length} elements` : `${Object.keys(elementBounds).length} elements` })
       ] })
     ] }),
     /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: "w-48 border-l border-border-secondary bg-bg-primary overflow-y-auto shrink-0", children: [
@@ -3131,7 +3131,9 @@ function StateViewPanel({
 }) {
   const [expandedStates, setExpandedStates] = (0, import_react10.useState)(/* @__PURE__ */ new Set());
   const [searchFilter, setSearchFilter] = (0, import_react10.useState)("");
-  const [viewMode, setViewMode] = (0, import_react10.useState)("list");
+  const [viewMode, setViewMode] = (0, import_react10.useState)(
+    captureScreenshots && captureScreenshots.length > 0 ? "screenshot" : "list"
+  );
   const [localSelectedStateId, setLocalSelectedStateId] = (0, import_react10.useState)(
     selectedStateId
   );

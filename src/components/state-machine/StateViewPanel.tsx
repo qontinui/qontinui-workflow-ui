@@ -1327,7 +1327,9 @@ export function StateViewPanel({
 }: StateViewPanelProps) {
   const [expandedStates, setExpandedStates] = useState<Set<string>>(new Set());
   const [searchFilter, setSearchFilter] = useState("");
-  const [viewMode, setViewMode] = useState<ViewMode>("list");
+  const [viewMode, setViewMode] = useState<ViewMode>(
+    captureScreenshots && captureScreenshots.length > 0 ? "screenshot" : "list",
+  );
 
   // Local selection state — the page-level selectedStateId gets clobbered by the
   // ReactFlow graph component in a hidden tab (fires onSelectionChange → null).
