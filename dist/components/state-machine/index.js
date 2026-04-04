@@ -3267,7 +3267,7 @@ function StateViewPanel({
       return next;
     });
   };
-  return /* @__PURE__ */ jsxs7("div", { className: "flex h-full", children: [
+  return /* @__PURE__ */ jsxs7("div", { className: "flex flex-1 h-full min-w-0", children: [
     /* @__PURE__ */ jsxs7("div", { className: "w-72 border-r border-border-secondary bg-bg-primary overflow-y-auto shrink-0", children: [
       /* @__PURE__ */ jsxs7("div", { className: "p-3 border-b border-border-secondary", children: [
         /* @__PURE__ */ jsxs7("div", { className: "flex items-center gap-2 mb-2", children: [

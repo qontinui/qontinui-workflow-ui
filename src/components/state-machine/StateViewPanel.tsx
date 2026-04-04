@@ -1427,7 +1427,7 @@ export function StateViewPanel({
   };
 
   return (
-    <div className="flex h-full">
+    <div className="flex flex-1 h-full min-w-0">
       {/* Left Panel: State List */}
       <div className="w-72 border-r border-border-secondary bg-bg-primary overflow-y-auto shrink-0">
         <div className="p-3 border-b border-border-secondary">
