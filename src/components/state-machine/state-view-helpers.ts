@@ -16,7 +16,6 @@ import type {
   TransitionAction,
 } from "@qontinui/shared-types";
 import {
-  getElementTypePrefix,
   getElementLabel,
 } from "@qontinui/workflow-utils";
 

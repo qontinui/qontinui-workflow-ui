@@ -604,7 +604,7 @@ export function ScreenshotStateView({
               >
                 {thumbnailCache.has(cap.id) ? (
                   <img
-                    src={thumbnailCache.get(cap.id)}
+                    src={thumbnailCache.get(cap.id)!}
                     alt={`Capture ${cap.captureIndex + 1}`}
                     className="w-full h-auto object-cover"
                     style={{ maxHeight: 100 }}
