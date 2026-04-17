@@ -65,6 +65,9 @@
     "tsup": "^8.5.1",
     "typescript": "^5.9.3"
   },
+  "overrides": {
+    "picomatch": "^4.0.4"
+  },
   "author": "Joshua Spinak",
   "license": "MIT"
 }
