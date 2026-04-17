@@ -14,6 +14,7 @@
  * - StateViewPanel — rich state viewer with list + force-directed spatial canvas
  * - PathfindingPanel — query paths between states
  * - StateViewTable — tabular state list with filtering
+ * - DiagramTab — live Mermaid ``stateDiagram-v2`` with active-state highlight
  */
 
 export { StateMachineGraphView } from "./StateMachineGraphView";
@@ -40,3 +41,6 @@ export type { PathfindingPanelProps } from "./PathfindingPanel";
 
 export { StateViewTable } from "./StateViewTable";
 export type { StateViewTableProps } from "./StateViewTable";
+
+export { DiagramTab } from "./DiagramTab";
+export type { DiagramTabProps } from "./DiagramTab";

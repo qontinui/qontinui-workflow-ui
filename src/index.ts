@@ -1,5 +1,9 @@
 // Types
-export type { WorkflowDataAdapter } from "./types";
+export type {
+  WorkflowDataAdapter,
+  PermittedTrigger,
+  BlockedTrigger,
+} from "./types";
 
 // Data provider
 export { WorkflowDataProvider, useWorkflowData } from "./WorkflowDataProvider";

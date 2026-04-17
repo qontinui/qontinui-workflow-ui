@@ -1239,21 +1239,56 @@ var ACTION_ICONS2 = {
   wait: Clock2,
   navigate: Globe3
 };
+function shortBlockedLabel(reason) {
+  if (!reason) return "Blocked";
+  const [prefix, ...rest] = reason.split(":");
+  const tail = rest.join(":");
+  switch (prefix) {
+    case "required_state_inactive":
+      return tail ? `Blocked: needs ${tail}` : "Blocked: missing state";
+    case "guard_failed":
+      return tail ? `Blocked: guard ${tail}` : "Blocked: guard failed";
+    case "guard_error": {
+      const guardName = rest[0] ?? "";
+      return guardName ? `Blocked: guard ${guardName} error` : "Blocked: guard error";
+    }
+    case "executor_refused":
+      return "Blocked: refused";
+    default:
+      return `Blocked: ${reason}`;
+  }
+}
 function TransitionsPanel({
   states,
   transitions,
-  onSelectTransition
+  onSelectTransition,
+  activeStateIds,
+  permittedTriggers,
+  blockedTriggers
 }) {
   const [selectedTransitionId, setSelectedTransitionId] = useState3(null);
   const [filterFromState, setFilterFromState] = useState3(null);
   const [filterToState, setFilterToState] = useState3(null);
   const [searchFilter, setSearchFilter] = useState3("");
+  const [permittedOnly, setPermittedOnly] = useState3(false);
   const [animation, setAnimation] = useState3({
     isPlaying: false,
     currentActionIndex: -1,
     progress: 0,
     speed: 1
   });
+  const permittedIds = useMemo3(
+    () => new Set((permittedTriggers ?? []).map((p) => p.transition_id)),
+    [permittedTriggers]
+  );
+  const blockedReasonById = useMemo3(() => {
+    const map = /* @__PURE__ */ new Map();
+    for (const b of blockedTriggers ?? []) {
+      map.set(b.transition_id, b.reason);
+    }
+    return map;
+  }, [blockedTriggers]);
+  const hasIntrospectionData = (permittedTriggers?.length ?? 0) > 0 || (blockedTriggers?.length ?? 0) > 0 || (activeStateIds?.length ?? 0) > 0;
   const animationRef = useRef2(null);
   const startTimeRef = useRef2(0);
   const selectedTransition = useMemo3(
@@ -1270,9 +1305,20 @@ function TransitionsPanel({
         const lower = searchFilter.toLowerCase();
         if (!t.name.toLowerCase().includes(lower)) return false;
       }
+      if (permittedOnly && hasIntrospectionData) {
+        if (!permittedIds.has(t.transition_id)) return false;
+      }
       return true;
     });
-  }, [transitions, filterFromState, filterToState, searchFilter]);
+  }, [
+    transitions,
+    filterFromState,
+    filterToState,
+    searchFilter,
+    permittedOnly,
+    hasIntrospectionData,
+    permittedIds
+  ]);
   const stateNameMap = useMemo3(() => {
     const map = /* @__PURE__ */ new Map();
     for (const s of states) {
@@ -1424,21 +1470,58 @@ function TransitionsPanel({
               ]
             }
           )
-        ] })
+        ] }),
+        /* @__PURE__ */ jsxs5(
+          "label",
+          {
+            className: `flex items-center gap-2 mt-2 text-[10px] select-none ${hasIntrospectionData ? "text-text-secondary cursor-pointer" : "text-text-muted/50 cursor-not-allowed"}`,
+            title: hasIntrospectionData ? "Show only transitions currently permitted from the active state set" : "No active-state introspection data available",
+            children: [
+              /* @__PURE__ */ jsx5(
+                "input",
+                {
+                  type: "checkbox",
+                  checked: permittedOnly && hasIntrospectionData,
+                  disabled: !hasIntrospectionData,
+                  onChange: (e) => setPermittedOnly(e.target.checked),
+                  className: "accent-brand-primary"
+                }
+              ),
+              /* @__PURE__ */ jsx5("span", { children: "Permitted from active states" }),
+              hasIntrospectionData && /* @__PURE__ */ jsxs5("span", { className: "ml-auto text-[9px] text-text-muted", children: [
+                permittedIds.size,
+                " permitted / ",
+                blockedReasonById.size,
+                " ",
+                "blocked"
+              ] })
+            ]
+          }
+        )
       ] }),
       /* @__PURE__ */ jsxs5("div", { className: "p-2 space-y-0.5", children: [
         filteredTransitions.map((t) => {
           const isSelected = t.transition_id === selectedTransitionId;
+          const isPermitted = permittedIds.has(t.transition_id);
+          const blockedReason = blockedReasonById.get(t.transition_id);
           return /* @__PURE__ */ jsxs5(
             "button",
             {
               onClick: () => handleSelectTransition(t.transition_id),
+              title: blockedReason ? `Blocked: ${blockedReason}` : isPermitted ? "Permitted from active states" : void 0,
               className: `
                   w-full text-left px-3 py-2 rounded-md transition-colors text-sm
                   ${isSelected ? "bg-brand-primary/10 border border-brand-primary/30" : "hover:bg-bg-secondary border border-transparent"}
                 `,
               children: [
                 /* @__PURE__ */ jsxs5("div", { className: "flex items-center gap-1.5", children: [
+                  hasIntrospectionData && isPermitted && /* @__PURE__ */ jsx5(
+                    "span",
+                    {
+                      "aria-label": "Permitted",
+                      className: "shrink-0 w-1.5 h-1.5 rounded-full bg-green-500"
+                    }
+                  ),
                   /* @__PURE__ */ jsx5("span", { className: "flex items-center gap-0.5", children: [...new Set(t.actions.map((a) => a.type))].slice(0, 3).map((type) => {
                     const Icon = ACTION_ICONS2[type];
                     const color = getActionColorConfig(type);
@@ -1458,7 +1541,15 @@ function TransitionsPanel({
                   /* @__PURE__ */ jsx5("span", { className: "truncate", children: t.from_states.map((s) => stateNameMap.get(s) ?? s).join(", ") }),
                   /* @__PURE__ */ jsx5(ArrowRight, { className: "size-2.5 shrink-0" }),
                   /* @__PURE__ */ jsx5("span", { className: "truncate", children: t.activate_states.map((s) => stateNameMap.get(s) ?? s).join(", ") })
-                ] })
+                ] }),
+                blockedReason && /* @__PURE__ */ jsx5("div", { className: "mt-1 ml-4", children: /* @__PURE__ */ jsx5(
+                  "span",
+                  {
+                    title: blockedReason,
+                    className: "inline-flex items-center rounded-full px-2 py-0.5 text-[10px] border bg-gray-500/20 text-gray-400 border-gray-500/30",
+                    children: shortBlockedLabel(blockedReason)
+                  }
+                ) })
               ]
             },
             t.transition_id
@@ -2192,18 +2283,11 @@ function StateDetailPanel({
 }
 
 // src/components/state-machine/StateViewPanel.tsx
-import { useState as useState5, useMemo as useMemo4, useRef as useRef3, useEffect as useEffect5, useCallback as useCallback5 } from "react";
+import { useState as useState8, useMemo as useMemo7, useEffect as useEffect7 } from "react";
 import {
-  Layers as Layers2,
-  ChevronRight as ChevronRight2,
+  Layers as Layers4,
+  ChevronRight as ChevronRight3,
   ChevronDown,
-  MousePointer as MousePointer4,
-  Type as TypeIcon4,
-  Globe as Globe4,
-  Hash as Hash2,
-  Box as Box2,
-  CheckCircle,
-  ArrowRight as ArrowRight2,
   Play as Play4,
   Lock as Lock2,
   Eye as Eye3,
@@ -2211,25 +2295,32 @@ import {
   Search as Search2,
   BarChart3,
   List,
-  ZoomIn,
-  ZoomOut,
-  Maximize as Maximize2,
   ArrowUpRight as ArrowUpRight2,
   ArrowDownLeft as ArrowDownLeft2,
-  Target,
-  Layout,
-  Image,
-  ChevronLeft,
-  X
+  ArrowRight as ArrowRight2,
+  CheckCircle,
+  Image as Image2
 } from "lucide-react";
 import {
-  getElementTypePrefix as getElementTypePrefix2,
-  getElementLabel as getElementLabel2,
+  getElementTypePrefix as getElementTypePrefix3,
+  getElementLabel as getElementLabel4,
   getActionTypeColor,
-  STATE_COLORS,
-  computeSpatialLayout
+  STATE_COLORS as STATE_COLORS3
 } from "@qontinui/workflow-utils";
-import { Fragment as Fragment4, jsx as jsx7, jsxs as jsxs7 } from "react/jsx-runtime";
+
+// src/components/state-machine/state-view-helpers.ts
+import {
+  MousePointer as MousePointer4,
+  Type as TypeIcon4,
+  Globe as Globe4,
+  Hash as Hash2,
+  Box as Box2,
+  Layers as Layers2,
+  Target
+} from "lucide-react";
+import {
+  getElementLabel as getElementLabel2
+} from "@qontinui/workflow-utils";
 var ELEMENT_ICONS = {
   testid: Hash2,
   role: MousePointer4,
@@ -2291,6 +2382,12 @@ function resolveElementTag(elementId, fingerprintDetails, state) {
   if (tags?.[elementId]) return tags[elementId];
   return null;
 }
+
+// src/components/state-machine/SpatialCanvas.tsx
+import { useState as useState5, useMemo as useMemo4, useRef as useRef3, useEffect as useEffect5, useCallback as useCallback5 } from "react";
+import { ZoomIn, ZoomOut, Maximize as Maximize2 } from "lucide-react";
+import { STATE_COLORS, computeSpatialLayout } from "@qontinui/workflow-utils";
+import { jsx as jsx7, jsxs as jsxs7 } from "react/jsx-runtime";
 function SpatialCanvas({
   states,
   transitions,
@@ -2587,13 +2684,19 @@ function SpatialCanvas({
     }
   );
 }
+
+// src/components/state-machine/StateLayoutView.tsx
+import { useState as useState6, useMemo as useMemo5 } from "react";
+import { Layout } from "lucide-react";
+import { getElementTypePrefix as getElementTypePrefix2, getElementLabel as getElementLabel3 } from "@qontinui/workflow-utils";
+import { jsx as jsx8, jsxs as jsxs8 } from "react/jsx-runtime";
 function StateLayoutView({
   state,
   elementThumbnails,
   fingerprintDetails
 }) {
-  const [hoveredElement, setHoveredElement] = useState5(null);
-  const positionedElements = useMemo4(() => {
+  const [hoveredElement, setHoveredElement] = useState6(null);
+  const positionedElements = useMemo5(() => {
     const items = [];
     for (const eid of state.element_ids) {
       const pos = resolveElementPosition(eid, fingerprintDetails, state);
@@ -2601,35 +2704,35 @@ function StateLayoutView({
       const label = resolveElementLabel(eid, fingerprintDetails, state);
       const tag = resolveElementTag(eid, fingerprintDetails, state);
       const prefix = getElementTypePrefix2(eid);
-      const thumb = elementThumbnails?.[eid] ?? elementThumbnails?.[getElementLabel2(eid)];
+      const thumb = elementThumbnails?.[eid] ?? elementThumbnails?.[getElementLabel3(eid)];
       items.push({ id: eid, label, tag, position: pos, thumbnail: thumb, prefix });
     }
     return items;
   }, [state, fingerprintDetails, elementThumbnails]);
   const elementsWithoutPosition = state.element_ids.length - positionedElements.length;
   if (positionedElements.length === 0) {
-    return /* @__PURE__ */ jsx7("div", { className: "flex items-center justify-center h-48 text-text-muted text-xs", children: "No position data available for this state's elements." });
+    return /* @__PURE__ */ jsx8("div", { className: "flex items-center justify-center h-48 text-text-muted text-xs", children: "No position data available for this state's elements." });
   }
-  return /* @__PURE__ */ jsxs7("div", { children: [
-    /* @__PURE__ */ jsxs7("h3", { className: "text-sm font-medium text-text-primary mb-3 flex items-center gap-2", children: [
-      /* @__PURE__ */ jsx7(Layout, { className: "size-3.5" }),
+  return /* @__PURE__ */ jsxs8("div", { children: [
+    /* @__PURE__ */ jsxs8("h3", { className: "text-sm font-medium text-text-primary mb-3 flex items-center gap-2", children: [
+      /* @__PURE__ */ jsx8(Layout, { className: "size-3.5" }),
       "State Layout"
     ] }),
-    /* @__PURE__ */ jsxs7(
+    /* @__PURE__ */ jsxs8(
       "div",
       {
         className: "relative bg-bg-tertiary border border-border-secondary rounded-lg",
         style: { aspectRatio: "16 / 10" },
         children: [
-          /* @__PURE__ */ jsxs7("div", { className: "absolute inset-0 pointer-events-none", children: [
-            /* @__PURE__ */ jsx7("div", { className: "absolute top-0 left-0 right-0 h-[10%] border-b border-dashed border-border-secondary/30" }),
-            /* @__PURE__ */ jsx7("div", { className: "absolute bottom-0 left-0 right-0 h-[10%] border-t border-dashed border-border-secondary/30" })
+          /* @__PURE__ */ jsxs8("div", { className: "absolute inset-0 pointer-events-none", children: [
+            /* @__PURE__ */ jsx8("div", { className: "absolute top-0 left-0 right-0 h-[10%] border-b border-dashed border-border-secondary/30" }),
+            /* @__PURE__ */ jsx8("div", { className: "absolute bottom-0 left-0 right-0 h-[10%] border-t border-dashed border-border-secondary/30" })
           ] }),
           positionedElements.map((el) => {
             const isHovered = hoveredElement === el.id;
             const colorClass = ELEMENT_COLORS[el.prefix] ?? "border-gray-400 bg-gray-500/10 text-gray-300";
             const thumbSrc = el.thumbnail ? el.thumbnail.startsWith("data:") ? el.thumbnail : `data:image/png;base64,${el.thumbnail}` : void 0;
-            return /* @__PURE__ */ jsxs7(
+            return /* @__PURE__ */ jsxs8(
               "div",
               {
                 className: "absolute group",
@@ -2641,7 +2744,7 @@ function StateLayoutView({
                 onMouseEnter: () => setHoveredElement(el.id),
                 onMouseLeave: () => setHoveredElement(null),
                 children: [
-                  /* @__PURE__ */ jsx7(
+                  /* @__PURE__ */ jsx8(
                     "div",
                     {
                       className: `
@@ -2650,19 +2753,19 @@ function StateLayoutView({
                   ${isHovered ? "ring-2 ring-brand-primary/50 shadow-lg z-20 scale-125" : "z-10"}
                 `,
                       style: { width: thumbSrc ? 32 : void 0, height: thumbSrc ? 32 : void 0 },
-                      children: thumbSrc ? /* @__PURE__ */ jsx7(
+                      children: thumbSrc ? /* @__PURE__ */ jsx8(
                         "img",
                         {
                           src: thumbSrc,
                           alt: el.label,
                           className: "w-full h-full object-contain"
                         }
-                      ) : /* @__PURE__ */ jsx7("div", { className: "px-1 py-0.5 text-[8px] whitespace-nowrap max-w-[80px] truncate", children: el.label })
+                      ) : /* @__PURE__ */ jsx8("div", { className: "px-1 py-0.5 text-[8px] whitespace-nowrap max-w-[80px] truncate", children: el.label })
                     }
                   ),
-                  isHovered && /* @__PURE__ */ jsxs7("div", { className: "absolute top-full left-1/2 -translate-x-1/2 mt-1 z-30 bg-bg-primary/95 backdrop-blur-xs border border-border-secondary rounded px-2 py-1 shadow-md whitespace-nowrap", children: [
-                    /* @__PURE__ */ jsx7("div", { className: "text-[10px] font-medium text-text-primary", children: el.label }),
-                    el.tag && /* @__PURE__ */ jsx7("div", { className: "text-[9px] text-text-muted", children: [el.tag.tagName && `<${el.tag.tagName}>`, el.tag.role && `role="${el.tag.role}"`, el.tag.zone].filter(Boolean).join(" ") })
+                  isHovered && /* @__PURE__ */ jsxs8("div", { className: "absolute top-full left-1/2 -translate-x-1/2 mt-1 z-30 bg-bg-primary/95 backdrop-blur-xs border border-border-secondary rounded px-2 py-1 shadow-md whitespace-nowrap", children: [
+                    /* @__PURE__ */ jsx8("div", { className: "text-[10px] font-medium text-text-primary", children: el.label }),
+                    el.tag && /* @__PURE__ */ jsx8("div", { className: "text-[9px] text-text-muted", children: [el.tag.tagName && `<${el.tag.tagName}>`, el.tag.role && `role="${el.tag.role}"`, el.tag.zone].filter(Boolean).join(" ") })
                   ] })
                 ]
               },
@@ -2672,7 +2775,7 @@ function StateLayoutView({
         ]
       }
     ),
-    elementsWithoutPosition > 0 && /* @__PURE__ */ jsxs7("p", { className: "text-[10px] text-text-muted mt-1.5", children: [
+    elementsWithoutPosition > 0 && /* @__PURE__ */ jsxs8("p", { className: "text-[10px] text-text-muted mt-1.5", children: [
       elementsWithoutPosition,
       " element",
       elementsWithoutPosition !== 1 ? "s" : "",
@@ -2680,6 +2783,21 @@ function StateLayoutView({
     ] })
   ] });
 }
+
+// src/components/state-machine/ScreenshotStateView.tsx
+import { useState as useState7, useMemo as useMemo6, useRef as useRef4, useEffect as useEffect6, useCallback as useCallback6 } from "react";
+import {
+  Layers as Layers3,
+  ChevronLeft,
+  ChevronRight as ChevronRight2,
+  ZoomIn as ZoomIn2,
+  ZoomOut as ZoomOut2,
+  Maximize as Maximize3,
+  Image,
+  X
+} from "lucide-react";
+import { STATE_COLORS as STATE_COLORS2 } from "@qontinui/workflow-utils";
+import { jsx as jsx9, jsxs as jsxs9 } from "react/jsx-runtime";
 function ScreenshotStateView({
   captureScreenshots,
   onLoadScreenshotImage,
@@ -2688,21 +2806,21 @@ function ScreenshotStateView({
   fingerprintDetails,
   elementThumbnails
 }) {
-  const canvasRef = useRef3(null);
-  const containerRef = useRef3(null);
-  const imageCache = useRef3(/* @__PURE__ */ new Map());
-  const thumbnailLoadingRef = useRef3(/* @__PURE__ */ new Set());
-  const [currentIndex, setCurrentIndex] = useState5(0);
-  const [userZoom, setUserZoom] = useState5(null);
-  const [autoFitZoom, setAutoFitZoom] = useState5(1);
+  const canvasRef = useRef4(null);
+  const containerRef = useRef4(null);
+  const imageCache = useRef4(/* @__PURE__ */ new Map());
+  const thumbnailLoadingRef = useRef4(/* @__PURE__ */ new Set());
+  const [currentIndex, setCurrentIndex] = useState7(0);
+  const [userZoom, setUserZoom] = useState7(null);
+  const [autoFitZoom, setAutoFitZoom] = useState7(1);
   const zoom = userZoom ?? autoFitZoom;
-  const [hoveredElement, setHoveredElement] = useState5(null);
-  const [canvasSize, setCanvasSize] = useState5({ width: 800, height: 600 });
-  const [isLoading, setIsLoading] = useState5(false);
-  const [selectedElementHash, setSelectedElementHash] = useState5(null);
-  const [thumbnailCache, setThumbnailCache] = useState5(/* @__PURE__ */ new Map());
+  const [hoveredElement, setHoveredElement] = useState7(null);
+  const [canvasSize, setCanvasSize] = useState7({ width: 800, height: 600 });
+  const [isLoading, setIsLoading] = useState7(false);
+  const [selectedElementHash, setSelectedElementHash] = useState7(null);
+  const [thumbnailCache, setThumbnailCache] = useState7(/* @__PURE__ */ new Map());
   const capture = captureScreenshots[currentIndex];
-  const elementBounds = useMemo4(() => {
+  const elementBounds = useMemo6(() => {
     if (!capture) return {};
     try {
       return JSON.parse(capture.elementBoundsJson);
@@ -2710,7 +2828,7 @@ function ScreenshotStateView({
       return {};
     }
   }, [capture]);
-  const selectedStateHashes = useMemo4(() => {
+  const selectedStateHashes = useMemo6(() => {
     const hashes = /* @__PURE__ */ new Set();
     for (const state of states) {
       if (selectedStateIds.has(state.state_id)) {
@@ -2721,11 +2839,11 @@ function ScreenshotStateView({
     }
     return hashes;
   }, [selectedStateIds, states]);
-  const selectedStates = useMemo4(
+  const selectedStates = useMemo6(
     () => states.filter((s) => selectedStateIds.has(s.state_id)),
     [states, selectedStateIds]
   );
-  const hashToElement = useMemo4(() => {
+  const hashToElement = useMemo6(() => {
     const map = /* @__PURE__ */ new Map();
     for (const state of states) {
       for (const eid of state.element_ids) {
@@ -2737,7 +2855,7 @@ function ScreenshotStateView({
     }
     return map;
   }, [states]);
-  const matchingScreenshotIndices = useMemo4(() => {
+  const matchingScreenshotIndices = useMemo6(() => {
     if (selectedStateIds.size === 0) return captureScreenshots.map((_, i) => i);
     const indices = [];
     for (let i = 0; i < captureScreenshots.length; i++) {
@@ -2751,7 +2869,7 @@ function ScreenshotStateView({
     }
     return indices;
   }, [captureScreenshots, selectedStateIds, selectedStateHashes]);
-  useEffect5(() => {
+  useEffect6(() => {
     if (selectedStateIds.size === 0) return;
     let bestIdx = -1;
     let bestOverlap = 0;
@@ -2768,7 +2886,7 @@ function ScreenshotStateView({
     }
     if (bestIdx >= 0) setCurrentIndex(bestIdx);
   }, [selectedStateIds, selectedStateHashes, captureScreenshots]);
-  useEffect5(() => {
+  useEffect6(() => {
     const container = containerRef.current;
     if (!container) return;
     const observer = new ResizeObserver((entries) => {
@@ -2783,7 +2901,7 @@ function ScreenshotStateView({
     observer.observe(container);
     return () => observer.disconnect();
   }, []);
-  useEffect5(() => {
+  useEffect6(() => {
     for (const cap of captureScreenshots) {
       if (thumbnailLoadingRef.current.has(cap.id)) continue;
       thumbnailLoadingRef.current.add(cap.id);
@@ -2797,7 +2915,7 @@ function ScreenshotStateView({
       });
     }
   }, [captureScreenshots, onLoadScreenshotImage]);
-  useEffect5(() => {
+  useEffect6(() => {
     if (!capture) return;
     const cached = imageCache.current.get(capture.id);
     if (cached) {
@@ -2830,7 +2948,7 @@ function ScreenshotStateView({
       cancelled = true;
     };
   }, [capture, onLoadScreenshotImage, canvasSize.width, canvasSize.height]);
-  useEffect5(() => {
+  useEffect6(() => {
     const canvas = canvasRef.current;
     if (!canvas || !capture) return;
     const ctx = canvas.getContext("2d");
@@ -2895,7 +3013,7 @@ function ScreenshotStateView({
       }
     }
   }, [canvasSize, capture, zoom, elementBounds, hoveredElement, selectedStateIds, selectedStateHashes, selectedElementHash, fingerprintDetails, hashToElement]);
-  const getElementAtPoint = useCallback5(
+  const getElementAtPoint = useCallback6(
     (clientX, clientY) => {
       const canvas = canvasRef.current;
       if (!canvas || !capture) return null;
@@ -2928,13 +3046,13 @@ function ScreenshotStateView({
     },
     [capture, zoom, canvasSize, elementBounds, selectedStateIds, selectedStateHashes]
   );
-  const handleMouseMove = useCallback5(
+  const handleMouseMove = useCallback6(
     (e) => {
       setHoveredElement(getElementAtPoint(e.clientX, e.clientY));
     },
     [getElementAtPoint]
   );
-  const handleCanvasClick = useCallback5(
+  const handleCanvasClick = useCallback6(
     (e) => {
       const hash = getElementAtPoint(e.clientX, e.clientY);
       if (!hash) {
@@ -2947,7 +3065,7 @@ function ScreenshotStateView({
   );
   const handlePrev = () => setCurrentIndex((i) => Math.max(0, i - 1));
   const handleNext = () => setCurrentIndex((i) => Math.min(captureScreenshots.length - 1, i + 1));
-  useEffect5(() => {
+  useEffect6(() => {
     const handler = (e) => {
       if (e.key === "ArrowLeft") handlePrev();
       if (e.key === "ArrowRight") handleNext();
@@ -2957,117 +3075,117 @@ function ScreenshotStateView({
     return () => window.removeEventListener("keydown", handler);
   }, [captureScreenshots.length]);
   if (captureScreenshots.length === 0) {
-    return /* @__PURE__ */ jsx7("div", { className: "flex items-center justify-center h-full text-text-muted", children: /* @__PURE__ */ jsxs7("div", { className: "text-center", children: [
-      /* @__PURE__ */ jsx7(Image, { className: "size-12 mx-auto mb-3 opacity-30" }),
-      /* @__PURE__ */ jsx7("p", { className: "text-sm", children: "No capture screenshots available" }),
-      /* @__PURE__ */ jsx7("p", { className: "text-xs mt-1 text-text-muted/70", children: "Run a state discovery to capture screenshots" })
+    return /* @__PURE__ */ jsx9("div", { className: "flex items-center justify-center h-full text-text-muted", children: /* @__PURE__ */ jsxs9("div", { className: "text-center", children: [
+      /* @__PURE__ */ jsx9(Image, { className: "size-12 mx-auto mb-3 opacity-30" }),
+      /* @__PURE__ */ jsx9("p", { className: "text-sm", children: "No capture screenshots available" }),
+      /* @__PURE__ */ jsx9("p", { className: "text-xs mt-1 text-text-muted/70", children: "Run a state discovery to capture screenshots" })
     ] }) });
   }
   const selectedFp = selectedElementHash ? fingerprintDetails?.[selectedElementHash] ?? null : null;
-  return /* @__PURE__ */ jsxs7("div", { className: "flex h-full", children: [
-    /* @__PURE__ */ jsx7("div", { className: "w-56 border-r border-border-secondary bg-bg-primary overflow-y-auto shrink-0", children: selectedStates.length > 0 ? /* @__PURE__ */ jsx7("div", { className: "flex flex-col", children: selectedStates.map((state, stateIdx) => {
+  return /* @__PURE__ */ jsxs9("div", { className: "flex h-full", children: [
+    /* @__PURE__ */ jsx9("div", { className: "w-56 border-r border-border-secondary bg-bg-primary overflow-y-auto shrink-0", children: selectedStates.length > 0 ? /* @__PURE__ */ jsx9("div", { className: "flex flex-col", children: selectedStates.map((state, stateIdx) => {
       const colorIdx = states.indexOf(state);
-      const color = STATE_COLORS[colorIdx % STATE_COLORS.length];
-      return /* @__PURE__ */ jsxs7("div", { className: stateIdx > 0 ? "border-t border-border-secondary" : "", children: [
-        /* @__PURE__ */ jsxs7("div", { className: "p-2 border-b border-border-secondary flex items-center gap-2", children: [
-          /* @__PURE__ */ jsx7("div", { className: "w-2 h-2 rounded-full shrink-0", style: { backgroundColor: color.border } }),
-          /* @__PURE__ */ jsx7("h4", { className: "text-[10px] font-semibold text-text-primary uppercase tracking-wider truncate", children: state.name }),
-          /* @__PURE__ */ jsx7("span", { className: "text-[9px] text-text-muted ml-auto shrink-0", children: state.element_ids.length })
+      const color = STATE_COLORS2[colorIdx % STATE_COLORS2.length];
+      return /* @__PURE__ */ jsxs9("div", { className: stateIdx > 0 ? "border-t border-border-secondary" : "", children: [
+        /* @__PURE__ */ jsxs9("div", { className: "p-2 border-b border-border-secondary flex items-center gap-2", children: [
+          /* @__PURE__ */ jsx9("div", { className: "w-2 h-2 rounded-full shrink-0", style: { backgroundColor: color.border } }),
+          /* @__PURE__ */ jsx9("h4", { className: "text-[10px] font-semibold text-text-primary uppercase tracking-wider truncate", children: state.name }),
+          /* @__PURE__ */ jsx9("span", { className: "text-[9px] text-text-muted ml-auto shrink-0", children: state.element_ids.length })
         ] }),
-        /* @__PURE__ */ jsx7("div", { className: "p-1.5 space-y-0.5", children: state.element_ids.map((eid) => {
+        /* @__PURE__ */ jsx9("div", { className: "p-1.5 space-y-0.5", children: state.element_ids.map((eid) => {
           const hash = getFingerprintHash(eid);
           const label = resolveElementLabel(eid, fingerprintDetails, state);
           const thumb = elementThumbnails?.[hash] ?? elementThumbnails?.[eid];
           const isActive = hash === selectedElementHash;
-          return /* @__PURE__ */ jsxs7(
+          return /* @__PURE__ */ jsxs9(
             "button",
             {
               onClick: () => setSelectedElementHash(isActive ? null : hash),
               className: `w-full flex items-center gap-1.5 text-[10px] px-2 py-1 rounded text-left ${isActive ? "bg-brand-primary/10 text-brand-primary" : "hover:bg-bg-secondary text-text-primary"}`,
               children: [
-                thumb ? /* @__PURE__ */ jsx7(
+                thumb ? /* @__PURE__ */ jsx9(
                   "img",
                   {
                     src: thumb.startsWith("data:") ? thumb : `data:image/png;base64,${thumb}`,
                     alt: label,
                     className: "w-5 h-5 object-cover rounded shrink-0"
                   }
-                ) : /* @__PURE__ */ jsx7(Layers2, { className: "size-3 text-text-muted shrink-0" }),
-                /* @__PURE__ */ jsx7("span", { className: "truncate", children: label })
+                ) : /* @__PURE__ */ jsx9(Layers3, { className: "size-3 text-text-muted shrink-0" }),
+                /* @__PURE__ */ jsx9("span", { className: "truncate", children: label })
               ]
             },
             eid
           );
         }) })
       ] }, state.state_id);
-    }) }) : /* @__PURE__ */ jsx7("div", { className: "flex items-center justify-center h-full text-text-muted", children: /* @__PURE__ */ jsxs7("div", { className: "text-center px-4", children: [
-      /* @__PURE__ */ jsx7(Layers2, { className: "size-8 mx-auto mb-2 opacity-30" }),
-      /* @__PURE__ */ jsx7("p", { className: "text-xs", children: "Select a state to see its elements" })
+    }) }) : /* @__PURE__ */ jsx9("div", { className: "flex items-center justify-center h-full text-text-muted", children: /* @__PURE__ */ jsxs9("div", { className: "text-center px-4", children: [
+      /* @__PURE__ */ jsx9(Layers3, { className: "size-8 mx-auto mb-2 opacity-30" }),
+      /* @__PURE__ */ jsx9("p", { className: "text-xs", children: "Select a state to see its elements" })
     ] }) }) }),
-    /* @__PURE__ */ jsxs7("div", { className: "flex-1 flex flex-col overflow-hidden", children: [
-      /* @__PURE__ */ jsxs7("div", { className: "flex items-center gap-2 px-3 py-1.5 border-b border-border-secondary bg-bg-primary shrink-0", children: [
-        /* @__PURE__ */ jsx7(
+    /* @__PURE__ */ jsxs9("div", { className: "flex-1 flex flex-col overflow-hidden", children: [
+      /* @__PURE__ */ jsxs9("div", { className: "flex items-center gap-2 px-3 py-1.5 border-b border-border-secondary bg-bg-primary shrink-0", children: [
+        /* @__PURE__ */ jsx9(
           "button",
           {
             className: "h-6 w-6 p-0 inline-flex items-center justify-center rounded text-text-secondary hover:text-text-primary disabled:opacity-30",
             onClick: handlePrev,
             disabled: currentIndex === 0,
             title: "Previous capture",
-            children: /* @__PURE__ */ jsx7(ChevronLeft, { className: "size-4" })
+            children: /* @__PURE__ */ jsx9(ChevronLeft, { className: "size-4" })
           }
         ),
-        /* @__PURE__ */ jsxs7("span", { className: "text-[10px] text-text-primary min-w-[70px] text-center", children: [
+        /* @__PURE__ */ jsxs9("span", { className: "text-[10px] text-text-primary min-w-[70px] text-center", children: [
           currentIndex + 1,
           " / ",
           captureScreenshots.length
         ] }),
-        /* @__PURE__ */ jsx7(
+        /* @__PURE__ */ jsx9(
           "button",
           {
             className: "h-6 w-6 p-0 inline-flex items-center justify-center rounded text-text-secondary hover:text-text-primary disabled:opacity-30",
             onClick: handleNext,
             disabled: currentIndex === captureScreenshots.length - 1,
             title: "Next capture",
-            children: /* @__PURE__ */ jsx7(ChevronRight2, { className: "size-4" })
+            children: /* @__PURE__ */ jsx9(ChevronRight2, { className: "size-4" })
           }
         ),
-        /* @__PURE__ */ jsx7("div", { className: "flex-1" }),
-        /* @__PURE__ */ jsxs7("div", { className: "flex items-center gap-0.5", children: [
-          /* @__PURE__ */ jsx7(
+        /* @__PURE__ */ jsx9("div", { className: "flex-1" }),
+        /* @__PURE__ */ jsxs9("div", { className: "flex items-center gap-0.5", children: [
+          /* @__PURE__ */ jsx9(
             "button",
             {
               className: "h-6 w-6 p-0 inline-flex items-center justify-center rounded text-text-secondary hover:text-text-primary",
               onClick: () => setUserZoom(Math.max(0.1, zoom - 0.25)),
               title: "Zoom out",
-              children: /* @__PURE__ */ jsx7(ZoomOut, { className: "size-3" })
+              children: /* @__PURE__ */ jsx9(ZoomOut2, { className: "size-3" })
             }
           ),
-          /* @__PURE__ */ jsxs7("span", { className: "text-[10px] text-text-muted w-8 text-center", children: [
+          /* @__PURE__ */ jsxs9("span", { className: "text-[10px] text-text-muted w-8 text-center", children: [
             Math.round(zoom * 100),
             "%"
           ] }),
-          /* @__PURE__ */ jsx7(
+          /* @__PURE__ */ jsx9(
             "button",
             {
               className: "h-6 w-6 p-0 inline-flex items-center justify-center rounded text-text-secondary hover:text-text-primary",
               onClick: () => setUserZoom(Math.min(3, zoom + 0.25)),
               title: "Zoom in",
-              children: /* @__PURE__ */ jsx7(ZoomIn, { className: "size-3" })
+              children: /* @__PURE__ */ jsx9(ZoomIn2, { className: "size-3" })
             }
           ),
-          /* @__PURE__ */ jsx7(
+          /* @__PURE__ */ jsx9(
             "button",
             {
               className: "h-6 w-6 p-0 inline-flex items-center justify-center rounded text-text-secondary hover:text-text-primary",
               onClick: () => setUserZoom(null),
               title: "Fit to view",
-              children: /* @__PURE__ */ jsx7(Maximize2, { className: "size-3" })
+              children: /* @__PURE__ */ jsx9(Maximize3, { className: "size-3" })
             }
           )
         ] })
       ] }),
-      /* @__PURE__ */ jsxs7("div", { ref: containerRef, className: "relative flex-1 bg-bg-secondary overflow-hidden", children: [
-        /* @__PURE__ */ jsx7(
+      /* @__PURE__ */ jsxs9("div", { ref: containerRef, className: "relative flex-1 bg-bg-secondary overflow-hidden", children: [
+        /* @__PURE__ */ jsx9(
           "canvas",
           {
             ref: canvasRef,
@@ -3081,16 +3199,16 @@ function ScreenshotStateView({
             onClick: handleCanvasClick
           }
         ),
-        isLoading && /* @__PURE__ */ jsx7("div", { className: "absolute inset-0 flex items-center justify-center bg-bg-secondary/50", children: /* @__PURE__ */ jsx7("div", { className: "animate-spin size-6 border-2 border-brand-primary border-t-transparent rounded-full" }) }),
-        hoveredElement && hoveredElement !== selectedElementHash && /* @__PURE__ */ jsxs7("div", { className: "absolute top-3 left-3 text-xs bg-bg-primary/95 backdrop-blur-xs px-3 py-2 rounded-lg border border-border-secondary shadow-md max-w-[280px] pointer-events-none", children: [
-          /* @__PURE__ */ jsx7("div", { className: "font-medium text-text-primary truncate", children: (() => {
+        isLoading && /* @__PURE__ */ jsx9("div", { className: "absolute inset-0 flex items-center justify-center bg-bg-secondary/50", children: /* @__PURE__ */ jsx9("div", { className: "animate-spin size-6 border-2 border-brand-primary border-t-transparent rounded-full" }) }),
+        hoveredElement && hoveredElement !== selectedElementHash && /* @__PURE__ */ jsxs9("div", { className: "absolute top-3 left-3 text-xs bg-bg-primary/95 backdrop-blur-xs px-3 py-2 rounded-lg border border-border-secondary shadow-md max-w-[280px] pointer-events-none", children: [
+          /* @__PURE__ */ jsx9("div", { className: "font-medium text-text-primary truncate", children: (() => {
             const entry = hashToElement.get(hoveredElement);
             return entry ? resolveElementLabel(entry.elementId, fingerprintDetails, entry.state) : hoveredElement;
           })() }),
           (() => {
             const fp = fingerprintDetails?.[hoveredElement];
             if (!fp) return null;
-            return /* @__PURE__ */ jsxs7("div", { className: "text-text-muted mt-0.5", children: [
+            return /* @__PURE__ */ jsxs9("div", { className: "text-text-muted mt-0.5", children: [
               "<",
               fp.tagName,
               ">",
@@ -3098,20 +3216,20 @@ function ScreenshotStateView({
             ] });
           })()
         ] }),
-        selectedElementHash && /* @__PURE__ */ jsx7("div", { className: "absolute bottom-2 left-2 right-2 text-xs bg-bg-primary/95 backdrop-blur-xs px-3 py-2 rounded-lg border border-border-secondary shadow-md", children: /* @__PURE__ */ jsxs7("div", { className: "flex items-start gap-3", children: [
-          /* @__PURE__ */ jsxs7("div", { className: "flex-1 min-w-0", children: [
-            /* @__PURE__ */ jsx7("div", { className: "font-medium text-text-primary truncate", children: (() => {
+        selectedElementHash && /* @__PURE__ */ jsx9("div", { className: "absolute bottom-2 left-2 right-2 text-xs bg-bg-primary/95 backdrop-blur-xs px-3 py-2 rounded-lg border border-border-secondary shadow-md", children: /* @__PURE__ */ jsxs9("div", { className: "flex items-start gap-3", children: [
+          /* @__PURE__ */ jsxs9("div", { className: "flex-1 min-w-0", children: [
+            /* @__PURE__ */ jsx9("div", { className: "font-medium text-text-primary truncate", children: (() => {
               const entry = hashToElement.get(selectedElementHash);
               return entry ? resolveElementLabel(entry.elementId, fingerprintDetails, entry.state) : selectedElementHash;
             })() }),
-            selectedFp && /* @__PURE__ */ jsxs7("div", { className: "text-[10px] text-text-muted mt-0.5", children: [
+            selectedFp && /* @__PURE__ */ jsxs9("div", { className: "text-[10px] text-text-muted mt-0.5", children: [
               "<",
               selectedFp.tagName,
               ">",
               selectedFp.role ? ` role="${selectedFp.role}"` : "",
               selectedFp.positionZone ? ` \xB7 ${selectedFp.positionZone}` : ""
             ] }),
-            elementBounds[selectedElementHash] && /* @__PURE__ */ jsxs7("div", { className: "text-[10px] text-text-muted mt-0.5", children: [
+            elementBounds[selectedElementHash] && /* @__PURE__ */ jsxs9("div", { className: "text-[10px] text-text-muted mt-0.5", children: [
               Math.round(elementBounds[selectedElementHash].x),
               ", ",
               Math.round(elementBounds[selectedElementHash].y),
@@ -3121,7 +3239,7 @@ function ScreenshotStateView({
               Math.round(elementBounds[selectedElementHash].height)
             ] })
           ] }),
-          elementThumbnails?.[selectedElementHash] && /* @__PURE__ */ jsx7(
+          elementThumbnails?.[selectedElementHash] && /* @__PURE__ */ jsx9(
             "img",
             {
               src: elementThumbnails[selectedElementHash].startsWith("data:") ? elementThumbnails[selectedElementHash] : `data:image/png;base64,${elementThumbnails[selectedElementHash]}`,
@@ -3129,34 +3247,34 @@ function ScreenshotStateView({
               className: "w-12 h-12 object-cover rounded border border-border-secondary shrink-0"
             }
           ),
-          /* @__PURE__ */ jsx7(
+          /* @__PURE__ */ jsx9(
             "button",
             {
               onClick: () => setSelectedElementHash(null),
               className: "text-text-muted hover:text-text-primary shrink-0",
-              children: /* @__PURE__ */ jsx7(X, { className: "size-3.5" })
+              children: /* @__PURE__ */ jsx9(X, { className: "size-3.5" })
             }
           )
         ] }) }),
-        !selectedElementHash && /* @__PURE__ */ jsx7("div", { className: "absolute bottom-2 right-2 text-[9px] text-text-muted bg-bg-primary/80 backdrop-blur-xs px-2 py-1 rounded border border-border-secondary/50", children: selectedStateIds.size > 0 ? `${Object.keys(elementBounds).filter((h) => selectedStateHashes.has(h)).length} / ${Object.keys(elementBounds).length} elements` : `${Object.keys(elementBounds).length} elements` })
+        !selectedElementHash && /* @__PURE__ */ jsx9("div", { className: "absolute bottom-2 right-2 text-[9px] text-text-muted bg-bg-primary/80 backdrop-blur-xs px-2 py-1 rounded border border-border-secondary/50", children: selectedStateIds.size > 0 ? `${Object.keys(elementBounds).filter((h) => selectedStateHashes.has(h)).length} / ${Object.keys(elementBounds).length} elements` : `${Object.keys(elementBounds).length} elements` })
       ] })
     ] }),
-    /* @__PURE__ */ jsxs7("div", { className: "w-48 border-l border-border-secondary bg-bg-primary overflow-y-auto shrink-0", children: [
-      /* @__PURE__ */ jsx7("div", { className: "p-2 border-b border-border-secondary", children: /* @__PURE__ */ jsxs7("h4", { className: "text-[10px] font-semibold text-text-muted uppercase tracking-wider", children: [
+    /* @__PURE__ */ jsxs9("div", { className: "w-48 border-l border-border-secondary bg-bg-primary overflow-y-auto shrink-0", children: [
+      /* @__PURE__ */ jsx9("div", { className: "p-2 border-b border-border-secondary", children: /* @__PURE__ */ jsxs9("h4", { className: "text-[10px] font-semibold text-text-muted uppercase tracking-wider", children: [
         "Screenshots ",
         selectedStateIds.size > 0 && `(${matchingScreenshotIndices.length})`
       ] }) }),
-      /* @__PURE__ */ jsxs7("div", { className: "p-1.5 space-y-1.5", children: [
+      /* @__PURE__ */ jsxs9("div", { className: "p-1.5 space-y-1.5", children: [
         matchingScreenshotIndices.map((idx) => {
           const cap = captureScreenshots[idx];
           const isCurrent = idx === currentIndex;
-          return /* @__PURE__ */ jsxs7(
+          return /* @__PURE__ */ jsxs9(
             "button",
             {
               onClick: () => setCurrentIndex(idx),
               className: `w-full rounded border-2 transition-colors overflow-hidden ${isCurrent ? "border-blue-500" : "border-transparent hover:border-border-secondary"}`,
               children: [
-                thumbnailCache.has(cap.id) ? /* @__PURE__ */ jsx7(
+                thumbnailCache.has(cap.id) ? /* @__PURE__ */ jsx9(
                   "img",
                   {
                     src: thumbnailCache.get(cap.id),
@@ -3164,8 +3282,8 @@ function ScreenshotStateView({
                     className: "w-full h-auto object-cover",
                     style: { maxHeight: 100 }
                   }
-                ) : /* @__PURE__ */ jsx7("div", { className: "w-full h-16 bg-bg-tertiary flex items-center justify-center", children: /* @__PURE__ */ jsx7(Image, { className: "size-4 text-text-muted opacity-30" }) }),
-                /* @__PURE__ */ jsxs7("div", { className: "text-[9px] text-text-muted px-1 py-0.5 text-center truncate", children: [
+                ) : /* @__PURE__ */ jsx9("div", { className: "w-full h-16 bg-bg-tertiary flex items-center justify-center", children: /* @__PURE__ */ jsx9(Image, { className: "size-4 text-text-muted opacity-30" }) }),
+                /* @__PURE__ */ jsxs9("div", { className: "text-[9px] text-text-muted px-1 py-0.5 text-center truncate", children: [
                   "#",
                   cap.captureIndex + 1,
                   " \xB7 ",
@@ -3176,11 +3294,14 @@ function ScreenshotStateView({
             cap.id
           );
         }),
-        matchingScreenshotIndices.length === 0 && /* @__PURE__ */ jsx7("p", { className: "text-[10px] text-text-muted text-center py-4", children: "No screenshots match selected state(s)" })
+        matchingScreenshotIndices.length === 0 && /* @__PURE__ */ jsx9("p", { className: "text-[10px] text-text-muted text-center py-4", children: "No screenshots match selected state(s)" })
       ] })
     ] })
   ] });
 }
+
+// src/components/state-machine/StateViewPanel.tsx
+import { Fragment as Fragment4, jsx as jsx10, jsxs as jsxs10 } from "react/jsx-runtime";
 function StateViewPanel({
   states,
   transitions,
@@ -3191,30 +3312,30 @@ function StateViewPanel({
   captureScreenshots,
   onLoadScreenshotImage
 }) {
-  const [expandedStates, setExpandedStates] = useState5(/* @__PURE__ */ new Set());
-  const [searchFilter, setSearchFilter] = useState5("");
-  const [viewMode, setViewMode] = useState5(
+  const [expandedStates, setExpandedStates] = useState8(/* @__PURE__ */ new Set());
+  const [searchFilter, setSearchFilter] = useState8("");
+  const [viewMode, setViewMode] = useState8(
     captureScreenshots && captureScreenshots.length > 0 ? "screenshot" : "list"
   );
-  const [hasAutoSwitched, setHasAutoSwitched] = useState5(
+  const [hasAutoSwitched, setHasAutoSwitched] = useState8(
     () => !!(captureScreenshots && captureScreenshots.length > 0)
   );
-  useEffect5(() => {
+  useEffect7(() => {
     if (!hasAutoSwitched && captureScreenshots && captureScreenshots.length > 0) {
       setViewMode("screenshot");
       setHasAutoSwitched(true);
     }
   }, [captureScreenshots, hasAutoSwitched]);
-  const [localSelectedStateId, setLocalSelectedStateId] = useState5(
+  const [localSelectedStateId, setLocalSelectedStateId] = useState8(
     selectedStateId
   );
-  const [selectedStateIds, setSelectedStateIds] = useState5(/* @__PURE__ */ new Set());
+  const [selectedStateIds, setSelectedStateIds] = useState8(/* @__PURE__ */ new Set());
   const effectiveSelectedStateId = localSelectedStateId;
-  const selectedState = useMemo4(
+  const selectedState = useMemo7(
     () => states.find((s) => s.state_id === effectiveSelectedStateId),
     [states, effectiveSelectedStateId]
   );
-  const transitionMap = useMemo4(() => {
+  const transitionMap = useMemo7(() => {
     const outgoing = /* @__PURE__ */ new Map();
     const incoming = /* @__PURE__ */ new Map();
     for (const t of transitions) {
@@ -3229,17 +3350,17 @@ function StateViewPanel({
     }
     return { outgoing, incoming };
   }, [transitions]);
-  const elementGroups = useMemo4(() => {
+  const elementGroups = useMemo7(() => {
     if (!selectedState) return /* @__PURE__ */ new Map();
     const groups = /* @__PURE__ */ new Map();
     for (const eid of selectedState.element_ids) {
-      const prefix = getElementTypePrefix2(eid);
+      const prefix = getElementTypePrefix3(eid);
       if (!groups.has(prefix)) groups.set(prefix, []);
       groups.get(prefix).push(eid);
     }
     return groups;
   }, [selectedState]);
-  const sharedElements = useMemo4(() => {
+  const sharedElements = useMemo7(() => {
     const elementStateMap = /* @__PURE__ */ new Map();
     for (const s of states) {
       for (const eid of s.element_ids) {
@@ -3249,7 +3370,7 @@ function StateViewPanel({
     }
     return elementStateMap;
   }, [states]);
-  const filteredStates = useMemo4(() => {
+  const filteredStates = useMemo7(() => {
     if (!searchFilter) return states;
     const lower = searchFilter.toLowerCase();
     return states.filter(
@@ -3267,18 +3388,18 @@ function StateViewPanel({
       return next;
     });
   };
-  return /* @__PURE__ */ jsxs7("div", { className: "flex flex-1 h-full min-w-0", children: [
-    /* @__PURE__ */ jsxs7("div", { className: "w-72 border-r border-border-secondary bg-bg-primary overflow-y-auto shrink-0", children: [
-      /* @__PURE__ */ jsxs7("div", { className: "p-3 border-b border-border-secondary", children: [
-        /* @__PURE__ */ jsxs7("div", { className: "flex items-center gap-2 mb-2", children: [
-          /* @__PURE__ */ jsx7(Layers2, { className: "size-4 text-brand-primary" }),
-          /* @__PURE__ */ jsx7("h3", { className: "text-sm font-semibold text-text-primary", children: "States" }),
-          /* @__PURE__ */ jsx7("span", { className: "text-xs text-text-muted ml-auto", children: states.length })
+  return /* @__PURE__ */ jsxs10("div", { className: "flex flex-1 h-full min-w-0", children: [
+    /* @__PURE__ */ jsxs10("div", { className: "w-72 border-r border-border-secondary bg-bg-primary overflow-y-auto shrink-0", children: [
+      /* @__PURE__ */ jsxs10("div", { className: "p-3 border-b border-border-secondary", children: [
+        /* @__PURE__ */ jsxs10("div", { className: "flex items-center gap-2 mb-2", children: [
+          /* @__PURE__ */ jsx10(Layers4, { className: "size-4 text-brand-primary" }),
+          /* @__PURE__ */ jsx10("h3", { className: "text-sm font-semibold text-text-primary", children: "States" }),
+          /* @__PURE__ */ jsx10("span", { className: "text-xs text-text-muted ml-auto", children: states.length })
         ] }),
-        /* @__PURE__ */ jsxs7("div", { className: "flex items-center gap-2 mb-2", children: [
-          /* @__PURE__ */ jsxs7("div", { className: "relative flex-1", children: [
-            /* @__PURE__ */ jsx7(Search2, { className: "absolute left-2 top-1/2 -translate-y-1/2 size-3 text-text-muted" }),
-            /* @__PURE__ */ jsx7(
+        /* @__PURE__ */ jsxs10("div", { className: "flex items-center gap-2 mb-2", children: [
+          /* @__PURE__ */ jsxs10("div", { className: "relative flex-1", children: [
+            /* @__PURE__ */ jsx10(Search2, { className: "absolute left-2 top-1/2 -translate-y-1/2 size-3 text-text-muted" }),
+            /* @__PURE__ */ jsx10(
               "input",
               {
                 type: "text",
@@ -3290,50 +3411,50 @@ function StateViewPanel({
               }
             )
           ] }),
-          /* @__PURE__ */ jsxs7("div", { className: "flex items-center border border-border-secondary rounded overflow-hidden", children: [
-            /* @__PURE__ */ jsx7(
+          /* @__PURE__ */ jsxs10("div", { className: "flex items-center border border-border-secondary rounded overflow-hidden", children: [
+            /* @__PURE__ */ jsx10(
               "button",
               {
                 onClick: () => setViewMode("list"),
                 className: `p-1 ${viewMode === "list" ? "bg-brand-primary/20 text-brand-primary" : "text-text-muted hover:text-text-primary"}`,
                 title: "List view",
-                children: /* @__PURE__ */ jsx7(List, { className: "size-3.5" })
+                children: /* @__PURE__ */ jsx10(List, { className: "size-3.5" })
               }
             ),
-            /* @__PURE__ */ jsx7(
+            /* @__PURE__ */ jsx10(
               "button",
               {
                 onClick: () => setViewMode("spatial"),
                 className: `p-1 ${viewMode === "spatial" ? "bg-brand-primary/20 text-brand-primary" : "text-text-muted hover:text-text-primary"}`,
                 title: "Spatial view",
-                children: /* @__PURE__ */ jsx7(BarChart3, { className: "size-3.5" })
+                children: /* @__PURE__ */ jsx10(BarChart3, { className: "size-3.5" })
               }
             ),
-            /* @__PURE__ */ jsx7(
+            /* @__PURE__ */ jsx10(
               "button",
               {
                 onClick: () => setViewMode("screenshot"),
                 className: `p-1 ${viewMode === "screenshot" ? "bg-brand-primary/20 text-brand-primary" : "text-text-muted hover:text-text-primary"}`,
                 title: "Screenshot view",
                 disabled: !captureScreenshots || captureScreenshots.length === 0,
-                children: /* @__PURE__ */ jsx7(Image, { className: "size-3.5" })
+                children: /* @__PURE__ */ jsx10(Image2, { className: "size-3.5" })
               }
             )
           ] })
         ] })
       ] }),
-      /* @__PURE__ */ jsxs7("div", { className: "p-2 space-y-0.5", children: [
+      /* @__PURE__ */ jsxs10("div", { className: "p-2 space-y-0.5", children: [
         filteredStates.map((state) => {
           const colorIdx = states.indexOf(state);
-          const color = STATE_COLORS[colorIdx % STATE_COLORS.length];
+          const color = STATE_COLORS3[colorIdx % STATE_COLORS3.length];
           const isSelected = viewMode === "screenshot" ? selectedStateIds.has(state.state_id) : state.state_id === effectiveSelectedStateId;
           const isExpanded = expandedStates.has(state.state_id);
           const stateOutgoing = transitionMap.outgoing.get(state.state_id) ?? [];
           const stateIncoming = transitionMap.incoming.get(state.state_id) ?? [];
           const isInitial = state.extra_metadata?.initial === true;
           const isBlocking = state.extra_metadata?.blocking === true;
-          return /* @__PURE__ */ jsxs7("div", { children: [
-            /* @__PURE__ */ jsxs7(
+          return /* @__PURE__ */ jsxs10("div", { children: [
+            /* @__PURE__ */ jsxs10(
               "button",
               {
                 "data-ui-id": `state-item-${state.state_id}`,
@@ -3361,25 +3482,25 @@ function StateViewPanel({
                     ${isSelected ? "bg-brand-primary/10 border border-brand-primary/30" : "hover:bg-bg-secondary border border-transparent"}
                   `,
                 children: [
-                  /* @__PURE__ */ jsxs7("div", { className: "flex items-center gap-2", children: [
-                    /* @__PURE__ */ jsx7(
+                  /* @__PURE__ */ jsxs10("div", { className: "flex items-center gap-2", children: [
+                    /* @__PURE__ */ jsx10(
                       "div",
                       {
                         className: "w-2.5 h-2.5 rounded-full shrink-0",
                         style: { backgroundColor: color.border }
                       }
                     ),
-                    isInitial && /* @__PURE__ */ jsx7(Play4, { className: "size-3 text-yellow-500 fill-yellow-500 shrink-0" }),
-                    isBlocking && /* @__PURE__ */ jsx7(Lock2, { className: "size-3 text-amber-500 shrink-0" }),
-                    /* @__PURE__ */ jsx7("span", { className: "font-medium text-text-primary truncate flex-1", children: state.name }),
-                    isExpanded ? /* @__PURE__ */ jsx7(ChevronDown, { className: "size-3 text-text-muted transition-transform" }) : /* @__PURE__ */ jsx7(ChevronRight2, { className: "size-3 text-text-muted transition-transform" })
+                    isInitial && /* @__PURE__ */ jsx10(Play4, { className: "size-3 text-yellow-500 fill-yellow-500 shrink-0" }),
+                    isBlocking && /* @__PURE__ */ jsx10(Lock2, { className: "size-3 text-amber-500 shrink-0" }),
+                    /* @__PURE__ */ jsx10("span", { className: "font-medium text-text-primary truncate flex-1", children: state.name }),
+                    isExpanded ? /* @__PURE__ */ jsx10(ChevronDown, { className: "size-3 text-text-muted transition-transform" }) : /* @__PURE__ */ jsx10(ChevronRight3, { className: "size-3 text-text-muted transition-transform" })
                   ] }),
-                  /* @__PURE__ */ jsxs7("div", { className: "flex items-center gap-2 mt-1 ml-4.5 text-xs text-text-muted", children: [
-                    /* @__PURE__ */ jsxs7("span", { children: [
+                  /* @__PURE__ */ jsxs10("div", { className: "flex items-center gap-2 mt-1 ml-4.5 text-xs text-text-muted", children: [
+                    /* @__PURE__ */ jsxs10("span", { children: [
                       state.element_ids.length,
                       " elements"
                     ] }),
-                    /* @__PURE__ */ jsxs7(
+                    /* @__PURE__ */ jsxs10(
                       "span",
                       {
                         className: Math.round(state.confidence * 100) >= 80 ? "text-green-400" : Math.round(state.confidence * 100) >= 50 ? "text-amber-400" : "text-red-400",
@@ -3389,39 +3510,39 @@ function StateViewPanel({
                         ]
                       }
                     ),
-                    stateOutgoing.length > 0 && /* @__PURE__ */ jsxs7("span", { className: "text-brand-secondary flex items-center gap-0.5", children: [
-                      /* @__PURE__ */ jsx7(ArrowUpRight2, { className: "size-2" }),
+                    stateOutgoing.length > 0 && /* @__PURE__ */ jsxs10("span", { className: "text-brand-secondary flex items-center gap-0.5", children: [
+                      /* @__PURE__ */ jsx10(ArrowUpRight2, { className: "size-2" }),
                       stateOutgoing.length
                     ] }),
-                    stateIncoming.length > 0 && /* @__PURE__ */ jsxs7("span", { className: "text-brand-primary flex items-center gap-0.5", children: [
-                      /* @__PURE__ */ jsx7(ArrowDownLeft2, { className: "size-2" }),
+                    stateIncoming.length > 0 && /* @__PURE__ */ jsxs10("span", { className: "text-brand-primary flex items-center gap-0.5", children: [
+                      /* @__PURE__ */ jsx10(ArrowDownLeft2, { className: "size-2" }),
                       stateIncoming.length
                     ] })
                   ] })
                 ]
               }
             ),
-            isExpanded && /* @__PURE__ */ jsxs7("div", { className: "ml-5 pl-2 border-l border-border-secondary mt-1 mb-2 space-y-0.5", children: [
+            isExpanded && /* @__PURE__ */ jsxs10("div", { className: "ml-5 pl-2 border-l border-border-secondary mt-1 mb-2 space-y-0.5", children: [
               state.element_ids.slice(0, 20).map((eid) => {
-                const prefix = getElementTypePrefix2(eid);
+                const prefix = getElementTypePrefix3(eid);
                 const label = resolveElementLabel(eid, fingerprintDetails, state);
-                const Icon = ELEMENT_ICONS[prefix] ?? Layers2;
+                const Icon = ELEMENT_ICONS[prefix] ?? Layers4;
                 const stateCount = sharedElements.get(eid)?.length ?? 1;
-                return /* @__PURE__ */ jsxs7(
+                return /* @__PURE__ */ jsxs10(
                   "div",
                   {
                     className: "text-[10px] text-text-muted flex items-center gap-1 py-0.5 px-1 rounded hover:bg-bg-secondary",
                     title: `${eid}${stateCount > 1 ? ` (shared across ${stateCount} states)` : ""}`,
                     children: [
-                      /* @__PURE__ */ jsx7(Icon, { className: "size-2.5 shrink-0" }),
-                      /* @__PURE__ */ jsx7("span", { className: "truncate flex-1", children: label }),
-                      stateCount > 1 && /* @__PURE__ */ jsx7("span", { className: "text-[8px] text-brand-primary bg-brand-primary/10 px-1 rounded-full shrink-0", children: stateCount })
+                      /* @__PURE__ */ jsx10(Icon, { className: "size-2.5 shrink-0" }),
+                      /* @__PURE__ */ jsx10("span", { className: "truncate flex-1", children: label }),
+                      stateCount > 1 && /* @__PURE__ */ jsx10("span", { className: "text-[8px] text-brand-primary bg-brand-primary/10 px-1 rounded-full shrink-0", children: stateCount })
                     ]
                   },
                   eid
                 );
               }),
-              state.element_ids.length > 20 && /* @__PURE__ */ jsxs7("div", { className: "text-[10px] text-text-muted py-0.5 px-1", children: [
+              state.element_ids.length > 20 && /* @__PURE__ */ jsxs10("div", { className: "text-[10px] text-text-muted py-0.5 px-1", children: [
                 "+",
                 state.element_ids.length - 20,
                 " more"
@@ -3429,10 +3550,10 @@ function StateViewPanel({
             ] })
           ] }, state.state_id);
         }),
-        filteredStates.length === 0 && /* @__PURE__ */ jsx7("p", { className: "text-xs text-text-muted text-center py-4", children: "No states match filter." })
+        filteredStates.length === 0 && /* @__PURE__ */ jsx10("p", { className: "text-xs text-text-muted text-center py-4", children: "No states match filter." })
       ] })
     ] }),
-    /* @__PURE__ */ jsx7("div", { className: "flex-1 overflow-hidden", children: viewMode === "screenshot" && captureScreenshots && onLoadScreenshotImage ? /* @__PURE__ */ jsx7(
+    /* @__PURE__ */ jsx10("div", { className: "flex-1 overflow-hidden", children: viewMode === "screenshot" && captureScreenshots && onLoadScreenshotImage ? /* @__PURE__ */ jsx10(
       ScreenshotStateView,
       {
         captureScreenshots,
@@ -3442,7 +3563,7 @@ function StateViewPanel({
         fingerprintDetails,
         elementThumbnails
       }
-    ) : viewMode === "spatial" ? /* @__PURE__ */ jsx7(
+    ) : viewMode === "spatial" ? /* @__PURE__ */ jsx10(
       SpatialCanvas,
       {
         states,
@@ -3450,30 +3571,30 @@ function StateViewPanel({
         selectedStateId: effectiveSelectedStateId,
         onSelectState: setLocalSelectedStateId
       }
-    ) : selectedState ? /* @__PURE__ */ jsxs7("div", { className: "p-6 space-y-6 overflow-y-auto h-full", children: [
-      /* @__PURE__ */ jsxs7("div", { children: [
-        /* @__PURE__ */ jsxs7("div", { className: "flex items-center gap-2", children: [
-          /* @__PURE__ */ jsx7("h2", { className: "text-lg font-semibold text-text-primary", children: selectedState.name }),
-          selectedState.extra_metadata?.initial === true && /* @__PURE__ */ jsxs7("span", { className: "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] border bg-yellow-500/20 text-yellow-400 border-yellow-500/30", children: [
-            /* @__PURE__ */ jsx7(Play4, { className: "size-2.5 fill-current" }),
+    ) : selectedState ? /* @__PURE__ */ jsxs10("div", { className: "p-6 space-y-6 overflow-y-auto h-full", children: [
+      /* @__PURE__ */ jsxs10("div", { children: [
+        /* @__PURE__ */ jsxs10("div", { className: "flex items-center gap-2", children: [
+          /* @__PURE__ */ jsx10("h2", { className: "text-lg font-semibold text-text-primary", children: selectedState.name }),
+          selectedState.extra_metadata?.initial === true && /* @__PURE__ */ jsxs10("span", { className: "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] border bg-yellow-500/20 text-yellow-400 border-yellow-500/30", children: [
+            /* @__PURE__ */ jsx10(Play4, { className: "size-2.5 fill-current" }),
             "Initial"
           ] }),
-          selectedState.extra_metadata?.blocking === true && /* @__PURE__ */ jsxs7("span", { className: "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] border bg-amber-500/20 text-amber-400 border-amber-500/30", children: [
-            /* @__PURE__ */ jsx7(Lock2, { className: "size-2.5" }),
+          selectedState.extra_metadata?.blocking === true && /* @__PURE__ */ jsxs10("span", { className: "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] border bg-amber-500/20 text-amber-400 border-amber-500/30", children: [
+            /* @__PURE__ */ jsx10(Lock2, { className: "size-2.5" }),
             "Blocking"
           ] })
         ] }),
-        selectedState.description && /* @__PURE__ */ jsx7("p", { className: "text-sm text-text-muted mt-1", children: selectedState.description }),
-        /* @__PURE__ */ jsxs7("div", { className: "flex items-center gap-3 mt-2 text-xs text-text-muted", children: [
-          /* @__PURE__ */ jsxs7("span", { className: "inline-flex items-center rounded-full px-2 py-0.5 text-[10px] border bg-bg-secondary border-border-secondary text-text-muted", children: [
+        selectedState.description && /* @__PURE__ */ jsx10("p", { className: "text-sm text-text-muted mt-1", children: selectedState.description }),
+        /* @__PURE__ */ jsxs10("div", { className: "flex items-center gap-3 mt-2 text-xs text-text-muted", children: [
+          /* @__PURE__ */ jsxs10("span", { className: "inline-flex items-center rounded-full px-2 py-0.5 text-[10px] border bg-bg-secondary border-border-secondary text-text-muted", children: [
             selectedState.element_ids.length,
             " elements"
           ] }),
-          /* @__PURE__ */ jsxs7("span", { className: "inline-flex items-center rounded-full px-2 py-0.5 text-[10px] border bg-bg-secondary border-border-secondary text-text-muted", children: [
+          /* @__PURE__ */ jsxs10("span", { className: "inline-flex items-center rounded-full px-2 py-0.5 text-[10px] border bg-bg-secondary border-border-secondary text-text-muted", children: [
             selectedState.render_ids.length,
             " renders"
           ] }),
-          /* @__PURE__ */ jsxs7(
+          /* @__PURE__ */ jsxs10(
             "span",
             {
               className: `inline-flex items-center rounded-full px-2 py-0.5 text-[10px] border ${Math.round(selectedState.confidence * 100) >= 80 ? "bg-green-500/10 border-green-500/30 text-green-400" : "bg-amber-500/10 border-amber-500/30 text-amber-400"}`,
@@ -3485,35 +3606,35 @@ function StateViewPanel({
           )
         ] })
       ] }),
-      /* @__PURE__ */ jsxs7("div", { children: [
-        /* @__PURE__ */ jsx7("h3", { className: "text-sm font-medium text-text-primary mb-3", children: "Elements by Type" }),
-        /* @__PURE__ */ jsx7("div", { className: "space-y-3", children: Array.from(elementGroups.entries()).map(
+      /* @__PURE__ */ jsxs10("div", { children: [
+        /* @__PURE__ */ jsx10("h3", { className: "text-sm font-medium text-text-primary mb-3", children: "Elements by Type" }),
+        /* @__PURE__ */ jsx10("div", { className: "space-y-3", children: Array.from(elementGroups.entries()).map(
           ([prefix, elements]) => {
-            const Icon = ELEMENT_ICONS[prefix] ?? Layers2;
+            const Icon = ELEMENT_ICONS[prefix] ?? Layers4;
             const colorClass = ELEMENT_COLORS[prefix] ?? "border-gray-400 bg-gray-500/10 text-gray-300";
-            return /* @__PURE__ */ jsxs7("div", { children: [
-              /* @__PURE__ */ jsxs7("div", { className: "flex items-center gap-2 mb-1.5", children: [
-                /* @__PURE__ */ jsx7(Icon, { className: "size-3.5" }),
-                /* @__PURE__ */ jsx7("span", { className: "text-xs font-medium text-text-primary capitalize", children: prefix }),
-                /* @__PURE__ */ jsxs7("span", { className: "text-xs text-text-muted", children: [
+            return /* @__PURE__ */ jsxs10("div", { children: [
+              /* @__PURE__ */ jsxs10("div", { className: "flex items-center gap-2 mb-1.5", children: [
+                /* @__PURE__ */ jsx10(Icon, { className: "size-3.5" }),
+                /* @__PURE__ */ jsx10("span", { className: "text-xs font-medium text-text-primary capitalize", children: prefix }),
+                /* @__PURE__ */ jsxs10("span", { className: "text-xs text-text-muted", children: [
                   "(",
                   elements.length,
                   ")"
                 ] })
               ] }),
-              /* @__PURE__ */ jsx7("div", { className: "flex flex-wrap gap-1.5", children: elements.map((eid) => {
+              /* @__PURE__ */ jsx10("div", { className: "flex flex-wrap gap-1.5", children: elements.map((eid) => {
                 const stateCount = sharedElements.get(eid)?.length ?? 1;
-                const rawLabel = getElementLabel2(eid);
+                const rawLabel = getElementLabel4(eid);
                 const descriptiveLabel = resolveElementLabel(eid, fingerprintDetails, selectedState);
                 const thumb = elementThumbnails?.[eid] ?? elementThumbnails?.[rawLabel];
-                return /* @__PURE__ */ jsx7(
+                return /* @__PURE__ */ jsx10(
                   "div",
                   {
                     className: `rounded border ${colorClass} overflow-hidden ${thumb ? "flex flex-col items-center w-16" : "text-[11px] px-2 py-0.5 inline-flex items-center gap-1"}`,
                     title: `${eid}${stateCount > 1 ? ` (shared across ${stateCount} states)` : ""}`,
-                    children: thumb ? /* @__PURE__ */ jsxs7(Fragment4, { children: [
-                      /* @__PURE__ */ jsxs7("div", { className: "relative", children: [
-                        /* @__PURE__ */ jsx7(
+                    children: thumb ? /* @__PURE__ */ jsxs10(Fragment4, { children: [
+                      /* @__PURE__ */ jsxs10("div", { className: "relative", children: [
+                        /* @__PURE__ */ jsx10(
                           "img",
                           {
                             src: thumb.startsWith("data:") ? thumb : `data:image/png;base64,${thumb}`,
@@ -3521,15 +3642,15 @@ function StateViewPanel({
                             className: "w-12 h-12 object-cover"
                           }
                         ),
-                        stateCount > 1 && /* @__PURE__ */ jsxs7("span", { className: "absolute -top-1 -right-1 text-[7px] bg-brand-primary/90 text-white px-1 rounded-full leading-tight", children: [
+                        stateCount > 1 && /* @__PURE__ */ jsxs10("span", { className: "absolute -top-1 -right-1 text-[7px] bg-brand-primary/90 text-white px-1 rounded-full leading-tight", children: [
                           "x",
                           stateCount
                         ] })
                       ] }),
-                      /* @__PURE__ */ jsx7("span", { className: "text-[8px] text-center px-0.5 py-0.5 truncate w-full leading-tight", children: descriptiveLabel })
-                    ] }) : /* @__PURE__ */ jsxs7(Fragment4, { children: [
+                      /* @__PURE__ */ jsx10("span", { className: "text-[8px] text-center px-0.5 py-0.5 truncate w-full leading-tight", children: descriptiveLabel })
+                    ] }) : /* @__PURE__ */ jsxs10(Fragment4, { children: [
                       descriptiveLabel,
-                      stateCount > 1 && /* @__PURE__ */ jsxs7("span", { className: "text-[8px] opacity-70 bg-white/10 px-0.5 rounded", children: [
+                      stateCount > 1 && /* @__PURE__ */ jsxs10("span", { className: "text-[8px] opacity-70 bg-white/10 px-0.5 rounded", children: [
                         "x",
                         stateCount
                       ] })
@@ -3542,7 +3663,7 @@ function StateViewPanel({
           }
         ) })
       ] }),
-      /* @__PURE__ */ jsx7(
+      /* @__PURE__ */ jsx10(
         StateLayoutView,
         {
           state: selectedState,
@@ -3550,20 +3671,20 @@ function StateViewPanel({
           fingerprintDetails
         }
       ),
-      /* @__PURE__ */ jsxs7("div", { children: [
-        /* @__PURE__ */ jsx7("h3", { className: "text-sm font-medium text-text-primary mb-3", children: "Transitions" }),
-        /* @__PURE__ */ jsxs7("div", { className: "space-y-2", children: [
+      /* @__PURE__ */ jsxs10("div", { children: [
+        /* @__PURE__ */ jsx10("h3", { className: "text-sm font-medium text-text-primary mb-3", children: "Transitions" }),
+        /* @__PURE__ */ jsxs10("div", { className: "space-y-2", children: [
           (transitionMap.outgoing.get(selectedState.state_id) ?? []).map(
-            (t) => /* @__PURE__ */ jsxs7(
+            (t) => /* @__PURE__ */ jsxs10(
               "div",
               {
                 className: "flex items-center gap-2 text-xs p-2.5 rounded-lg bg-bg-secondary border border-border-secondary",
                 children: [
-                  /* @__PURE__ */ jsx7(ArrowRight2, { className: "size-3 text-brand-secondary shrink-0" }),
-                  /* @__PURE__ */ jsx7("span", { className: "font-medium text-text-primary", children: t.name }),
-                  t.actions.length > 0 && /* @__PURE__ */ jsx7("span", { className: "flex items-center gap-0.5 shrink-0", children: [...new Set(t.actions.map((a) => a.type))].slice(0, 3).map((actionType) => {
+                  /* @__PURE__ */ jsx10(ArrowRight2, { className: "size-3 text-brand-secondary shrink-0" }),
+                  /* @__PURE__ */ jsx10("span", { className: "font-medium text-text-primary", children: t.name }),
+                  t.actions.length > 0 && /* @__PURE__ */ jsx10("span", { className: "flex items-center gap-0.5 shrink-0", children: [...new Set(t.actions.map((a) => a.type))].slice(0, 3).map((actionType) => {
                     const ActionIcon = ACTION_ICONS3[actionType];
-                    return ActionIcon ? /* @__PURE__ */ jsx7(
+                    return ActionIcon ? /* @__PURE__ */ jsx10(
                       ActionIcon,
                       {
                         className: `size-2.5 ${getActionTypeColor(actionType)}`
@@ -3571,32 +3692,32 @@ function StateViewPanel({
                       actionType
                     ) : null;
                   }) }),
-                  /* @__PURE__ */ jsx7(ArrowRight2, { className: "size-2.5 text-text-muted" }),
-                  /* @__PURE__ */ jsx7("span", { className: "text-text-muted truncate", children: t.activate_states.map(
+                  /* @__PURE__ */ jsx10(ArrowRight2, { className: "size-2.5 text-text-muted" }),
+                  /* @__PURE__ */ jsx10("span", { className: "text-text-muted truncate", children: t.activate_states.map(
                     (sid) => states.find((s) => s.state_id === sid)?.name ?? sid
                   ).join(", ") }),
-                  t.actions.length > 0 && /* @__PURE__ */ jsxs7("span", { className: "text-text-muted ml-auto text-[10px] shrink-0", children: [
+                  t.actions.length > 0 && /* @__PURE__ */ jsxs10("span", { className: "text-text-muted ml-auto text-[10px] shrink-0", children: [
                     t.actions.length,
                     " action",
                     t.actions.length !== 1 ? "s" : ""
                   ] }),
-                  t.stays_visible && /* @__PURE__ */ jsx7(Eye3, { className: "size-3 text-green-400 shrink-0" })
+                  t.stays_visible && /* @__PURE__ */ jsx10(Eye3, { className: "size-3 text-green-400 shrink-0" })
                 ]
               },
               `out-${t.transition_id}`
             )
           ),
           (transitionMap.incoming.get(selectedState.state_id) ?? []).map(
-            (t) => /* @__PURE__ */ jsxs7(
+            (t) => /* @__PURE__ */ jsxs10(
               "div",
               {
                 className: "flex items-center gap-2 text-xs p-2.5 rounded-lg bg-bg-secondary border border-border-secondary",
                 children: [
-                  /* @__PURE__ */ jsx7(CheckCircle, { className: "size-3 text-brand-primary shrink-0" }),
-                  /* @__PURE__ */ jsx7("span", { className: "font-medium text-text-primary", children: t.name }),
-                  t.actions.length > 0 && /* @__PURE__ */ jsx7("span", { className: "flex items-center gap-0.5 shrink-0", children: [...new Set(t.actions.map((a) => a.type))].slice(0, 3).map((actionType) => {
+                  /* @__PURE__ */ jsx10(CheckCircle, { className: "size-3 text-brand-primary shrink-0" }),
+                  /* @__PURE__ */ jsx10("span", { className: "font-medium text-text-primary", children: t.name }),
+                  t.actions.length > 0 && /* @__PURE__ */ jsx10("span", { className: "flex items-center gap-0.5 shrink-0", children: [...new Set(t.actions.map((a) => a.type))].slice(0, 3).map((actionType) => {
                     const ActionIcon = ACTION_ICONS3[actionType];
-                    return ActionIcon ? /* @__PURE__ */ jsx7(
+                    return ActionIcon ? /* @__PURE__ */ jsx10(
                       ActionIcon,
                       {
                         className: `size-2.5 ${getActionTypeColor(actionType)}`
@@ -3604,7 +3725,7 @@ function StateViewPanel({
                       actionType
                     ) : null;
                   }) }),
-                  /* @__PURE__ */ jsxs7("span", { className: "text-text-muted truncate", children: [
+                  /* @__PURE__ */ jsxs10("span", { className: "text-text-muted truncate", children: [
                     "from",
                     " ",
                     t.from_states.map(
@@ -3616,36 +3737,36 @@ function StateViewPanel({
               `in-${t.transition_id}`
             )
           ),
-          (transitionMap.outgoing.get(selectedState.state_id) ?? []).length === 0 && (transitionMap.incoming.get(selectedState.state_id) ?? []).length === 0 && /* @__PURE__ */ jsx7("p", { className: "text-xs text-text-muted", children: "No transitions connected." })
+          (transitionMap.outgoing.get(selectedState.state_id) ?? []).length === 0 && (transitionMap.incoming.get(selectedState.state_id) ?? []).length === 0 && /* @__PURE__ */ jsx10("p", { className: "text-xs text-text-muted", children: "No transitions connected." })
         ] })
       ] }),
-      selectedState.acceptance_criteria.length > 0 && /* @__PURE__ */ jsxs7("div", { children: [
-        /* @__PURE__ */ jsx7("h3", { className: "text-sm font-medium text-text-primary mb-2", children: "Acceptance Criteria" }),
-        /* @__PURE__ */ jsx7("ul", { className: "space-y-1", children: selectedState.acceptance_criteria.map((criteria, i) => /* @__PURE__ */ jsxs7(
+      selectedState.acceptance_criteria.length > 0 && /* @__PURE__ */ jsxs10("div", { children: [
+        /* @__PURE__ */ jsx10("h3", { className: "text-sm font-medium text-text-primary mb-2", children: "Acceptance Criteria" }),
+        /* @__PURE__ */ jsx10("ul", { className: "space-y-1", children: selectedState.acceptance_criteria.map((criteria, i) => /* @__PURE__ */ jsxs10(
           "li",
           {
             className: "text-xs text-text-muted flex items-start gap-1.5",
             children: [
-              /* @__PURE__ */ jsx7(CheckCircle, { className: "size-3 text-green-500 mt-0.5 shrink-0" }),
+              /* @__PURE__ */ jsx10(CheckCircle, { className: "size-3 text-green-500 mt-0.5 shrink-0" }),
               criteria
             ]
           },
           i
         )) })
       ] }),
-      selectedState.domain_knowledge.length > 0 && /* @__PURE__ */ jsxs7("div", { children: [
-        /* @__PURE__ */ jsxs7("h3", { className: "text-sm font-medium text-text-primary mb-2", children: [
-          /* @__PURE__ */ jsx7(BookOpen, { className: "size-3.5 inline mr-1" }),
+      selectedState.domain_knowledge.length > 0 && /* @__PURE__ */ jsxs10("div", { children: [
+        /* @__PURE__ */ jsxs10("h3", { className: "text-sm font-medium text-text-primary mb-2", children: [
+          /* @__PURE__ */ jsx10(BookOpen, { className: "size-3.5 inline mr-1" }),
           "Domain Knowledge"
         ] }),
-        /* @__PURE__ */ jsx7("div", { className: "space-y-2", children: selectedState.domain_knowledge.map((dk) => /* @__PURE__ */ jsxs7(
+        /* @__PURE__ */ jsx10("div", { className: "space-y-2", children: selectedState.domain_knowledge.map((dk) => /* @__PURE__ */ jsxs10(
           "div",
           {
             className: "p-3 rounded-lg bg-bg-secondary border border-border-secondary",
             children: [
-              /* @__PURE__ */ jsx7("div", { className: "text-xs font-medium text-text-primary", children: dk.title }),
-              /* @__PURE__ */ jsx7("div", { className: "text-[10px] text-text-muted mt-1 line-clamp-3", children: dk.content }),
-              dk.tags.length > 0 && /* @__PURE__ */ jsx7("div", { className: "flex flex-wrap gap-1 mt-1.5", children: dk.tags.map((tag) => /* @__PURE__ */ jsx7(
+              /* @__PURE__ */ jsx10("div", { className: "text-xs font-medium text-text-primary", children: dk.title }),
+              /* @__PURE__ */ jsx10("div", { className: "text-[10px] text-text-muted mt-1 line-clamp-3", children: dk.content }),
+              dk.tags.length > 0 && /* @__PURE__ */ jsx10("div", { className: "flex flex-wrap gap-1 mt-1.5", children: dk.tags.map((tag) => /* @__PURE__ */ jsx10(
                 "span",
                 {
                   className: "text-[9px] px-1.5 py-0.5 rounded-full bg-brand-primary/10 text-brand-primary",
@@ -3658,27 +3779,27 @@ function StateViewPanel({
           dk.id
         )) })
       ] }),
-      /* @__PURE__ */ jsxs7("div", { className: "text-xs text-text-muted space-y-1 pt-3 border-t border-border-secondary", children: [
-        /* @__PURE__ */ jsxs7("div", { children: [
+      /* @__PURE__ */ jsxs10("div", { className: "text-xs text-text-muted space-y-1 pt-3 border-t border-border-secondary", children: [
+        /* @__PURE__ */ jsxs10("div", { children: [
           "State ID:",
           " ",
-          /* @__PURE__ */ jsx7("code", { className: "bg-bg-secondary px-1 rounded", children: selectedState.state_id })
+          /* @__PURE__ */ jsx10("code", { className: "bg-bg-secondary px-1 rounded", children: selectedState.state_id })
         ] }),
-        /* @__PURE__ */ jsxs7("div", { children: [
+        /* @__PURE__ */ jsxs10("div", { children: [
           "Created:",
           " ",
           new Date(selectedState.created_at).toLocaleDateString()
         ] }),
-        /* @__PURE__ */ jsxs7("div", { children: [
+        /* @__PURE__ */ jsxs10("div", { children: [
           "Updated:",
           " ",
           new Date(selectedState.updated_at).toLocaleDateString()
         ] })
       ] })
-    ] }) : /* @__PURE__ */ jsx7("div", { className: "flex items-center justify-center h-full text-text-muted", children: /* @__PURE__ */ jsxs7("div", { className: "text-center", children: [
-      /* @__PURE__ */ jsx7(Layers2, { className: "size-12 mx-auto mb-3 opacity-30" }),
-      /* @__PURE__ */ jsx7("p", { className: "text-sm", children: "Select a state to view its details" }),
-      /* @__PURE__ */ jsxs7("p", { className: "text-xs mt-1 text-text-muted/70", children: [
+    ] }) : /* @__PURE__ */ jsx10("div", { className: "flex items-center justify-center h-full text-text-muted", children: /* @__PURE__ */ jsxs10("div", { className: "text-center", children: [
+      /* @__PURE__ */ jsx10(Layers4, { className: "size-12 mx-auto mb-3 opacity-30" }),
+      /* @__PURE__ */ jsx10("p", { className: "text-sm", children: "Select a state to view its details" }),
+      /* @__PURE__ */ jsxs10("p", { className: "text-xs mt-1 text-text-muted/70", children: [
         states.length,
         " state",
         states.length !== 1 ? "s" : "",
@@ -3689,23 +3810,23 @@ function StateViewPanel({
 }
 
 // src/components/state-machine/PathfindingPanel.tsx
-import { useState as useState6, useCallback as useCallback6 } from "react";
+import { useState as useState9, useCallback as useCallback7 } from "react";
 import {
   findPath
 } from "@qontinui/workflow-utils";
-import { Fragment as Fragment5, jsx as jsx8, jsxs as jsxs8 } from "react/jsx-runtime";
+import { Fragment as Fragment5, jsx as jsx11, jsxs as jsxs11 } from "react/jsx-runtime";
 function PathfindingPanel({
   states,
   transitions,
   onPathFound,
   onFindPath
 }) {
-  const [fromStateId, setFromStateId] = useState6("");
-  const [targetStateId, setTargetStateId] = useState6("");
-  const [algorithm, setAlgorithm] = useState6("dijkstra");
-  const [result, setResult] = useState6(null);
-  const [isSearching, setIsSearching] = useState6(false);
-  const handleFind = useCallback6(async () => {
+  const [fromStateId, setFromStateId] = useState9("");
+  const [targetStateId, setTargetStateId] = useState9("");
+  const [algorithm, setAlgorithm] = useState9("dijkstra");
+  const [result, setResult] = useState9(null);
+  const [isSearching, setIsSearching] = useState9(false);
+  const handleFind = useCallback7(async () => {
     if (!fromStateId || !targetStateId) return;
     setIsSearching(true);
     try {
@@ -3732,17 +3853,17 @@ function PathfindingPanel({
     onFindPath,
     onPathFound
   ]);
-  const clearResult = useCallback6(() => {
+  const clearResult = useCallback7(() => {
     setResult(null);
     onPathFound?.({ found: false, steps: [], total_cost: 0 });
   }, [onPathFound]);
   const stateName = (stateId) => states.find((s) => s.state_id === stateId)?.name ?? stateId;
-  return /* @__PURE__ */ jsxs8("div", { className: "flex flex-col gap-4 p-4", children: [
-    /* @__PURE__ */ jsx8("h3", { className: "text-sm font-semibold text-text-primary", children: "Pathfinding" }),
-    /* @__PURE__ */ jsxs8("div", { className: "grid grid-cols-2 gap-3", children: [
-      /* @__PURE__ */ jsxs8("div", { children: [
-        /* @__PURE__ */ jsx8("label", { className: "block text-xs text-text-secondary mb-1", children: "From" }),
-        /* @__PURE__ */ jsxs8(
+  return /* @__PURE__ */ jsxs11("div", { className: "flex flex-col gap-4 p-4", children: [
+    /* @__PURE__ */ jsx11("h3", { className: "text-sm font-semibold text-text-primary", children: "Pathfinding" }),
+    /* @__PURE__ */ jsxs11("div", { className: "grid grid-cols-2 gap-3", children: [
+      /* @__PURE__ */ jsxs11("div", { children: [
+        /* @__PURE__ */ jsx11("label", { className: "block text-xs text-text-secondary mb-1", children: "From" }),
+        /* @__PURE__ */ jsxs11(
           "select",
           {
             value: fromStateId,
@@ -3750,15 +3871,15 @@ function PathfindingPanel({
             className: "w-full px-2 py-1.5 text-sm bg-bg-tertiary border border-border-secondary rounded text-text-primary [&>option]:text-black [&>option]:bg-white",
             style: { colorScheme: "dark" },
             children: [
-              /* @__PURE__ */ jsx8("option", { value: "", children: "Select state..." }),
-              states.map((s) => /* @__PURE__ */ jsx8("option", { value: s.state_id, children: s.name }, s.state_id))
+              /* @__PURE__ */ jsx11("option", { value: "", children: "Select state..." }),
+              states.map((s) => /* @__PURE__ */ jsx11("option", { value: s.state_id, children: s.name }, s.state_id))
             ]
           }
         )
       ] }),
-      /* @__PURE__ */ jsxs8("div", { children: [
-        /* @__PURE__ */ jsx8("label", { className: "block text-xs text-text-secondary mb-1", children: "To" }),
-        /* @__PURE__ */ jsxs8(
+      /* @__PURE__ */ jsxs11("div", { children: [
+        /* @__PURE__ */ jsx11("label", { className: "block text-xs text-text-secondary mb-1", children: "To" }),
+        /* @__PURE__ */ jsxs11(
           "select",
           {
             value: targetStateId,
@@ -3766,15 +3887,15 @@ function PathfindingPanel({
             className: "w-full px-2 py-1.5 text-sm bg-bg-tertiary border border-border-secondary rounded text-text-primary [&>option]:text-black [&>option]:bg-white",
             style: { colorScheme: "dark" },
             children: [
-              /* @__PURE__ */ jsx8("option", { value: "", children: "Select state..." }),
-              states.map((s) => /* @__PURE__ */ jsx8("option", { value: s.state_id, children: s.name }, s.state_id))
+              /* @__PURE__ */ jsx11("option", { value: "", children: "Select state..." }),
+              states.map((s) => /* @__PURE__ */ jsx11("option", { value: s.state_id, children: s.name }, s.state_id))
             ]
           }
         )
       ] })
     ] }),
-    /* @__PURE__ */ jsxs8("div", { className: "flex gap-2", children: [
-      !onFindPath && /* @__PURE__ */ jsxs8(
+    /* @__PURE__ */ jsxs11("div", { className: "flex gap-2", children: [
+      !onFindPath && /* @__PURE__ */ jsxs11(
         "select",
         {
           value: algorithm,
@@ -3782,21 +3903,21 @@ function PathfindingPanel({
           className: "px-2 py-1.5 text-sm bg-bg-tertiary border border-border-secondary rounded text-text-primary [&>option]:text-black [&>option]:bg-white",
           style: { colorScheme: "dark" },
           children: [
-            /* @__PURE__ */ jsx8("option", { value: "dijkstra", children: "Dijkstra (cheapest)" }),
-            /* @__PURE__ */ jsx8("option", { value: "bfs", children: "BFS (shortest)" })
+            /* @__PURE__ */ jsx11("option", { value: "dijkstra", children: "Dijkstra (cheapest)" }),
+            /* @__PURE__ */ jsx11("option", { value: "bfs", children: "BFS (shortest)" })
           ]
         }
       ),
-      /* @__PURE__ */ jsx8(
+      /* @__PURE__ */ jsx11(
         "button",
         {
           onClick: handleFind,
           disabled: !fromStateId || !targetStateId || isSearching,
           className: "flex-1 px-3 py-1.5 text-sm font-medium text-white bg-brand-primary hover:bg-brand-primary/90 disabled:opacity-50 disabled:cursor-not-allowed rounded",
-          children: /* @__PURE__ */ jsx8("span", { children: isSearching ? "Searching..." : "Find Path" })
+          children: /* @__PURE__ */ jsx11("span", { children: isSearching ? "Searching..." : "Find Path" })
         }
       ),
-      result && /* @__PURE__ */ jsx8(
+      result && /* @__PURE__ */ jsx11(
         "button",
         {
           onClick: clearResult,
@@ -3805,41 +3926,41 @@ function PathfindingPanel({
         }
       )
     ] }),
-    result && /* @__PURE__ */ jsx8("div", { className: "border-t border-border-secondary pt-3", children: result.found ? /* @__PURE__ */ jsxs8(Fragment5, { children: [
-      /* @__PURE__ */ jsxs8("div", { className: "flex items-center justify-between mb-2", children: [
-        /* @__PURE__ */ jsxs8("span", { className: "text-xs text-green-400 font-medium", children: [
+    result && /* @__PURE__ */ jsx11("div", { className: "border-t border-border-secondary pt-3", children: result.found ? /* @__PURE__ */ jsxs11(Fragment5, { children: [
+      /* @__PURE__ */ jsxs11("div", { className: "flex items-center justify-between mb-2", children: [
+        /* @__PURE__ */ jsxs11("span", { className: "text-xs text-green-400 font-medium", children: [
           "Path found (",
           result.steps.length,
           " step",
           result.steps.length !== 1 ? "s" : "",
           ")"
         ] }),
-        /* @__PURE__ */ jsxs8("span", { className: "text-xs text-text-secondary", children: [
+        /* @__PURE__ */ jsxs11("span", { className: "text-xs text-text-secondary", children: [
           "Total cost: ",
           result.total_cost.toFixed(1)
         ] })
       ] }),
-      result.steps.length === 0 ? /* @__PURE__ */ jsx8("p", { className: "text-xs text-text-secondary italic", children: "Already at target state" }) : /* @__PURE__ */ jsx8("div", { className: "space-y-1.5", children: result.steps.map((step, i) => /* @__PURE__ */ jsxs8(
+      result.steps.length === 0 ? /* @__PURE__ */ jsx11("p", { className: "text-xs text-text-secondary italic", children: "Already at target state" }) : /* @__PURE__ */ jsx11("div", { className: "space-y-1.5", children: result.steps.map((step, i) => /* @__PURE__ */ jsxs11(
         "div",
         {
           className: "p-2 bg-bg-tertiary border border-border-secondary rounded text-xs",
           children: [
-            /* @__PURE__ */ jsxs8("div", { className: "flex items-center justify-between", children: [
-              /* @__PURE__ */ jsxs8("span", { className: "font-medium text-text-primary", children: [
+            /* @__PURE__ */ jsxs11("div", { className: "flex items-center justify-between", children: [
+              /* @__PURE__ */ jsxs11("span", { className: "font-medium text-text-primary", children: [
                 i + 1,
                 ". ",
                 step.transition_name
               ] }),
-              /* @__PURE__ */ jsxs8("span", { className: "text-text-secondary", children: [
+              /* @__PURE__ */ jsxs11("span", { className: "text-text-secondary", children: [
                 "cost: ",
                 step.path_cost.toFixed(1)
               ] })
             ] }),
-            /* @__PURE__ */ jsxs8("div", { className: "mt-1 text-text-secondary", children: [
+            /* @__PURE__ */ jsxs11("div", { className: "mt-1 text-text-secondary", children: [
               step.from_states.map(stateName).join(", "),
               " \u2192 ",
               step.activate_states.map(stateName).join(", "),
-              step.exit_states.length > 0 && /* @__PURE__ */ jsxs8("span", { className: "text-red-400", children: [
+              step.exit_states.length > 0 && /* @__PURE__ */ jsxs11("span", { className: "text-red-400", children: [
                 " (exits: ",
                 step.exit_states.map(stateName).join(", "),
                 ")"
@@ -3849,38 +3970,38 @@ function PathfindingPanel({
         },
         i
       )) })
-    ] }) : /* @__PURE__ */ jsx8("div", { className: "text-xs text-red-400", children: result.error ?? "No path found between the specified states" }) })
+    ] }) : /* @__PURE__ */ jsx11("div", { className: "text-xs text-red-400", children: result.error ?? "No path found between the specified states" }) })
   ] });
 }
 
 // src/components/state-machine/StateViewTable.tsx
-import { useState as useState7, useMemo as useMemo5 } from "react";
+import { useState as useState10, useMemo as useMemo8 } from "react";
 import {
   getElementTypeStyle as getElementTypeStyle2,
-  getElementTypePrefix as getElementTypePrefix3,
+  getElementTypePrefix as getElementTypePrefix4,
   getConfidenceColor as getConfidenceColor2
 } from "@qontinui/workflow-utils";
-import { jsx as jsx9, jsxs as jsxs9 } from "react/jsx-runtime";
+import { jsx as jsx12, jsxs as jsxs12 } from "react/jsx-runtime";
 function StateViewTable({
   states,
   selectedStateId,
   onSelectState
 }) {
-  const [filter, setFilter] = useState7("");
-  const filteredStates = useMemo5(() => {
+  const [filter, setFilter] = useState10("");
+  const filteredStates = useMemo8(() => {
     if (!filter.trim()) return states;
     const q = filter.toLowerCase();
     return states.filter(
       (s) => s.name.toLowerCase().includes(q) || s.element_ids.some((eid) => eid.toLowerCase().includes(q))
     );
   }, [states, filter]);
-  return /* @__PURE__ */ jsxs9("div", { className: "flex flex-col gap-3 p-4", children: [
-    /* @__PURE__ */ jsx9("div", { className: "flex items-center justify-between", children: /* @__PURE__ */ jsxs9("h3", { className: "text-sm font-semibold text-text-primary", children: [
+  return /* @__PURE__ */ jsxs12("div", { className: "flex flex-col gap-3 p-4", children: [
+    /* @__PURE__ */ jsx12("div", { className: "flex items-center justify-between", children: /* @__PURE__ */ jsxs12("h3", { className: "text-sm font-semibold text-text-primary", children: [
       "States (",
       states.length,
       ")"
     ] }) }),
-    /* @__PURE__ */ jsx9(
+    /* @__PURE__ */ jsx12(
       "input",
       {
         type: "text",
@@ -3890,42 +4011,42 @@ function StateViewTable({
         className: "w-full px-2 py-1.5 text-sm bg-bg-tertiary border border-border-secondary rounded text-text-primary placeholder:text-text-muted"
       }
     ),
-    /* @__PURE__ */ jsxs9("div", { className: "space-y-1", children: [
+    /* @__PURE__ */ jsxs12("div", { className: "space-y-1", children: [
       filteredStates.map((state) => {
         const isSelected = state.state_id === selectedStateId;
         const confidenceColor = getConfidenceColor2(state.confidence);
         const confidencePct = Math.round(state.confidence * 100);
         const typeCounts = /* @__PURE__ */ new Map();
         for (const eid of state.element_ids) {
-          const prefix = getElementTypePrefix3(eid);
+          const prefix = getElementTypePrefix4(eid);
           typeCounts.set(prefix, (typeCounts.get(prefix) ?? 0) + 1);
         }
         const sortedTypes = Array.from(typeCounts.entries()).sort(
           (a, b) => b[1] - a[1]
         );
-        return /* @__PURE__ */ jsxs9(
+        return /* @__PURE__ */ jsxs12(
           "button",
           {
             onClick: () => onSelectState(isSelected ? null : state.state_id),
             className: `w-full text-left p-2.5 rounded border transition-colors ${isSelected ? "bg-brand-primary/10 border-brand-primary/30" : "bg-bg-tertiary border-border-secondary hover:border-text-muted"}`,
             children: [
-              /* @__PURE__ */ jsxs9("div", { className: "flex items-center justify-between mb-1", children: [
-                /* @__PURE__ */ jsx9("span", { className: "text-sm font-medium text-text-primary truncate", children: state.name }),
-                /* @__PURE__ */ jsxs9("div", { className: "flex items-center gap-2 text-xs shrink-0 ml-2", children: [
-                  /* @__PURE__ */ jsxs9("span", { className: "text-text-secondary", children: [
+              /* @__PURE__ */ jsxs12("div", { className: "flex items-center justify-between mb-1", children: [
+                /* @__PURE__ */ jsx12("span", { className: "text-sm font-medium text-text-primary truncate", children: state.name }),
+                /* @__PURE__ */ jsxs12("div", { className: "flex items-center gap-2 text-xs shrink-0 ml-2", children: [
+                  /* @__PURE__ */ jsxs12("span", { className: "text-text-secondary", children: [
                     state.element_ids.length,
                     " el"
                   ] }),
-                  /* @__PURE__ */ jsxs9("span", { className: confidenceColor, children: [
+                  /* @__PURE__ */ jsxs12("span", { className: confidenceColor, children: [
                     confidencePct,
                     "%"
                   ] })
                 ] })
               ] }),
-              sortedTypes.length > 0 && /* @__PURE__ */ jsxs9("div", { className: "flex flex-wrap gap-1 mt-1", children: [
+              sortedTypes.length > 0 && /* @__PURE__ */ jsxs12("div", { className: "flex flex-wrap gap-1 mt-1", children: [
                 sortedTypes.slice(0, 5).map(([prefix, count]) => {
                   const style = getElementTypeStyle2(`${prefix}:dummy`);
-                  return /* @__PURE__ */ jsxs9(
+                  return /* @__PURE__ */ jsxs12(
                     "span",
                     {
                       className: `px-1.5 py-0.5 text-[10px] rounded border ${style.bg} ${style.text} ${style.border}`,
@@ -3938,23 +4059,155 @@ function StateViewTable({
                     prefix
                   );
                 }),
-                sortedTypes.length > 5 && /* @__PURE__ */ jsxs9("span", { className: "px-1 py-0.5 text-[10px] text-text-muted", children: [
+                sortedTypes.length > 5 && /* @__PURE__ */ jsxs12("span", { className: "px-1 py-0.5 text-[10px] text-text-muted", children: [
                   "+",
                   sortedTypes.length - 5,
                   " more"
                 ] })
               ] }),
-              state.description && /* @__PURE__ */ jsx9("p", { className: "text-xs text-text-secondary mt-1 line-clamp-1", children: state.description })
+              state.description && /* @__PURE__ */ jsx12("p", { className: "text-xs text-text-secondary mt-1 line-clamp-1", children: state.description })
             ]
           },
           state.state_id
         );
       }),
-      filteredStates.length === 0 && /* @__PURE__ */ jsx9("p", { className: "text-xs text-text-muted italic text-center py-4", children: filter ? "No states match the filter" : "No states in this config" })
+      filteredStates.length === 0 && /* @__PURE__ */ jsx12("p", { className: "text-xs text-text-muted italic text-center py-4", children: filter ? "No states match the filter" : "No states in this config" })
+    ] })
+  ] });
+}
+
+// src/components/state-machine/DiagramTab.tsx
+import { useEffect as useEffect8, useRef as useRef5, useState as useState11 } from "react";
+import { RefreshCw, Loader2, Workflow } from "lucide-react";
+import { jsx as jsx13, jsxs as jsxs13 } from "react/jsx-runtime";
+function DiagramTab({
+  activeStateIds,
+  diagramSource,
+  isLoading,
+  onRefresh
+}) {
+  const containerRef = useRef5(null);
+  const [importError, setImportError] = useState11(null);
+  const [renderError, setRenderError] = useState11(null);
+  useEffect8(() => {
+    if (!diagramSource || !diagramSource.trim()) {
+      if (containerRef.current) containerRef.current.innerHTML = "";
+      setRenderError(null);
+      return;
+    }
+    let cancelled = false;
+    void (async () => {
+      const specifier = "mermaid";
+      const mod = await import(
+        /* @vite-ignore */
+        specifier
+      ).catch(
+        (e) => {
+          if (!cancelled) {
+            setImportError(
+              e instanceof Error ? e.message : "Failed to load `mermaid`"
+            );
+          }
+          return null;
+        }
+      );
+      if (cancelled || !mod) return;
+      setImportError(null);
+      const mermaid = mod.default;
+      try {
+        mermaid.initialize({
+          startOnLoad: false,
+          theme: "dark",
+          securityLevel: "strict"
+        });
+        const id = `qontinui-sm-diagram-${Date.now()}`;
+        const { svg } = await mermaid.render(id, diagramSource);
+        if (cancelled || !containerRef.current) return;
+        containerRef.current.innerHTML = svg;
+        setRenderError(null);
+      } catch (e) {
+        if (cancelled) return;
+        setRenderError(e instanceof Error ? e.message : String(e));
+        if (containerRef.current) {
+          containerRef.current.innerHTML = "";
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [diagramSource]);
+  const hasSource = !!diagramSource && diagramSource.trim().length > 0;
+  return /* @__PURE__ */ jsxs13("div", { className: "flex flex-col h-full w-full", children: [
+    /* @__PURE__ */ jsxs13("div", { className: "flex items-center justify-between px-6 py-3 border-b border-border-primary bg-surface-primary", children: [
+      /* @__PURE__ */ jsxs13("div", { className: "flex items-center gap-2", children: [
+        /* @__PURE__ */ jsx13(Workflow, { className: "size-4 text-brand-primary" }),
+        /* @__PURE__ */ jsx13("h2", { className: "text-sm font-semibold text-text-primary", children: "State Machine Diagram" }),
+        activeStateIds && activeStateIds.length > 0 && /* @__PURE__ */ jsxs13("span", { className: "text-xs text-text-muted ml-2", children: [
+          "(highlighting ",
+          activeStateIds.length,
+          " hypothetical active state",
+          activeStateIds.length === 1 ? "" : "s",
+          ")"
+        ] })
+      ] }),
+      onRefresh && /* @__PURE__ */ jsxs13(
+        "button",
+        {
+          type: "button",
+          onClick: onRefresh,
+          disabled: isLoading,
+          className: "inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium border border-border-primary text-text-primary hover:bg-surface-secondary disabled:opacity-50",
+          children: [
+            /* @__PURE__ */ jsx13(
+              RefreshCw,
+              {
+                className: `size-3.5 ${isLoading ? "animate-spin" : ""}`
+              }
+            ),
+            "Refresh"
+          ]
+        }
+      )
+    ] }),
+    /* @__PURE__ */ jsxs13("div", { className: "flex-1 min-h-0 overflow-auto p-6 bg-surface-secondary", children: [
+      isLoading && /* @__PURE__ */ jsxs13("div", { className: "flex items-center justify-center h-full text-text-muted gap-2", children: [
+        /* @__PURE__ */ jsx13(Loader2, { className: "size-4 animate-spin" }),
+        "Loading diagram\u2026"
+      ] }),
+      !isLoading && importError && /* @__PURE__ */ jsxs13("div", { className: "max-w-xl mx-auto p-4 border border-border-primary rounded-md bg-surface-primary text-sm text-text-primary", children: [
+        /* @__PURE__ */ jsx13("p", { className: "font-semibold mb-1", children: "Mermaid is not available in this bundle." }),
+        /* @__PURE__ */ jsxs13("p", { className: "text-text-muted", children: [
+          "Install ",
+          /* @__PURE__ */ jsx13("code", { className: "font-mono", children: "mermaid" }),
+          " (e.g.",
+          " ",
+          /* @__PURE__ */ jsx13("code", { className: "font-mono", children: "npm install mermaid" }),
+          ") to enable the Diagram tab."
+        ] }),
+        /* @__PURE__ */ jsxs13("p", { className: "text-xs text-text-muted mt-2", children: [
+          "Import error: ",
+          importError
+        ] })
+      ] }),
+      !isLoading && !importError && !hasSource && /* @__PURE__ */ jsx13("div", { className: "flex items-center justify-center h-full text-text-muted", children: "No diagram available" }),
+      !isLoading && !importError && hasSource && renderError && /* @__PURE__ */ jsxs13("div", { className: "max-w-xl mx-auto p-4 border border-border-primary rounded-md bg-surface-primary text-sm", children: [
+        /* @__PURE__ */ jsx13("p", { className: "font-semibold mb-1 text-text-primary", children: "Failed to render diagram." }),
+        /* @__PURE__ */ jsx13("pre", { className: "text-xs text-text-muted whitespace-pre-wrap", children: renderError })
+      ] }),
+      /* @__PURE__ */ jsx13(
+        "div",
+        {
+          ref: containerRef,
+          className: "mermaid-diagram flex items-center justify-center",
+          style: { display: hasSource && !importError ? void 0 : "none" }
+        }
+      )
     ] })
   ] });
 }
 export {
+  DiagramTab,
   PathfindingPanel,
   StateDetailPanel,
   StateMachineGraphView,

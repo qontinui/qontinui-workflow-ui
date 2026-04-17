@@ -34,6 +34,7 @@ import type {
   StateMachineTransition,
   TransitionAction,
 } from "@qontinui/shared-types";
+import type { PermittedTrigger, BlockedTrigger } from "../../types";
 import {
   ACTION_LABELS,
   ACTION_ACTIVE_LABELS,
@@ -49,6 +50,22 @@ export interface TransitionsPanelProps {
   states: StateMachineState[];
   transitions: StateMachineTransition[];
   onSelectTransition: (id: string | null) => void;
+  /**
+   * Active-state IDs for the "permitted from active states" filter. When
+   * omitted, the filter toggle has no effect (the filter is still visible
+   * but disabled).
+   */
+  activeStateIds?: string[];
+  /**
+   * Permitted triggers computed from the current active state set. Usually
+   * fetched by the parent via ``useWorkflowData().getPermittedTriggers``.
+   */
+  permittedTriggers?: PermittedTrigger[];
+  /**
+   * Blocked triggers (with reasons) computed from the current active state
+   * set.
+   */
+  blockedTriggers?: BlockedTrigger[];
 }
 
 // =============================================================================
@@ -77,6 +94,43 @@ interface AnimationState {
 }
 
 // =============================================================================
+// Blocked-reason helpers
+// =============================================================================
+
+/**
+ * Render a structured ``reason`` prefix as short human-readable text for a
+ * pill badge. Long reasons should be shown in the tooltip (``title`` attr),
+ * not the pill.
+ *
+ * Known prefixes:
+ *  - ``required_state_inactive:{id}`` → "Blocked: needs {id}"
+ *  - ``guard_failed:{name}`` → "Blocked: guard {name}"
+ *  - ``guard_error:{name}:{exc}`` → "Blocked: guard {name} error"
+ *  - ``executor_refused`` → "Blocked: refused"
+ */
+function shortBlockedLabel(reason: string): string {
+  if (!reason) return "Blocked";
+  const [prefix, ...rest] = reason.split(":");
+  const tail = rest.join(":");
+  switch (prefix) {
+    case "required_state_inactive":
+      return tail ? `Blocked: needs ${tail}` : "Blocked: missing state";
+    case "guard_failed":
+      return tail ? `Blocked: guard ${tail}` : "Blocked: guard failed";
+    case "guard_error": {
+      const guardName = rest[0] ?? "";
+      return guardName
+        ? `Blocked: guard ${guardName} error`
+        : "Blocked: guard error";
+    }
+    case "executor_refused":
+      return "Blocked: refused";
+    default:
+      return `Blocked: ${reason}`;
+  }
+}
+
+// =============================================================================
 // Component
 // =============================================================================
 
@@ -84,6 +138,9 @@ export function TransitionsPanel({
   states,
   transitions,
   onSelectTransition,
+  activeStateIds,
+  permittedTriggers,
+  blockedTriggers,
 }: TransitionsPanelProps) {
   const [selectedTransitionId, setSelectedTransitionId] = useState<
     string | null
@@ -91,12 +148,33 @@ export function TransitionsPanel({
   const [filterFromState, setFilterFromState] = useState<string | null>(null);
   const [filterToState, setFilterToState] = useState<string | null>(null);
   const [searchFilter, setSearchFilter] = useState("");
+  const [permittedOnly, setPermittedOnly] = useState(false);
   const [animation, setAnimation] = useState<AnimationState>({
     isPlaying: false,
     currentActionIndex: -1,
     progress: 0,
     speed: 1,
   });
+
+  // Fast-lookup sets/maps over the introspection props.
+  const permittedIds = useMemo(
+    () => new Set((permittedTriggers ?? []).map((p) => p.transition_id)),
+    [permittedTriggers],
+  );
+  const blockedReasonById = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const b of blockedTriggers ?? []) {
+      map.set(b.transition_id, b.reason);
+    }
+    return map;
+  }, [blockedTriggers]);
+
+  // The permitted-only filter only makes sense when we have introspection
+  // data. Otherwise the toggle is visible but disabled.
+  const hasIntrospectionData =
+    (permittedTriggers?.length ?? 0) > 0 ||
+    (blockedTriggers?.length ?? 0) > 0 ||
+    (activeStateIds?.length ?? 0) > 0;
 
   const animationRef = useRef<number | null>(null);
   const startTimeRef = useRef<number>(0);
@@ -117,9 +195,20 @@ export function TransitionsPanel({
         const lower = searchFilter.toLowerCase();
         if (!t.name.toLowerCase().includes(lower)) return false;
       }
+      if (permittedOnly && hasIntrospectionData) {
+        if (!permittedIds.has(t.transition_id)) return false;
+      }
       return true;
     });
-  }, [transitions, filterFromState, filterToState, searchFilter]);
+  }, [
+    transitions,
+    filterFromState,
+    filterToState,
+    searchFilter,
+    permittedOnly,
+    hasIntrospectionData,
+    permittedIds,
+  ]);
 
   const stateNameMap = useMemo(() => {
     const map = new Map<string, string>();
@@ -313,15 +402,53 @@ export function TransitionsPanel({
               ))}
             </select>
           </div>
+
+          {/* Permitted-from-active-states toggle */}
+          <label
+            className={`flex items-center gap-2 mt-2 text-[10px] select-none ${
+              hasIntrospectionData
+                ? "text-text-secondary cursor-pointer"
+                : "text-text-muted/50 cursor-not-allowed"
+            }`}
+            title={
+              hasIntrospectionData
+                ? "Show only transitions currently permitted from the active state set"
+                : "No active-state introspection data available"
+            }
+          >
+            <input
+              type="checkbox"
+              checked={permittedOnly && hasIntrospectionData}
+              disabled={!hasIntrospectionData}
+              onChange={(e) => setPermittedOnly(e.target.checked)}
+              className="accent-brand-primary"
+            />
+            <span>Permitted from active states</span>
+            {hasIntrospectionData && (
+              <span className="ml-auto text-[9px] text-text-muted">
+                {permittedIds.size} permitted / {blockedReasonById.size}{" "}
+                blocked
+              </span>
+            )}
+          </label>
         </div>
 
         <div className="p-2 space-y-0.5">
           {filteredTransitions.map((t) => {
             const isSelected = t.transition_id === selectedTransitionId;
+            const isPermitted = permittedIds.has(t.transition_id);
+            const blockedReason = blockedReasonById.get(t.transition_id);
             return (
               <button
                 key={t.transition_id}
                 onClick={() => handleSelectTransition(t.transition_id)}
+                title={
+                  blockedReason
+                    ? `Blocked: ${blockedReason}`
+                    : isPermitted
+                      ? "Permitted from active states"
+                      : undefined
+                }
                 className={`
                   w-full text-left px-3 py-2 rounded-md transition-colors text-sm
                   ${
@@ -332,6 +459,13 @@ export function TransitionsPanel({
                 `}
               >
                 <div className="flex items-center gap-1.5">
+                  {/* Permitted marker dot — only when introspection data is available */}
+                  {hasIntrospectionData && isPermitted && (
+                    <span
+                      aria-label="Permitted"
+                      className="shrink-0 w-1.5 h-1.5 rounded-full bg-green-500"
+                    />
+                  )}
                   {/* Action type icons */}
                   <span className="flex items-center gap-0.5">
                     {[...new Set(t.actions.map((a) => a.type))]
@@ -372,6 +506,17 @@ export function TransitionsPanel({
                       .join(", ")}
                   </span>
                 </div>
+                {/* Blocked reason pill */}
+                {blockedReason && (
+                  <div className="mt-1 ml-4">
+                    <span
+                      title={blockedReason}
+                      className="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] border bg-gray-500/20 text-gray-400 border-gray-500/30"
+                    >
+                      {shortBlockedLabel(blockedReason)}
+                    </span>
+                  </div>
+                )}
               </button>
             );
           })}

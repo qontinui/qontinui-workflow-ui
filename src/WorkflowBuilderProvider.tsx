@@ -187,7 +187,7 @@ function workflowBuilderReducer(
           state.currentStageIndex,
           steps,
         ),
-        selectedStepId: action.step.id,
+        selectedStepId: (action.step as { id: string }).id,
       };
     }
 
@@ -308,10 +308,11 @@ function workflowBuilderReducer(
       );
       const original = steps.find((s) => s.id === action.stepId);
       if (!original) return state;
+      const cloneId = generateStepId();
       const clone = {
         ...original,
-        id: generateStepId(),
-        name: `${original.name} (copy)`,
+        id: cloneId,
+        name: `${(original as { name?: string }).name ?? ""} (copy)`,
       } as UnifiedStep;
       const idx = steps.findIndex((s) => s.id === action.stepId);
       const newSteps = [...steps];
@@ -324,7 +325,7 @@ function workflowBuilderReducer(
           state.currentStageIndex,
           newSteps,
         ),
-        selectedStepId: clone.id,
+        selectedStepId: cloneId,
       };
     }
 
@@ -401,6 +402,8 @@ function workflowBuilderReducer(
         timeout_seconds: wf.timeout_seconds,
         provider: wf.provider,
         model: wf.model,
+        approval_gate: false,
+        completion_prompts_first: false,
       };
       return {
         ...state,

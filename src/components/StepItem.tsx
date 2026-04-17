@@ -149,7 +149,7 @@ export function StepItemConcrete({
       {/* Step Info */}
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-1.5">
-          <span className="text-sm text-zinc-200 truncate">{step.name}</span>
+          <span className="text-sm text-zinc-200 truncate">{(step as { name?: string }).name}</span>
           {isSummaryStep && <LockIcon />}
           {showNeedsConfig && !hasErrors && !hasWarnings && (
             <span title="Needs configuration"><AlertIcon /></span>
@@ -198,7 +198,14 @@ export function StepItemConcrete({
 /**
  * Get the icon data for a step, handling test sub-types.
  */
-function getStepItemIconData(step: UnifiedStep): StepIconData {
+function getStepItemIconData(rawStep: UnifiedStep): StepIconData {
+  // UnifiedStep's fallback arm (`{ [k: string]: unknown }`) collapses field
+  // types to `unknown`; narrow to the canonical shape for readable access.
+  const step = rawStep as {
+    type: string;
+    test_type?: string | null;
+    test_id?: string | null;
+  };
   if (step.type === "command" && (step.test_type || step.test_id)) {
     const testType = step.test_type || "custom_command";
     return getTestIconData(testType);

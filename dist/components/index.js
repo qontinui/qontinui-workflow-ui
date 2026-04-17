@@ -10,7 +10,7 @@ import {
   ChatInput,
   ChatMessageArea,
   WorkflowPreviewPanel
-} from "../chunk-EW6Q36TR.js";
+} from "../chunk-DHU3K3MY.js";
 
 // src/components/PhaseSection.tsx
 import { useState, useCallback } from "react";
@@ -251,7 +251,8 @@ function StepItemConcrete({
     }
   );
 }
-function getStepItemIconData(step) {
+function getStepItemIconData(rawStep) {
+  const step = rawStep;
   if (step.type === "command" && (step.test_type || step.test_id)) {
     const testType = step.test_type || "custom_command";
     return getTestIconData(testType);

@@ -20,6 +20,7 @@ var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: tru
 // src/components/state-machine/index.ts
 var state_machine_exports = {};
 __export(state_machine_exports, {
+  DiagramTab: () => DiagramTab,
   PathfindingPanel: () => PathfindingPanel,
   StateDetailPanel: () => StateDetailPanel,
   StateMachineGraphView: () => StateMachineGraphView,
@@ -1215,21 +1216,56 @@ var ACTION_ICONS2 = {
   wait: import_lucide_react4.Clock,
   navigate: import_lucide_react4.Globe
 };
+function shortBlockedLabel(reason) {
+  if (!reason) return "Blocked";
+  const [prefix, ...rest] = reason.split(":");
+  const tail = rest.join(":");
+  switch (prefix) {
+    case "required_state_inactive":
+      return tail ? `Blocked: needs ${tail}` : "Blocked: missing state";
+    case "guard_failed":
+      return tail ? `Blocked: guard ${tail}` : "Blocked: guard failed";
+    case "guard_error": {
+      const guardName = rest[0] ?? "";
+      return guardName ? `Blocked: guard ${guardName} error` : "Blocked: guard error";
+    }
+    case "executor_refused":
+      return "Blocked: refused";
+    default:
+      return `Blocked: ${reason}`;
+  }
+}
 function TransitionsPanel({
   states,
   transitions,
-  onSelectTransition
+  onSelectTransition,
+  activeStateIds,
+  permittedTriggers,
+  blockedTriggers
 }) {
   const [selectedTransitionId, setSelectedTransitionId] = (0, import_react8.useState)(null);
   const [filterFromState, setFilterFromState] = (0, import_react8.useState)(null);
   const [filterToState, setFilterToState] = (0, import_react8.useState)(null);
   const [searchFilter, setSearchFilter] = (0, import_react8.useState)("");
+  const [permittedOnly, setPermittedOnly] = (0, import_react8.useState)(false);
   const [animation, setAnimation] = (0, import_react8.useState)({
     isPlaying: false,
     currentActionIndex: -1,
     progress: 0,
     speed: 1
   });
+  const permittedIds = (0, import_react8.useMemo)(
+    () => new Set((permittedTriggers ?? []).map((p) => p.transition_id)),
+    [permittedTriggers]
+  );
+  const blockedReasonById = (0, import_react8.useMemo)(() => {
+    const map = /* @__PURE__ */ new Map();
+    for (const b of blockedTriggers ?? []) {
+      map.set(b.transition_id, b.reason);
+    }
+    return map;
+  }, [blockedTriggers]);
+  const hasIntrospectionData = (permittedTriggers?.length ?? 0) > 0 || (blockedTriggers?.length ?? 0) > 0 || (activeStateIds?.length ?? 0) > 0;
   const animationRef = (0, import_react8.useRef)(null);
   const startTimeRef = (0, import_react8.useRef)(0);
   const selectedTransition = (0, import_react8.useMemo)(
@@ -1246,9 +1282,20 @@ function TransitionsPanel({
         const lower = searchFilter.toLowerCase();
         if (!t.name.toLowerCase().includes(lower)) return false;
       }
+      if (permittedOnly && hasIntrospectionData) {
+        if (!permittedIds.has(t.transition_id)) return false;
+      }
       return true;
     });
-  }, [transitions, filterFromState, filterToState, searchFilter]);
+  }, [
+    transitions,
+    filterFromState,
+    filterToState,
+    searchFilter,
+    permittedOnly,
+    hasIntrospectionData,
+    permittedIds
+  ]);
   const stateNameMap = (0, import_react8.useMemo)(() => {
     const map = /* @__PURE__ */ new Map();
     for (const s of states) {
@@ -1400,21 +1447,58 @@ function TransitionsPanel({
               ]
             }
           )
-        ] })
+        ] }),
+        /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)(
+          "label",
+          {
+            className: `flex items-center gap-2 mt-2 text-[10px] select-none ${hasIntrospectionData ? "text-text-secondary cursor-pointer" : "text-text-muted/50 cursor-not-allowed"}`,
+            title: hasIntrospectionData ? "Show only transitions currently permitted from the active state set" : "No active-state introspection data available",
+            children: [
+              /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(
+                "input",
+                {
+                  type: "checkbox",
+                  checked: permittedOnly && hasIntrospectionData,
+                  disabled: !hasIntrospectionData,
+                  onChange: (e) => setPermittedOnly(e.target.checked),
+                  className: "accent-brand-primary"
+                }
+              ),
+              /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("span", { children: "Permitted from active states" }),
+              hasIntrospectionData && /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("span", { className: "ml-auto text-[9px] text-text-muted", children: [
+                permittedIds.size,
+                " permitted / ",
+                blockedReasonById.size,
+                " ",
+                "blocked"
+              ] })
+            ]
+          }
+        )
       ] }),
       /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("div", { className: "p-2 space-y-0.5", children: [
         filteredTransitions.map((t) => {
           const isSelected = t.transition_id === selectedTransitionId;
+          const isPermitted = permittedIds.has(t.transition_id);
+          const blockedReason = blockedReasonById.get(t.transition_id);
           return /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)(
             "button",
             {
               onClick: () => handleSelectTransition(t.transition_id),
+              title: blockedReason ? `Blocked: ${blockedReason}` : isPermitted ? "Permitted from active states" : void 0,
               className: `
                   w-full text-left px-3 py-2 rounded-md transition-colors text-sm
                   ${isSelected ? "bg-brand-primary/10 border border-brand-primary/30" : "hover:bg-bg-secondary border border-transparent"}
                 `,
               children: [
                 /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("div", { className: "flex items-center gap-1.5", children: [
+                  hasIntrospectionData && isPermitted && /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(
+                    "span",
+                    {
+                      "aria-label": "Permitted",
+                      className: "shrink-0 w-1.5 h-1.5 rounded-full bg-green-500"
+                    }
+                  ),
                   /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("span", { className: "flex items-center gap-0.5", children: [...new Set(t.actions.map((a) => a.type))].slice(0, 3).map((type) => {
                     const Icon = ACTION_ICONS2[type];
                     const color = (0, import_workflow_utils2.getActionColorConfig)(type);
@@ -1434,7 +1518,15 @@ function TransitionsPanel({
                   /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("span", { className: "truncate", children: t.from_states.map((s) => stateNameMap.get(s) ?? s).join(", ") }),
                   /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(import_lucide_react4.ArrowRight, { className: "size-2.5 shrink-0" }),
                   /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("span", { className: "truncate", children: t.activate_states.map((s) => stateNameMap.get(s) ?? s).join(", ") })
-                ] })
+                ] }),
+                blockedReason && /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("div", { className: "mt-1 ml-4", children: /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(
+                  "span",
+                  {
+                    title: blockedReason,
+                    className: "inline-flex items-center rounded-full px-2 py-0.5 text-[10px] border bg-gray-500/20 text-gray-400 border-gray-500/30",
+                    children: shortBlockedLabel(blockedReason)
+                  }
+                ) })
               ]
             },
             t.transition_id
@@ -2164,10 +2256,13 @@ function StateDetailPanel({
 }
 
 // src/components/state-machine/StateViewPanel.tsx
-var import_react10 = require("react");
+var import_react13 = require("react");
+var import_lucide_react9 = require("lucide-react");
+var import_workflow_utils8 = require("@qontinui/workflow-utils");
+
+// src/components/state-machine/state-view-helpers.ts
 var import_lucide_react5 = require("lucide-react");
 var import_workflow_utils4 = require("@qontinui/workflow-utils");
-var import_jsx_runtime7 = require("react/jsx-runtime");
 var ELEMENT_ICONS = {
   testid: import_lucide_react5.Hash,
   role: import_lucide_react5.MousePointer,
@@ -2229,6 +2324,12 @@ function resolveElementTag(elementId, fingerprintDetails, state) {
   if (tags?.[elementId]) return tags[elementId];
   return null;
 }
+
+// src/components/state-machine/SpatialCanvas.tsx
+var import_react10 = require("react");
+var import_lucide_react6 = require("lucide-react");
+var import_workflow_utils5 = require("@qontinui/workflow-utils");
+var import_jsx_runtime7 = require("react/jsx-runtime");
 function SpatialCanvas({
   states,
   transitions,
@@ -2241,7 +2342,7 @@ function SpatialCanvas({
   const [zoom, setZoom] = (0, import_react10.useState)(1);
   const [hoveredStateId, setHoveredStateId] = (0, import_react10.useState)(null);
   const layout = (0, import_react10.useMemo)(
-    () => (0, import_workflow_utils4.computeSpatialLayout)(
+    () => (0, import_workflow_utils5.computeSpatialLayout)(
       states,
       transitions,
       canvasSize.width,
@@ -2358,7 +2459,7 @@ function SpatialCanvas({
       const state = states[i];
       const pos = layout.get(state.state_id);
       if (!pos) continue;
-      const color = import_workflow_utils4.STATE_COLORS[i % import_workflow_utils4.STATE_COLORS.length];
+      const color = import_workflow_utils5.STATE_COLORS[i % import_workflow_utils5.STATE_COLORS.length];
       const isSelected = state.state_id === selectedStateId;
       const isHovered = state.state_id === hoveredStateId;
       const isInitial = state.extra_metadata?.initial === true;
@@ -2476,7 +2577,7 @@ function SpatialCanvas({
               className: "h-7 w-7 p-0 inline-flex items-center justify-center rounded bg-bg-primary/80 backdrop-blur-xs text-text-secondary hover:text-text-primary",
               onClick: () => setZoom((z) => Math.min(3, z + 0.25)),
               title: "Zoom in",
-              children: /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(import_lucide_react5.ZoomIn, { className: "size-3.5" })
+              children: /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(import_lucide_react6.ZoomIn, { className: "size-3.5" })
             }
           ),
           /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(
@@ -2485,7 +2586,7 @@ function SpatialCanvas({
               className: "h-7 w-7 p-0 inline-flex items-center justify-center rounded bg-bg-primary/80 backdrop-blur-xs text-text-secondary hover:text-text-primary",
               onClick: () => setZoom((z) => Math.max(0.5, z - 0.25)),
               title: "Zoom out",
-              children: /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(import_lucide_react5.ZoomOut, { className: "size-3.5" })
+              children: /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(import_lucide_react6.ZoomOut, { className: "size-3.5" })
             }
           ),
           /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(
@@ -2494,7 +2595,7 @@ function SpatialCanvas({
               className: "h-7 w-7 p-0 inline-flex items-center justify-center rounded bg-bg-primary/80 backdrop-blur-xs text-text-secondary hover:text-text-primary",
               onClick: () => setZoom(1),
               title: "Reset zoom",
-              children: /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(import_lucide_react5.Maximize, { className: "size-3.5" })
+              children: /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(import_lucide_react6.Maximize, { className: "size-3.5" })
             }
           )
         ] }),
@@ -2525,49 +2626,55 @@ function SpatialCanvas({
     }
   );
 }
+
+// src/components/state-machine/StateLayoutView.tsx
+var import_react11 = require("react");
+var import_lucide_react7 = require("lucide-react");
+var import_workflow_utils6 = require("@qontinui/workflow-utils");
+var import_jsx_runtime8 = require("react/jsx-runtime");
 function StateLayoutView({
   state,
   elementThumbnails,
   fingerprintDetails
 }) {
-  const [hoveredElement, setHoveredElement] = (0, import_react10.useState)(null);
-  const positionedElements = (0, import_react10.useMemo)(() => {
+  const [hoveredElement, setHoveredElement] = (0, import_react11.useState)(null);
+  const positionedElements = (0, import_react11.useMemo)(() => {
     const items = [];
     for (const eid of state.element_ids) {
       const pos = resolveElementPosition(eid, fingerprintDetails, state);
       if (!pos) continue;
       const label = resolveElementLabel(eid, fingerprintDetails, state);
       const tag = resolveElementTag(eid, fingerprintDetails, state);
-      const prefix = (0, import_workflow_utils4.getElementTypePrefix)(eid);
-      const thumb = elementThumbnails?.[eid] ?? elementThumbnails?.[(0, import_workflow_utils4.getElementLabel)(eid)];
+      const prefix = (0, import_workflow_utils6.getElementTypePrefix)(eid);
+      const thumb = elementThumbnails?.[eid] ?? elementThumbnails?.[(0, import_workflow_utils6.getElementLabel)(eid)];
       items.push({ id: eid, label, tag, position: pos, thumbnail: thumb, prefix });
     }
     return items;
   }, [state, fingerprintDetails, elementThumbnails]);
   const elementsWithoutPosition = state.element_ids.length - positionedElements.length;
   if (positionedElements.length === 0) {
-    return /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("div", { className: "flex items-center justify-center h-48 text-text-muted text-xs", children: "No position data available for this state's elements." });
+    return /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("div", { className: "flex items-center justify-center h-48 text-text-muted text-xs", children: "No position data available for this state's elements." });
   }
-  return /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { children: [
-    /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("h3", { className: "text-sm font-medium text-text-primary mb-3 flex items-center gap-2", children: [
-      /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(import_lucide_react5.Layout, { className: "size-3.5" }),
+  return /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)("div", { children: [
+    /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)("h3", { className: "text-sm font-medium text-text-primary mb-3 flex items-center gap-2", children: [
+      /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(import_lucide_react7.Layout, { className: "size-3.5" }),
       "State Layout"
     ] }),
-    /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)(
+    /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)(
       "div",
       {
         className: "relative bg-bg-tertiary border border-border-secondary rounded-lg",
         style: { aspectRatio: "16 / 10" },
         children: [
-          /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: "absolute inset-0 pointer-events-none", children: [
-            /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("div", { className: "absolute top-0 left-0 right-0 h-[10%] border-b border-dashed border-border-secondary/30" }),
-            /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("div", { className: "absolute bottom-0 left-0 right-0 h-[10%] border-t border-dashed border-border-secondary/30" })
+          /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)("div", { className: "absolute inset-0 pointer-events-none", children: [
+            /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("div", { className: "absolute top-0 left-0 right-0 h-[10%] border-b border-dashed border-border-secondary/30" }),
+            /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("div", { className: "absolute bottom-0 left-0 right-0 h-[10%] border-t border-dashed border-border-secondary/30" })
           ] }),
           positionedElements.map((el) => {
             const isHovered = hoveredElement === el.id;
             const colorClass = ELEMENT_COLORS[el.prefix] ?? "border-gray-400 bg-gray-500/10 text-gray-300";
             const thumbSrc = el.thumbnail ? el.thumbnail.startsWith("data:") ? el.thumbnail : `data:image/png;base64,${el.thumbnail}` : void 0;
-            return /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)(
+            return /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)(
               "div",
               {
                 className: "absolute group",
@@ -2579,7 +2686,7 @@ function StateLayoutView({
                 onMouseEnter: () => setHoveredElement(el.id),
                 onMouseLeave: () => setHoveredElement(null),
                 children: [
-                  /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(
+                  /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(
                     "div",
                     {
                       className: `
@@ -2588,19 +2695,19 @@ function StateLayoutView({
                   ${isHovered ? "ring-2 ring-brand-primary/50 shadow-lg z-20 scale-125" : "z-10"}
                 `,
                       style: { width: thumbSrc ? 32 : void 0, height: thumbSrc ? 32 : void 0 },
-                      children: thumbSrc ? /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(
+                      children: thumbSrc ? /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(
                         "img",
                         {
                           src: thumbSrc,
                           alt: el.label,
                           className: "w-full h-full object-contain"
                         }
-                      ) : /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("div", { className: "px-1 py-0.5 text-[8px] whitespace-nowrap max-w-[80px] truncate", children: el.label })
+                      ) : /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("div", { className: "px-1 py-0.5 text-[8px] whitespace-nowrap max-w-[80px] truncate", children: el.label })
                     }
                   ),
-                  isHovered && /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: "absolute top-full left-1/2 -translate-x-1/2 mt-1 z-30 bg-bg-primary/95 backdrop-blur-xs border border-border-secondary rounded px-2 py-1 shadow-md whitespace-nowrap", children: [
-                    /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("div", { className: "text-[10px] font-medium text-text-primary", children: el.label }),
-                    el.tag && /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("div", { className: "text-[9px] text-text-muted", children: [el.tag.tagName && `<${el.tag.tagName}>`, el.tag.role && `role="${el.tag.role}"`, el.tag.zone].filter(Boolean).join(" ") })
+                  isHovered && /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)("div", { className: "absolute top-full left-1/2 -translate-x-1/2 mt-1 z-30 bg-bg-primary/95 backdrop-blur-xs border border-border-secondary rounded px-2 py-1 shadow-md whitespace-nowrap", children: [
+                    /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("div", { className: "text-[10px] font-medium text-text-primary", children: el.label }),
+                    el.tag && /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("div", { className: "text-[9px] text-text-muted", children: [el.tag.tagName && `<${el.tag.tagName}>`, el.tag.role && `role="${el.tag.role}"`, el.tag.zone].filter(Boolean).join(" ") })
                   ] })
                 ]
               },
@@ -2610,7 +2717,7 @@ function StateLayoutView({
         ]
       }
     ),
-    elementsWithoutPosition > 0 && /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("p", { className: "text-[10px] text-text-muted mt-1.5", children: [
+    elementsWithoutPosition > 0 && /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)("p", { className: "text-[10px] text-text-muted mt-1.5", children: [
       elementsWithoutPosition,
       " element",
       elementsWithoutPosition !== 1 ? "s" : "",
@@ -2618,6 +2725,12 @@ function StateLayoutView({
     ] })
   ] });
 }
+
+// src/components/state-machine/ScreenshotStateView.tsx
+var import_react12 = require("react");
+var import_lucide_react8 = require("lucide-react");
+var import_workflow_utils7 = require("@qontinui/workflow-utils");
+var import_jsx_runtime9 = require("react/jsx-runtime");
 function ScreenshotStateView({
   captureScreenshots,
   onLoadScreenshotImage,
@@ -2626,21 +2739,21 @@ function ScreenshotStateView({
   fingerprintDetails,
   elementThumbnails
 }) {
-  const canvasRef = (0, import_react10.useRef)(null);
-  const containerRef = (0, import_react10.useRef)(null);
-  const imageCache = (0, import_react10.useRef)(/* @__PURE__ */ new Map());
-  const thumbnailLoadingRef = (0, import_react10.useRef)(/* @__PURE__ */ new Set());
-  const [currentIndex, setCurrentIndex] = (0, import_react10.useState)(0);
-  const [userZoom, setUserZoom] = (0, import_react10.useState)(null);
-  const [autoFitZoom, setAutoFitZoom] = (0, import_react10.useState)(1);
+  const canvasRef = (0, import_react12.useRef)(null);
+  const containerRef = (0, import_react12.useRef)(null);
+  const imageCache = (0, import_react12.useRef)(/* @__PURE__ */ new Map());
+  const thumbnailLoadingRef = (0, import_react12.useRef)(/* @__PURE__ */ new Set());
+  const [currentIndex, setCurrentIndex] = (0, import_react12.useState)(0);
+  const [userZoom, setUserZoom] = (0, import_react12.useState)(null);
+  const [autoFitZoom, setAutoFitZoom] = (0, import_react12.useState)(1);
   const zoom = userZoom ?? autoFitZoom;
-  const [hoveredElement, setHoveredElement] = (0, import_react10.useState)(null);
-  const [canvasSize, setCanvasSize] = (0, import_react10.useState)({ width: 800, height: 600 });
-  const [isLoading, setIsLoading] = (0, import_react10.useState)(false);
-  const [selectedElementHash, setSelectedElementHash] = (0, import_react10.useState)(null);
-  const [thumbnailCache, setThumbnailCache] = (0, import_react10.useState)(/* @__PURE__ */ new Map());
+  const [hoveredElement, setHoveredElement] = (0, import_react12.useState)(null);
+  const [canvasSize, setCanvasSize] = (0, import_react12.useState)({ width: 800, height: 600 });
+  const [isLoading, setIsLoading] = (0, import_react12.useState)(false);
+  const [selectedElementHash, setSelectedElementHash] = (0, import_react12.useState)(null);
+  const [thumbnailCache, setThumbnailCache] = (0, import_react12.useState)(/* @__PURE__ */ new Map());
   const capture = captureScreenshots[currentIndex];
-  const elementBounds = (0, import_react10.useMemo)(() => {
+  const elementBounds = (0, import_react12.useMemo)(() => {
     if (!capture) return {};
     try {
       return JSON.parse(capture.elementBoundsJson);
@@ -2648,7 +2761,7 @@ function ScreenshotStateView({
       return {};
     }
   }, [capture]);
-  const selectedStateHashes = (0, import_react10.useMemo)(() => {
+  const selectedStateHashes = (0, import_react12.useMemo)(() => {
     const hashes = /* @__PURE__ */ new Set();
     for (const state of states) {
       if (selectedStateIds.has(state.state_id)) {
@@ -2659,11 +2772,11 @@ function ScreenshotStateView({
     }
     return hashes;
   }, [selectedStateIds, states]);
-  const selectedStates = (0, import_react10.useMemo)(
+  const selectedStates = (0, import_react12.useMemo)(
     () => states.filter((s) => selectedStateIds.has(s.state_id)),
     [states, selectedStateIds]
   );
-  const hashToElement = (0, import_react10.useMemo)(() => {
+  const hashToElement = (0, import_react12.useMemo)(() => {
     const map = /* @__PURE__ */ new Map();
     for (const state of states) {
       for (const eid of state.element_ids) {
@@ -2675,7 +2788,7 @@ function ScreenshotStateView({
     }
     return map;
   }, [states]);
-  const matchingScreenshotIndices = (0, import_react10.useMemo)(() => {
+  const matchingScreenshotIndices = (0, import_react12.useMemo)(() => {
     if (selectedStateIds.size === 0) return captureScreenshots.map((_, i) => i);
     const indices = [];
     for (let i = 0; i < captureScreenshots.length; i++) {
@@ -2689,7 +2802,7 @@ function ScreenshotStateView({
     }
     return indices;
   }, [captureScreenshots, selectedStateIds, selectedStateHashes]);
-  (0, import_react10.useEffect)(() => {
+  (0, import_react12.useEffect)(() => {
     if (selectedStateIds.size === 0) return;
     let bestIdx = -1;
     let bestOverlap = 0;
@@ -2706,7 +2819,7 @@ function ScreenshotStateView({
     }
     if (bestIdx >= 0) setCurrentIndex(bestIdx);
   }, [selectedStateIds, selectedStateHashes, captureScreenshots]);
-  (0, import_react10.useEffect)(() => {
+  (0, import_react12.useEffect)(() => {
     const container = containerRef.current;
     if (!container) return;
     const observer = new ResizeObserver((entries) => {
@@ -2721,7 +2834,7 @@ function ScreenshotStateView({
     observer.observe(container);
     return () => observer.disconnect();
   }, []);
-  (0, import_react10.useEffect)(() => {
+  (0, import_react12.useEffect)(() => {
     for (const cap of captureScreenshots) {
       if (thumbnailLoadingRef.current.has(cap.id)) continue;
       thumbnailLoadingRef.current.add(cap.id);
@@ -2735,7 +2848,7 @@ function ScreenshotStateView({
       });
     }
   }, [captureScreenshots, onLoadScreenshotImage]);
-  (0, import_react10.useEffect)(() => {
+  (0, import_react12.useEffect)(() => {
     if (!capture) return;
     const cached = imageCache.current.get(capture.id);
     if (cached) {
@@ -2768,7 +2881,7 @@ function ScreenshotStateView({
       cancelled = true;
     };
   }, [capture, onLoadScreenshotImage, canvasSize.width, canvasSize.height]);
-  (0, import_react10.useEffect)(() => {
+  (0, import_react12.useEffect)(() => {
     const canvas = canvasRef.current;
     if (!canvas || !capture) return;
     const ctx = canvas.getContext("2d");
@@ -2833,7 +2946,7 @@ function ScreenshotStateView({
       }
     }
   }, [canvasSize, capture, zoom, elementBounds, hoveredElement, selectedStateIds, selectedStateHashes, selectedElementHash, fingerprintDetails, hashToElement]);
-  const getElementAtPoint = (0, import_react10.useCallback)(
+  const getElementAtPoint = (0, import_react12.useCallback)(
     (clientX, clientY) => {
       const canvas = canvasRef.current;
       if (!canvas || !capture) return null;
@@ -2866,13 +2979,13 @@ function ScreenshotStateView({
     },
     [capture, zoom, canvasSize, elementBounds, selectedStateIds, selectedStateHashes]
   );
-  const handleMouseMove = (0, import_react10.useCallback)(
+  const handleMouseMove = (0, import_react12.useCallback)(
     (e) => {
       setHoveredElement(getElementAtPoint(e.clientX, e.clientY));
     },
     [getElementAtPoint]
   );
-  const handleCanvasClick = (0, import_react10.useCallback)(
+  const handleCanvasClick = (0, import_react12.useCallback)(
     (e) => {
       const hash = getElementAtPoint(e.clientX, e.clientY);
       if (!hash) {
@@ -2885,7 +2998,7 @@ function ScreenshotStateView({
   );
   const handlePrev = () => setCurrentIndex((i) => Math.max(0, i - 1));
   const handleNext = () => setCurrentIndex((i) => Math.min(captureScreenshots.length - 1, i + 1));
-  (0, import_react10.useEffect)(() => {
+  (0, import_react12.useEffect)(() => {
     const handler = (e) => {
       if (e.key === "ArrowLeft") handlePrev();
       if (e.key === "ArrowRight") handleNext();
@@ -2895,117 +3008,117 @@ function ScreenshotStateView({
     return () => window.removeEventListener("keydown", handler);
   }, [captureScreenshots.length]);
   if (captureScreenshots.length === 0) {
-    return /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("div", { className: "flex items-center justify-center h-full text-text-muted", children: /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: "text-center", children: [
-      /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(import_lucide_react5.Image, { className: "size-12 mx-auto mb-3 opacity-30" }),
-      /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("p", { className: "text-sm", children: "No capture screenshots available" }),
-      /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("p", { className: "text-xs mt-1 text-text-muted/70", children: "Run a state discovery to capture screenshots" })
+    return /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("div", { className: "flex items-center justify-center h-full text-text-muted", children: /* @__PURE__ */ (0, import_jsx_runtime9.jsxs)("div", { className: "text-center", children: [
+      /* @__PURE__ */ (0, import_jsx_runtime9.jsx)(import_lucide_react8.Image, { className: "size-12 mx-auto mb-3 opacity-30" }),
+      /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("p", { className: "text-sm", children: "No capture screenshots available" }),
+      /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("p", { className: "text-xs mt-1 text-text-muted/70", children: "Run a state discovery to capture screenshots" })
     ] }) });
   }
   const selectedFp = selectedElementHash ? fingerprintDetails?.[selectedElementHash] ?? null : null;
-  return /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: "flex h-full", children: [
-    /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("div", { className: "w-56 border-r border-border-secondary bg-bg-primary overflow-y-auto shrink-0", children: selectedStates.length > 0 ? /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("div", { className: "flex flex-col", children: selectedStates.map((state, stateIdx) => {
+  return /* @__PURE__ */ (0, import_jsx_runtime9.jsxs)("div", { className: "flex h-full", children: [
+    /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("div", { className: "w-56 border-r border-border-secondary bg-bg-primary overflow-y-auto shrink-0", children: selectedStates.length > 0 ? /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("div", { className: "flex flex-col", children: selectedStates.map((state, stateIdx) => {
       const colorIdx = states.indexOf(state);
-      const color = import_workflow_utils4.STATE_COLORS[colorIdx % import_workflow_utils4.STATE_COLORS.length];
-      return /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: stateIdx > 0 ? "border-t border-border-secondary" : "", children: [
-        /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: "p-2 border-b border-border-secondary flex items-center gap-2", children: [
-          /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("div", { className: "w-2 h-2 rounded-full shrink-0", style: { backgroundColor: color.border } }),
-          /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("h4", { className: "text-[10px] font-semibold text-text-primary uppercase tracking-wider truncate", children: state.name }),
-          /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("span", { className: "text-[9px] text-text-muted ml-auto shrink-0", children: state.element_ids.length })
+      const color = import_workflow_utils7.STATE_COLORS[colorIdx % import_workflow_utils7.STATE_COLORS.length];
+      return /* @__PURE__ */ (0, import_jsx_runtime9.jsxs)("div", { className: stateIdx > 0 ? "border-t border-border-secondary" : "", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime9.jsxs)("div", { className: "p-2 border-b border-border-secondary flex items-center gap-2", children: [
+          /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("div", { className: "w-2 h-2 rounded-full shrink-0", style: { backgroundColor: color.border } }),
+          /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("h4", { className: "text-[10px] font-semibold text-text-primary uppercase tracking-wider truncate", children: state.name }),
+          /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("span", { className: "text-[9px] text-text-muted ml-auto shrink-0", children: state.element_ids.length })
         ] }),
-        /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("div", { className: "p-1.5 space-y-0.5", children: state.element_ids.map((eid) => {
+        /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("div", { className: "p-1.5 space-y-0.5", children: state.element_ids.map((eid) => {
           const hash = getFingerprintHash(eid);
           const label = resolveElementLabel(eid, fingerprintDetails, state);
           const thumb = elementThumbnails?.[hash] ?? elementThumbnails?.[eid];
           const isActive = hash === selectedElementHash;
-          return /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)(
+          return /* @__PURE__ */ (0, import_jsx_runtime9.jsxs)(
             "button",
             {
               onClick: () => setSelectedElementHash(isActive ? null : hash),
               className: `w-full flex items-center gap-1.5 text-[10px] px-2 py-1 rounded text-left ${isActive ? "bg-brand-primary/10 text-brand-primary" : "hover:bg-bg-secondary text-text-primary"}`,
               children: [
-                thumb ? /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(
+                thumb ? /* @__PURE__ */ (0, import_jsx_runtime9.jsx)(
                   "img",
                   {
                     src: thumb.startsWith("data:") ? thumb : `data:image/png;base64,${thumb}`,
                     alt: label,
                     className: "w-5 h-5 object-cover rounded shrink-0"
                   }
-                ) : /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(import_lucide_react5.Layers, { className: "size-3 text-text-muted shrink-0" }),
-                /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("span", { className: "truncate", children: label })
+                ) : /* @__PURE__ */ (0, import_jsx_runtime9.jsx)(import_lucide_react8.Layers, { className: "size-3 text-text-muted shrink-0" }),
+                /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("span", { className: "truncate", children: label })
               ]
             },
             eid
           );
         }) })
       ] }, state.state_id);
-    }) }) : /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("div", { className: "flex items-center justify-center h-full text-text-muted", children: /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: "text-center px-4", children: [
-      /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(import_lucide_react5.Layers, { className: "size-8 mx-auto mb-2 opacity-30" }),
-      /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("p", { className: "text-xs", children: "Select a state to see its elements" })
+    }) }) : /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("div", { className: "flex items-center justify-center h-full text-text-muted", children: /* @__PURE__ */ (0, import_jsx_runtime9.jsxs)("div", { className: "text-center px-4", children: [
+      /* @__PURE__ */ (0, import_jsx_runtime9.jsx)(import_lucide_react8.Layers, { className: "size-8 mx-auto mb-2 opacity-30" }),
+      /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("p", { className: "text-xs", children: "Select a state to see its elements" })
     ] }) }) }),
-    /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: "flex-1 flex flex-col overflow-hidden", children: [
-      /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: "flex items-center gap-2 px-3 py-1.5 border-b border-border-secondary bg-bg-primary shrink-0", children: [
-        /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(
+    /* @__PURE__ */ (0, import_jsx_runtime9.jsxs)("div", { className: "flex-1 flex flex-col overflow-hidden", children: [
+      /* @__PURE__ */ (0, import_jsx_runtime9.jsxs)("div", { className: "flex items-center gap-2 px-3 py-1.5 border-b border-border-secondary bg-bg-primary shrink-0", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime9.jsx)(
           "button",
           {
             className: "h-6 w-6 p-0 inline-flex items-center justify-center rounded text-text-secondary hover:text-text-primary disabled:opacity-30",
             onClick: handlePrev,
             disabled: currentIndex === 0,
             title: "Previous capture",
-            children: /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(import_lucide_react5.ChevronLeft, { className: "size-4" })
+            children: /* @__PURE__ */ (0, import_jsx_runtime9.jsx)(import_lucide_react8.ChevronLeft, { className: "size-4" })
           }
         ),
-        /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("span", { className: "text-[10px] text-text-primary min-w-[70px] text-center", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime9.jsxs)("span", { className: "text-[10px] text-text-primary min-w-[70px] text-center", children: [
           currentIndex + 1,
           " / ",
           captureScreenshots.length
         ] }),
-        /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(
+        /* @__PURE__ */ (0, import_jsx_runtime9.jsx)(
           "button",
           {
             className: "h-6 w-6 p-0 inline-flex items-center justify-center rounded text-text-secondary hover:text-text-primary disabled:opacity-30",
             onClick: handleNext,
             disabled: currentIndex === captureScreenshots.length - 1,
             title: "Next capture",
-            children: /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(import_lucide_react5.ChevronRight, { className: "size-4" })
+            children: /* @__PURE__ */ (0, import_jsx_runtime9.jsx)(import_lucide_react8.ChevronRight, { className: "size-4" })
           }
         ),
-        /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("div", { className: "flex-1" }),
-        /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: "flex items-center gap-0.5", children: [
-          /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(
+        /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("div", { className: "flex-1" }),
+        /* @__PURE__ */ (0, import_jsx_runtime9.jsxs)("div", { className: "flex items-center gap-0.5", children: [
+          /* @__PURE__ */ (0, import_jsx_runtime9.jsx)(
             "button",
             {
               className: "h-6 w-6 p-0 inline-flex items-center justify-center rounded text-text-secondary hover:text-text-primary",
               onClick: () => setUserZoom(Math.max(0.1, zoom - 0.25)),
               title: "Zoom out",
-              children: /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(import_lucide_react5.ZoomOut, { className: "size-3" })
+              children: /* @__PURE__ */ (0, import_jsx_runtime9.jsx)(import_lucide_react8.ZoomOut, { className: "size-3" })
             }
           ),
-          /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("span", { className: "text-[10px] text-text-muted w-8 text-center", children: [
+          /* @__PURE__ */ (0, import_jsx_runtime9.jsxs)("span", { className: "text-[10px] text-text-muted w-8 text-center", children: [
             Math.round(zoom * 100),
             "%"
           ] }),
-          /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(
+          /* @__PURE__ */ (0, import_jsx_runtime9.jsx)(
             "button",
             {
               className: "h-6 w-6 p-0 inline-flex items-center justify-center rounded text-text-secondary hover:text-text-primary",
               onClick: () => setUserZoom(Math.min(3, zoom + 0.25)),
               title: "Zoom in",
-              children: /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(import_lucide_react5.ZoomIn, { className: "size-3" })
+              children: /* @__PURE__ */ (0, import_jsx_runtime9.jsx)(import_lucide_react8.ZoomIn, { className: "size-3" })
             }
           ),
-          /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(
+          /* @__PURE__ */ (0, import_jsx_runtime9.jsx)(
             "button",
             {
               className: "h-6 w-6 p-0 inline-flex items-center justify-center rounded text-text-secondary hover:text-text-primary",
               onClick: () => setUserZoom(null),
               title: "Fit to view",
-              children: /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(import_lucide_react5.Maximize, { className: "size-3" })
+              children: /* @__PURE__ */ (0, import_jsx_runtime9.jsx)(import_lucide_react8.Maximize, { className: "size-3" })
             }
           )
         ] })
       ] }),
-      /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { ref: containerRef, className: "relative flex-1 bg-bg-secondary overflow-hidden", children: [
-        /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(
+      /* @__PURE__ */ (0, import_jsx_runtime9.jsxs)("div", { ref: containerRef, className: "relative flex-1 bg-bg-secondary overflow-hidden", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime9.jsx)(
           "canvas",
           {
             ref: canvasRef,
@@ -3019,16 +3132,16 @@ function ScreenshotStateView({
             onClick: handleCanvasClick
           }
         ),
-        isLoading && /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("div", { className: "absolute inset-0 flex items-center justify-center bg-bg-secondary/50", children: /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("div", { className: "animate-spin size-6 border-2 border-brand-primary border-t-transparent rounded-full" }) }),
-        hoveredElement && hoveredElement !== selectedElementHash && /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: "absolute top-3 left-3 text-xs bg-bg-primary/95 backdrop-blur-xs px-3 py-2 rounded-lg border border-border-secondary shadow-md max-w-[280px] pointer-events-none", children: [
-          /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("div", { className: "font-medium text-text-primary truncate", children: (() => {
+        isLoading && /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("div", { className: "absolute inset-0 flex items-center justify-center bg-bg-secondary/50", children: /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("div", { className: "animate-spin size-6 border-2 border-brand-primary border-t-transparent rounded-full" }) }),
+        hoveredElement && hoveredElement !== selectedElementHash && /* @__PURE__ */ (0, import_jsx_runtime9.jsxs)("div", { className: "absolute top-3 left-3 text-xs bg-bg-primary/95 backdrop-blur-xs px-3 py-2 rounded-lg border border-border-secondary shadow-md max-w-[280px] pointer-events-none", children: [
+          /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("div", { className: "font-medium text-text-primary truncate", children: (() => {
             const entry = hashToElement.get(hoveredElement);
             return entry ? resolveElementLabel(entry.elementId, fingerprintDetails, entry.state) : hoveredElement;
           })() }),
           (() => {
             const fp = fingerprintDetails?.[hoveredElement];
             if (!fp) return null;
-            return /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: "text-text-muted mt-0.5", children: [
+            return /* @__PURE__ */ (0, import_jsx_runtime9.jsxs)("div", { className: "text-text-muted mt-0.5", children: [
               "<",
               fp.tagName,
               ">",
@@ -3036,20 +3149,20 @@ function ScreenshotStateView({
             ] });
           })()
         ] }),
-        selectedElementHash && /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("div", { className: "absolute bottom-2 left-2 right-2 text-xs bg-bg-primary/95 backdrop-blur-xs px-3 py-2 rounded-lg border border-border-secondary shadow-md", children: /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: "flex items-start gap-3", children: [
-          /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: "flex-1 min-w-0", children: [
-            /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("div", { className: "font-medium text-text-primary truncate", children: (() => {
+        selectedElementHash && /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("div", { className: "absolute bottom-2 left-2 right-2 text-xs bg-bg-primary/95 backdrop-blur-xs px-3 py-2 rounded-lg border border-border-secondary shadow-md", children: /* @__PURE__ */ (0, import_jsx_runtime9.jsxs)("div", { className: "flex items-start gap-3", children: [
+          /* @__PURE__ */ (0, import_jsx_runtime9.jsxs)("div", { className: "flex-1 min-w-0", children: [
+            /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("div", { className: "font-medium text-text-primary truncate", children: (() => {
               const entry = hashToElement.get(selectedElementHash);
               return entry ? resolveElementLabel(entry.elementId, fingerprintDetails, entry.state) : selectedElementHash;
             })() }),
-            selectedFp && /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: "text-[10px] text-text-muted mt-0.5", children: [
+            selectedFp && /* @__PURE__ */ (0, import_jsx_runtime9.jsxs)("div", { className: "text-[10px] text-text-muted mt-0.5", children: [
               "<",
               selectedFp.tagName,
               ">",
               selectedFp.role ? ` role="${selectedFp.role}"` : "",
               selectedFp.positionZone ? ` \xB7 ${selectedFp.positionZone}` : ""
             ] }),
-            elementBounds[selectedElementHash] && /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: "text-[10px] text-text-muted mt-0.5", children: [
+            elementBounds[selectedElementHash] && /* @__PURE__ */ (0, import_jsx_runtime9.jsxs)("div", { className: "text-[10px] text-text-muted mt-0.5", children: [
               Math.round(elementBounds[selectedElementHash].x),
               ", ",
               Math.round(elementBounds[selectedElementHash].y),
@@ -3059,7 +3172,7 @@ function ScreenshotStateView({
               Math.round(elementBounds[selectedElementHash].height)
             ] })
           ] }),
-          elementThumbnails?.[selectedElementHash] && /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(
+          elementThumbnails?.[selectedElementHash] && /* @__PURE__ */ (0, import_jsx_runtime9.jsx)(
             "img",
             {
               src: elementThumbnails[selectedElementHash].startsWith("data:") ? elementThumbnails[selectedElementHash] : `data:image/png;base64,${elementThumbnails[selectedElementHash]}`,
@@ -3067,34 +3180,34 @@ function ScreenshotStateView({
               className: "w-12 h-12 object-cover rounded border border-border-secondary shrink-0"
             }
           ),
-          /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(
+          /* @__PURE__ */ (0, import_jsx_runtime9.jsx)(
             "button",
             {
               onClick: () => setSelectedElementHash(null),
               className: "text-text-muted hover:text-text-primary shrink-0",
-              children: /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(import_lucide_react5.X, { className: "size-3.5" })
+              children: /* @__PURE__ */ (0, import_jsx_runtime9.jsx)(import_lucide_react8.X, { className: "size-3.5" })
             }
           )
         ] }) }),
-        !selectedElementHash && /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("div", { className: "absolute bottom-2 right-2 text-[9px] text-text-muted bg-bg-primary/80 backdrop-blur-xs px-2 py-1 rounded border border-border-secondary/50", children: selectedStateIds.size > 0 ? `${Object.keys(elementBounds).filter((h) => selectedStateHashes.has(h)).length} / ${Object.keys(elementBounds).length} elements` : `${Object.keys(elementBounds).length} elements` })
+        !selectedElementHash && /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("div", { className: "absolute bottom-2 right-2 text-[9px] text-text-muted bg-bg-primary/80 backdrop-blur-xs px-2 py-1 rounded border border-border-secondary/50", children: selectedStateIds.size > 0 ? `${Object.keys(elementBounds).filter((h) => selectedStateHashes.has(h)).length} / ${Object.keys(elementBounds).length} elements` : `${Object.keys(elementBounds).length} elements` })
       ] })
     ] }),
-    /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: "w-48 border-l border-border-secondary bg-bg-primary overflow-y-auto shrink-0", children: [
-      /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("div", { className: "p-2 border-b border-border-secondary", children: /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("h4", { className: "text-[10px] font-semibold text-text-muted uppercase tracking-wider", children: [
+    /* @__PURE__ */ (0, import_jsx_runtime9.jsxs)("div", { className: "w-48 border-l border-border-secondary bg-bg-primary overflow-y-auto shrink-0", children: [
+      /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("div", { className: "p-2 border-b border-border-secondary", children: /* @__PURE__ */ (0, import_jsx_runtime9.jsxs)("h4", { className: "text-[10px] font-semibold text-text-muted uppercase tracking-wider", children: [
         "Screenshots ",
         selectedStateIds.size > 0 && `(${matchingScreenshotIndices.length})`
       ] }) }),
-      /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: "p-1.5 space-y-1.5", children: [
+      /* @__PURE__ */ (0, import_jsx_runtime9.jsxs)("div", { className: "p-1.5 space-y-1.5", children: [
         matchingScreenshotIndices.map((idx) => {
           const cap = captureScreenshots[idx];
           const isCurrent = idx === currentIndex;
-          return /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)(
+          return /* @__PURE__ */ (0, import_jsx_runtime9.jsxs)(
             "button",
             {
               onClick: () => setCurrentIndex(idx),
               className: `w-full rounded border-2 transition-colors overflow-hidden ${isCurrent ? "border-blue-500" : "border-transparent hover:border-border-secondary"}`,
               children: [
-                thumbnailCache.has(cap.id) ? /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(
+                thumbnailCache.has(cap.id) ? /* @__PURE__ */ (0, import_jsx_runtime9.jsx)(
                   "img",
                   {
                     src: thumbnailCache.get(cap.id),
@@ -3102,8 +3215,8 @@ function ScreenshotStateView({
                     className: "w-full h-auto object-cover",
                     style: { maxHeight: 100 }
                   }
-                ) : /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("div", { className: "w-full h-16 bg-bg-tertiary flex items-center justify-center", children: /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(import_lucide_react5.Image, { className: "size-4 text-text-muted opacity-30" }) }),
-                /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: "text-[9px] text-text-muted px-1 py-0.5 text-center truncate", children: [
+                ) : /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("div", { className: "w-full h-16 bg-bg-tertiary flex items-center justify-center", children: /* @__PURE__ */ (0, import_jsx_runtime9.jsx)(import_lucide_react8.Image, { className: "size-4 text-text-muted opacity-30" }) }),
+                /* @__PURE__ */ (0, import_jsx_runtime9.jsxs)("div", { className: "text-[9px] text-text-muted px-1 py-0.5 text-center truncate", children: [
                   "#",
                   cap.captureIndex + 1,
                   " \xB7 ",
@@ -3114,11 +3227,14 @@ function ScreenshotStateView({
             cap.id
           );
         }),
-        matchingScreenshotIndices.length === 0 && /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("p", { className: "text-[10px] text-text-muted text-center py-4", children: "No screenshots match selected state(s)" })
+        matchingScreenshotIndices.length === 0 && /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("p", { className: "text-[10px] text-text-muted text-center py-4", children: "No screenshots match selected state(s)" })
       ] })
     ] })
   ] });
 }
+
+// src/components/state-machine/StateViewPanel.tsx
+var import_jsx_runtime10 = require("react/jsx-runtime");
 function StateViewPanel({
   states,
   transitions,
@@ -3129,30 +3245,30 @@ function StateViewPanel({
   captureScreenshots,
   onLoadScreenshotImage
 }) {
-  const [expandedStates, setExpandedStates] = (0, import_react10.useState)(/* @__PURE__ */ new Set());
-  const [searchFilter, setSearchFilter] = (0, import_react10.useState)("");
-  const [viewMode, setViewMode] = (0, import_react10.useState)(
+  const [expandedStates, setExpandedStates] = (0, import_react13.useState)(/* @__PURE__ */ new Set());
+  const [searchFilter, setSearchFilter] = (0, import_react13.useState)("");
+  const [viewMode, setViewMode] = (0, import_react13.useState)(
     captureScreenshots && captureScreenshots.length > 0 ? "screenshot" : "list"
   );
-  const [hasAutoSwitched, setHasAutoSwitched] = (0, import_react10.useState)(
+  const [hasAutoSwitched, setHasAutoSwitched] = (0, import_react13.useState)(
     () => !!(captureScreenshots && captureScreenshots.length > 0)
   );
-  (0, import_react10.useEffect)(() => {
+  (0, import_react13.useEffect)(() => {
     if (!hasAutoSwitched && captureScreenshots && captureScreenshots.length > 0) {
       setViewMode("screenshot");
       setHasAutoSwitched(true);
     }
   }, [captureScreenshots, hasAutoSwitched]);
-  const [localSelectedStateId, setLocalSelectedStateId] = (0, import_react10.useState)(
+  const [localSelectedStateId, setLocalSelectedStateId] = (0, import_react13.useState)(
     selectedStateId
   );
-  const [selectedStateIds, setSelectedStateIds] = (0, import_react10.useState)(/* @__PURE__ */ new Set());
+  const [selectedStateIds, setSelectedStateIds] = (0, import_react13.useState)(/* @__PURE__ */ new Set());
   const effectiveSelectedStateId = localSelectedStateId;
-  const selectedState = (0, import_react10.useMemo)(
+  const selectedState = (0, import_react13.useMemo)(
     () => states.find((s) => s.state_id === effectiveSelectedStateId),
     [states, effectiveSelectedStateId]
   );
-  const transitionMap = (0, import_react10.useMemo)(() => {
+  const transitionMap = (0, import_react13.useMemo)(() => {
     const outgoing = /* @__PURE__ */ new Map();
     const incoming = /* @__PURE__ */ new Map();
     for (const t of transitions) {
@@ -3167,17 +3283,17 @@ function StateViewPanel({
     }
     return { outgoing, incoming };
   }, [transitions]);
-  const elementGroups = (0, import_react10.useMemo)(() => {
+  const elementGroups = (0, import_react13.useMemo)(() => {
     if (!selectedState) return /* @__PURE__ */ new Map();
     const groups = /* @__PURE__ */ new Map();
     for (const eid of selectedState.element_ids) {
-      const prefix = (0, import_workflow_utils4.getElementTypePrefix)(eid);
+      const prefix = (0, import_workflow_utils8.getElementTypePrefix)(eid);
       if (!groups.has(prefix)) groups.set(prefix, []);
       groups.get(prefix).push(eid);
     }
     return groups;
   }, [selectedState]);
-  const sharedElements = (0, import_react10.useMemo)(() => {
+  const sharedElements = (0, import_react13.useMemo)(() => {
     const elementStateMap = /* @__PURE__ */ new Map();
     for (const s of states) {
       for (const eid of s.element_ids) {
@@ -3187,7 +3303,7 @@ function StateViewPanel({
     }
     return elementStateMap;
   }, [states]);
-  const filteredStates = (0, import_react10.useMemo)(() => {
+  const filteredStates = (0, import_react13.useMemo)(() => {
     if (!searchFilter) return states;
     const lower = searchFilter.toLowerCase();
     return states.filter(
@@ -3205,18 +3321,18 @@ function StateViewPanel({
       return next;
     });
   };
-  return /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: "flex flex-1 h-full min-w-0", children: [
-    /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: "w-72 border-r border-border-secondary bg-bg-primary overflow-y-auto shrink-0", children: [
-      /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: "p-3 border-b border-border-secondary", children: [
-        /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: "flex items-center gap-2 mb-2", children: [
-          /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(import_lucide_react5.Layers, { className: "size-4 text-brand-primary" }),
-          /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("h3", { className: "text-sm font-semibold text-text-primary", children: "States" }),
-          /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("span", { className: "text-xs text-text-muted ml-auto", children: states.length })
+  return /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("div", { className: "flex flex-1 h-full min-w-0", children: [
+    /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("div", { className: "w-72 border-r border-border-secondary bg-bg-primary overflow-y-auto shrink-0", children: [
+      /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("div", { className: "p-3 border-b border-border-secondary", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("div", { className: "flex items-center gap-2 mb-2", children: [
+          /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(import_lucide_react9.Layers, { className: "size-4 text-brand-primary" }),
+          /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("h3", { className: "text-sm font-semibold text-text-primary", children: "States" }),
+          /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("span", { className: "text-xs text-text-muted ml-auto", children: states.length })
         ] }),
-        /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: "flex items-center gap-2 mb-2", children: [
-          /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: "relative flex-1", children: [
-            /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(import_lucide_react5.Search, { className: "absolute left-2 top-1/2 -translate-y-1/2 size-3 text-text-muted" }),
-            /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(
+        /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("div", { className: "flex items-center gap-2 mb-2", children: [
+          /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("div", { className: "relative flex-1", children: [
+            /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(import_lucide_react9.Search, { className: "absolute left-2 top-1/2 -translate-y-1/2 size-3 text-text-muted" }),
+            /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(
               "input",
               {
                 type: "text",
@@ -3228,50 +3344,50 @@ function StateViewPanel({
               }
             )
           ] }),
-          /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: "flex items-center border border-border-secondary rounded overflow-hidden", children: [
-            /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(
+          /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("div", { className: "flex items-center border border-border-secondary rounded overflow-hidden", children: [
+            /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(
               "button",
               {
                 onClick: () => setViewMode("list"),
                 className: `p-1 ${viewMode === "list" ? "bg-brand-primary/20 text-brand-primary" : "text-text-muted hover:text-text-primary"}`,
                 title: "List view",
-                children: /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(import_lucide_react5.List, { className: "size-3.5" })
+                children: /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(import_lucide_react9.List, { className: "size-3.5" })
               }
             ),
-            /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(
+            /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(
               "button",
               {
                 onClick: () => setViewMode("spatial"),
                 className: `p-1 ${viewMode === "spatial" ? "bg-brand-primary/20 text-brand-primary" : "text-text-muted hover:text-text-primary"}`,
                 title: "Spatial view",
-                children: /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(import_lucide_react5.BarChart3, { className: "size-3.5" })
+                children: /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(import_lucide_react9.BarChart3, { className: "size-3.5" })
               }
             ),
-            /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(
+            /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(
               "button",
               {
                 onClick: () => setViewMode("screenshot"),
                 className: `p-1 ${viewMode === "screenshot" ? "bg-brand-primary/20 text-brand-primary" : "text-text-muted hover:text-text-primary"}`,
                 title: "Screenshot view",
                 disabled: !captureScreenshots || captureScreenshots.length === 0,
-                children: /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(import_lucide_react5.Image, { className: "size-3.5" })
+                children: /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(import_lucide_react9.Image, { className: "size-3.5" })
               }
             )
           ] })
         ] })
       ] }),
-      /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: "p-2 space-y-0.5", children: [
+      /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("div", { className: "p-2 space-y-0.5", children: [
         filteredStates.map((state) => {
           const colorIdx = states.indexOf(state);
-          const color = import_workflow_utils4.STATE_COLORS[colorIdx % import_workflow_utils4.STATE_COLORS.length];
+          const color = import_workflow_utils8.STATE_COLORS[colorIdx % import_workflow_utils8.STATE_COLORS.length];
           const isSelected = viewMode === "screenshot" ? selectedStateIds.has(state.state_id) : state.state_id === effectiveSelectedStateId;
           const isExpanded = expandedStates.has(state.state_id);
           const stateOutgoing = transitionMap.outgoing.get(state.state_id) ?? [];
           const stateIncoming = transitionMap.incoming.get(state.state_id) ?? [];
           const isInitial = state.extra_metadata?.initial === true;
           const isBlocking = state.extra_metadata?.blocking === true;
-          return /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { children: [
-            /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)(
+          return /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("div", { children: [
+            /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)(
               "button",
               {
                 "data-ui-id": `state-item-${state.state_id}`,
@@ -3299,25 +3415,25 @@ function StateViewPanel({
                     ${isSelected ? "bg-brand-primary/10 border border-brand-primary/30" : "hover:bg-bg-secondary border border-transparent"}
                   `,
                 children: [
-                  /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: "flex items-center gap-2", children: [
-                    /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(
+                  /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("div", { className: "flex items-center gap-2", children: [
+                    /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(
                       "div",
                       {
                         className: "w-2.5 h-2.5 rounded-full shrink-0",
                         style: { backgroundColor: color.border }
                       }
                     ),
-                    isInitial && /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(import_lucide_react5.Play, { className: "size-3 text-yellow-500 fill-yellow-500 shrink-0" }),
-                    isBlocking && /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(import_lucide_react5.Lock, { className: "size-3 text-amber-500 shrink-0" }),
-                    /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("span", { className: "font-medium text-text-primary truncate flex-1", children: state.name }),
-                    isExpanded ? /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(import_lucide_react5.ChevronDown, { className: "size-3 text-text-muted transition-transform" }) : /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(import_lucide_react5.ChevronRight, { className: "size-3 text-text-muted transition-transform" })
+                    isInitial && /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(import_lucide_react9.Play, { className: "size-3 text-yellow-500 fill-yellow-500 shrink-0" }),
+                    isBlocking && /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(import_lucide_react9.Lock, { className: "size-3 text-amber-500 shrink-0" }),
+                    /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("span", { className: "font-medium text-text-primary truncate flex-1", children: state.name }),
+                    isExpanded ? /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(import_lucide_react9.ChevronDown, { className: "size-3 text-text-muted transition-transform" }) : /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(import_lucide_react9.ChevronRight, { className: "size-3 text-text-muted transition-transform" })
                   ] }),
-                  /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: "flex items-center gap-2 mt-1 ml-4.5 text-xs text-text-muted", children: [
-                    /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("span", { children: [
+                  /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("div", { className: "flex items-center gap-2 mt-1 ml-4.5 text-xs text-text-muted", children: [
+                    /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("span", { children: [
                       state.element_ids.length,
                       " elements"
                     ] }),
-                    /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)(
+                    /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)(
                       "span",
                       {
                         className: Math.round(state.confidence * 100) >= 80 ? "text-green-400" : Math.round(state.confidence * 100) >= 50 ? "text-amber-400" : "text-red-400",
@@ -3327,39 +3443,39 @@ function StateViewPanel({
                         ]
                       }
                     ),
-                    stateOutgoing.length > 0 && /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("span", { className: "text-brand-secondary flex items-center gap-0.5", children: [
-                      /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(import_lucide_react5.ArrowUpRight, { className: "size-2" }),
+                    stateOutgoing.length > 0 && /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("span", { className: "text-brand-secondary flex items-center gap-0.5", children: [
+                      /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(import_lucide_react9.ArrowUpRight, { className: "size-2" }),
                       stateOutgoing.length
                     ] }),
-                    stateIncoming.length > 0 && /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("span", { className: "text-brand-primary flex items-center gap-0.5", children: [
-                      /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(import_lucide_react5.ArrowDownLeft, { className: "size-2" }),
+                    stateIncoming.length > 0 && /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("span", { className: "text-brand-primary flex items-center gap-0.5", children: [
+                      /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(import_lucide_react9.ArrowDownLeft, { className: "size-2" }),
                       stateIncoming.length
                     ] })
                   ] })
                 ]
               }
             ),
-            isExpanded && /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: "ml-5 pl-2 border-l border-border-secondary mt-1 mb-2 space-y-0.5", children: [
+            isExpanded && /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("div", { className: "ml-5 pl-2 border-l border-border-secondary mt-1 mb-2 space-y-0.5", children: [
               state.element_ids.slice(0, 20).map((eid) => {
-                const prefix = (0, import_workflow_utils4.getElementTypePrefix)(eid);
+                const prefix = (0, import_workflow_utils8.getElementTypePrefix)(eid);
                 const label = resolveElementLabel(eid, fingerprintDetails, state);
-                const Icon = ELEMENT_ICONS[prefix] ?? import_lucide_react5.Layers;
+                const Icon = ELEMENT_ICONS[prefix] ?? import_lucide_react9.Layers;
                 const stateCount = sharedElements.get(eid)?.length ?? 1;
-                return /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)(
+                return /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)(
                   "div",
                   {
                     className: "text-[10px] text-text-muted flex items-center gap-1 py-0.5 px-1 rounded hover:bg-bg-secondary",
                     title: `${eid}${stateCount > 1 ? ` (shared across ${stateCount} states)` : ""}`,
                     children: [
-                      /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(Icon, { className: "size-2.5 shrink-0" }),
-                      /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("span", { className: "truncate flex-1", children: label }),
-                      stateCount > 1 && /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("span", { className: "text-[8px] text-brand-primary bg-brand-primary/10 px-1 rounded-full shrink-0", children: stateCount })
+                      /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(Icon, { className: "size-2.5 shrink-0" }),
+                      /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("span", { className: "truncate flex-1", children: label }),
+                      stateCount > 1 && /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("span", { className: "text-[8px] text-brand-primary bg-brand-primary/10 px-1 rounded-full shrink-0", children: stateCount })
                     ]
                   },
                   eid
                 );
               }),
-              state.element_ids.length > 20 && /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: "text-[10px] text-text-muted py-0.5 px-1", children: [
+              state.element_ids.length > 20 && /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("div", { className: "text-[10px] text-text-muted py-0.5 px-1", children: [
                 "+",
                 state.element_ids.length - 20,
                 " more"
@@ -3367,10 +3483,10 @@ function StateViewPanel({
             ] })
           ] }, state.state_id);
         }),
-        filteredStates.length === 0 && /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("p", { className: "text-xs text-text-muted text-center py-4", children: "No states match filter." })
+        filteredStates.length === 0 && /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("p", { className: "text-xs text-text-muted text-center py-4", children: "No states match filter." })
       ] })
     ] }),
-    /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("div", { className: "flex-1 overflow-hidden", children: viewMode === "screenshot" && captureScreenshots && onLoadScreenshotImage ? /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(
+    /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("div", { className: "flex-1 overflow-hidden", children: viewMode === "screenshot" && captureScreenshots && onLoadScreenshotImage ? /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(
       ScreenshotStateView,
       {
         captureScreenshots,
@@ -3380,7 +3496,7 @@ function StateViewPanel({
         fingerprintDetails,
         elementThumbnails
       }
-    ) : viewMode === "spatial" ? /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(
+    ) : viewMode === "spatial" ? /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(
       SpatialCanvas,
       {
         states,
@@ -3388,30 +3504,30 @@ function StateViewPanel({
         selectedStateId: effectiveSelectedStateId,
         onSelectState: setLocalSelectedStateId
       }
-    ) : selectedState ? /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: "p-6 space-y-6 overflow-y-auto h-full", children: [
-      /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { children: [
-        /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: "flex items-center gap-2", children: [
-          /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("h2", { className: "text-lg font-semibold text-text-primary", children: selectedState.name }),
-          selectedState.extra_metadata?.initial === true && /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("span", { className: "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] border bg-yellow-500/20 text-yellow-400 border-yellow-500/30", children: [
-            /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(import_lucide_react5.Play, { className: "size-2.5 fill-current" }),
+    ) : selectedState ? /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("div", { className: "p-6 space-y-6 overflow-y-auto h-full", children: [
+      /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("div", { children: [
+        /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("div", { className: "flex items-center gap-2", children: [
+          /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("h2", { className: "text-lg font-semibold text-text-primary", children: selectedState.name }),
+          selectedState.extra_metadata?.initial === true && /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("span", { className: "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] border bg-yellow-500/20 text-yellow-400 border-yellow-500/30", children: [
+            /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(import_lucide_react9.Play, { className: "size-2.5 fill-current" }),
             "Initial"
           ] }),
-          selectedState.extra_metadata?.blocking === true && /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("span", { className: "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] border bg-amber-500/20 text-amber-400 border-amber-500/30", children: [
-            /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(import_lucide_react5.Lock, { className: "size-2.5" }),
+          selectedState.extra_metadata?.blocking === true && /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("span", { className: "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] border bg-amber-500/20 text-amber-400 border-amber-500/30", children: [
+            /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(import_lucide_react9.Lock, { className: "size-2.5" }),
             "Blocking"
           ] })
         ] }),
-        selectedState.description && /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("p", { className: "text-sm text-text-muted mt-1", children: selectedState.description }),
-        /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: "flex items-center gap-3 mt-2 text-xs text-text-muted", children: [
-          /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("span", { className: "inline-flex items-center rounded-full px-2 py-0.5 text-[10px] border bg-bg-secondary border-border-secondary text-text-muted", children: [
+        selectedState.description && /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("p", { className: "text-sm text-text-muted mt-1", children: selectedState.description }),
+        /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("div", { className: "flex items-center gap-3 mt-2 text-xs text-text-muted", children: [
+          /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("span", { className: "inline-flex items-center rounded-full px-2 py-0.5 text-[10px] border bg-bg-secondary border-border-secondary text-text-muted", children: [
             selectedState.element_ids.length,
             " elements"
           ] }),
-          /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("span", { className: "inline-flex items-center rounded-full px-2 py-0.5 text-[10px] border bg-bg-secondary border-border-secondary text-text-muted", children: [
+          /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("span", { className: "inline-flex items-center rounded-full px-2 py-0.5 text-[10px] border bg-bg-secondary border-border-secondary text-text-muted", children: [
             selectedState.render_ids.length,
             " renders"
           ] }),
-          /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)(
+          /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)(
             "span",
             {
               className: `inline-flex items-center rounded-full px-2 py-0.5 text-[10px] border ${Math.round(selectedState.confidence * 100) >= 80 ? "bg-green-500/10 border-green-500/30 text-green-400" : "bg-amber-500/10 border-amber-500/30 text-amber-400"}`,
@@ -3423,35 +3539,35 @@ function StateViewPanel({
           )
         ] })
       ] }),
-      /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { children: [
-        /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("h3", { className: "text-sm font-medium text-text-primary mb-3", children: "Elements by Type" }),
-        /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("div", { className: "space-y-3", children: Array.from(elementGroups.entries()).map(
+      /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("div", { children: [
+        /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("h3", { className: "text-sm font-medium text-text-primary mb-3", children: "Elements by Type" }),
+        /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("div", { className: "space-y-3", children: Array.from(elementGroups.entries()).map(
           ([prefix, elements]) => {
-            const Icon = ELEMENT_ICONS[prefix] ?? import_lucide_react5.Layers;
+            const Icon = ELEMENT_ICONS[prefix] ?? import_lucide_react9.Layers;
             const colorClass = ELEMENT_COLORS[prefix] ?? "border-gray-400 bg-gray-500/10 text-gray-300";
-            return /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { children: [
-              /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: "flex items-center gap-2 mb-1.5", children: [
-                /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(Icon, { className: "size-3.5" }),
-                /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("span", { className: "text-xs font-medium text-text-primary capitalize", children: prefix }),
-                /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("span", { className: "text-xs text-text-muted", children: [
+            return /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("div", { children: [
+              /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("div", { className: "flex items-center gap-2 mb-1.5", children: [
+                /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(Icon, { className: "size-3.5" }),
+                /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("span", { className: "text-xs font-medium text-text-primary capitalize", children: prefix }),
+                /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("span", { className: "text-xs text-text-muted", children: [
                   "(",
                   elements.length,
                   ")"
                 ] })
               ] }),
-              /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("div", { className: "flex flex-wrap gap-1.5", children: elements.map((eid) => {
+              /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("div", { className: "flex flex-wrap gap-1.5", children: elements.map((eid) => {
                 const stateCount = sharedElements.get(eid)?.length ?? 1;
-                const rawLabel = (0, import_workflow_utils4.getElementLabel)(eid);
+                const rawLabel = (0, import_workflow_utils8.getElementLabel)(eid);
                 const descriptiveLabel = resolveElementLabel(eid, fingerprintDetails, selectedState);
                 const thumb = elementThumbnails?.[eid] ?? elementThumbnails?.[rawLabel];
-                return /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(
+                return /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(
                   "div",
                   {
                     className: `rounded border ${colorClass} overflow-hidden ${thumb ? "flex flex-col items-center w-16" : "text-[11px] px-2 py-0.5 inline-flex items-center gap-1"}`,
                     title: `${eid}${stateCount > 1 ? ` (shared across ${stateCount} states)` : ""}`,
-                    children: thumb ? /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)(import_jsx_runtime7.Fragment, { children: [
-                      /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: "relative", children: [
-                        /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(
+                    children: thumb ? /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)(import_jsx_runtime10.Fragment, { children: [
+                      /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("div", { className: "relative", children: [
+                        /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(
                           "img",
                           {
                             src: thumb.startsWith("data:") ? thumb : `data:image/png;base64,${thumb}`,
@@ -3459,15 +3575,15 @@ function StateViewPanel({
                             className: "w-12 h-12 object-cover"
                           }
                         ),
-                        stateCount > 1 && /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("span", { className: "absolute -top-1 -right-1 text-[7px] bg-brand-primary/90 text-white px-1 rounded-full leading-tight", children: [
+                        stateCount > 1 && /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("span", { className: "absolute -top-1 -right-1 text-[7px] bg-brand-primary/90 text-white px-1 rounded-full leading-tight", children: [
                           "x",
                           stateCount
                         ] })
                       ] }),
-                      /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("span", { className: "text-[8px] text-center px-0.5 py-0.5 truncate w-full leading-tight", children: descriptiveLabel })
-                    ] }) : /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)(import_jsx_runtime7.Fragment, { children: [
+                      /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("span", { className: "text-[8px] text-center px-0.5 py-0.5 truncate w-full leading-tight", children: descriptiveLabel })
+                    ] }) : /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)(import_jsx_runtime10.Fragment, { children: [
                       descriptiveLabel,
-                      stateCount > 1 && /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("span", { className: "text-[8px] opacity-70 bg-white/10 px-0.5 rounded", children: [
+                      stateCount > 1 && /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("span", { className: "text-[8px] opacity-70 bg-white/10 px-0.5 rounded", children: [
                         "x",
                         stateCount
                       ] })
@@ -3480,7 +3596,7 @@ function StateViewPanel({
           }
         ) })
       ] }),
-      /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(
+      /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(
         StateLayoutView,
         {
           state: selectedState,
@@ -3488,61 +3604,61 @@ function StateViewPanel({
           fingerprintDetails
         }
       ),
-      /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { children: [
-        /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("h3", { className: "text-sm font-medium text-text-primary mb-3", children: "Transitions" }),
-        /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: "space-y-2", children: [
+      /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("div", { children: [
+        /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("h3", { className: "text-sm font-medium text-text-primary mb-3", children: "Transitions" }),
+        /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("div", { className: "space-y-2", children: [
           (transitionMap.outgoing.get(selectedState.state_id) ?? []).map(
-            (t) => /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)(
+            (t) => /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)(
               "div",
               {
                 className: "flex items-center gap-2 text-xs p-2.5 rounded-lg bg-bg-secondary border border-border-secondary",
                 children: [
-                  /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(import_lucide_react5.ArrowRight, { className: "size-3 text-brand-secondary shrink-0" }),
-                  /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("span", { className: "font-medium text-text-primary", children: t.name }),
-                  t.actions.length > 0 && /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("span", { className: "flex items-center gap-0.5 shrink-0", children: [...new Set(t.actions.map((a) => a.type))].slice(0, 3).map((actionType) => {
+                  /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(import_lucide_react9.ArrowRight, { className: "size-3 text-brand-secondary shrink-0" }),
+                  /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("span", { className: "font-medium text-text-primary", children: t.name }),
+                  t.actions.length > 0 && /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("span", { className: "flex items-center gap-0.5 shrink-0", children: [...new Set(t.actions.map((a) => a.type))].slice(0, 3).map((actionType) => {
                     const ActionIcon = ACTION_ICONS3[actionType];
-                    return ActionIcon ? /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(
+                    return ActionIcon ? /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(
                       ActionIcon,
                       {
-                        className: `size-2.5 ${(0, import_workflow_utils4.getActionTypeColor)(actionType)}`
+                        className: `size-2.5 ${(0, import_workflow_utils8.getActionTypeColor)(actionType)}`
                       },
                       actionType
                     ) : null;
                   }) }),
-                  /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(import_lucide_react5.ArrowRight, { className: "size-2.5 text-text-muted" }),
-                  /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("span", { className: "text-text-muted truncate", children: t.activate_states.map(
+                  /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(import_lucide_react9.ArrowRight, { className: "size-2.5 text-text-muted" }),
+                  /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("span", { className: "text-text-muted truncate", children: t.activate_states.map(
                     (sid) => states.find((s) => s.state_id === sid)?.name ?? sid
                   ).join(", ") }),
-                  t.actions.length > 0 && /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("span", { className: "text-text-muted ml-auto text-[10px] shrink-0", children: [
+                  t.actions.length > 0 && /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("span", { className: "text-text-muted ml-auto text-[10px] shrink-0", children: [
                     t.actions.length,
                     " action",
                     t.actions.length !== 1 ? "s" : ""
                   ] }),
-                  t.stays_visible && /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(import_lucide_react5.Eye, { className: "size-3 text-green-400 shrink-0" })
+                  t.stays_visible && /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(import_lucide_react9.Eye, { className: "size-3 text-green-400 shrink-0" })
                 ]
               },
               `out-${t.transition_id}`
             )
           ),
           (transitionMap.incoming.get(selectedState.state_id) ?? []).map(
-            (t) => /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)(
+            (t) => /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)(
               "div",
               {
                 className: "flex items-center gap-2 text-xs p-2.5 rounded-lg bg-bg-secondary border border-border-secondary",
                 children: [
-                  /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(import_lucide_react5.CheckCircle, { className: "size-3 text-brand-primary shrink-0" }),
-                  /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("span", { className: "font-medium text-text-primary", children: t.name }),
-                  t.actions.length > 0 && /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("span", { className: "flex items-center gap-0.5 shrink-0", children: [...new Set(t.actions.map((a) => a.type))].slice(0, 3).map((actionType) => {
+                  /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(import_lucide_react9.CheckCircle, { className: "size-3 text-brand-primary shrink-0" }),
+                  /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("span", { className: "font-medium text-text-primary", children: t.name }),
+                  t.actions.length > 0 && /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("span", { className: "flex items-center gap-0.5 shrink-0", children: [...new Set(t.actions.map((a) => a.type))].slice(0, 3).map((actionType) => {
                     const ActionIcon = ACTION_ICONS3[actionType];
-                    return ActionIcon ? /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(
+                    return ActionIcon ? /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(
                       ActionIcon,
                       {
-                        className: `size-2.5 ${(0, import_workflow_utils4.getActionTypeColor)(actionType)}`
+                        className: `size-2.5 ${(0, import_workflow_utils8.getActionTypeColor)(actionType)}`
                       },
                       actionType
                     ) : null;
                   }) }),
-                  /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("span", { className: "text-text-muted truncate", children: [
+                  /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("span", { className: "text-text-muted truncate", children: [
                     "from",
                     " ",
                     t.from_states.map(
@@ -3554,36 +3670,36 @@ function StateViewPanel({
               `in-${t.transition_id}`
             )
           ),
-          (transitionMap.outgoing.get(selectedState.state_id) ?? []).length === 0 && (transitionMap.incoming.get(selectedState.state_id) ?? []).length === 0 && /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("p", { className: "text-xs text-text-muted", children: "No transitions connected." })
+          (transitionMap.outgoing.get(selectedState.state_id) ?? []).length === 0 && (transitionMap.incoming.get(selectedState.state_id) ?? []).length === 0 && /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("p", { className: "text-xs text-text-muted", children: "No transitions connected." })
         ] })
       ] }),
-      selectedState.acceptance_criteria.length > 0 && /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { children: [
-        /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("h3", { className: "text-sm font-medium text-text-primary mb-2", children: "Acceptance Criteria" }),
-        /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("ul", { className: "space-y-1", children: selectedState.acceptance_criteria.map((criteria, i) => /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)(
+      selectedState.acceptance_criteria.length > 0 && /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("div", { children: [
+        /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("h3", { className: "text-sm font-medium text-text-primary mb-2", children: "Acceptance Criteria" }),
+        /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("ul", { className: "space-y-1", children: selectedState.acceptance_criteria.map((criteria, i) => /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)(
           "li",
           {
             className: "text-xs text-text-muted flex items-start gap-1.5",
             children: [
-              /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(import_lucide_react5.CheckCircle, { className: "size-3 text-green-500 mt-0.5 shrink-0" }),
+              /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(import_lucide_react9.CheckCircle, { className: "size-3 text-green-500 mt-0.5 shrink-0" }),
               criteria
             ]
           },
           i
         )) })
       ] }),
-      selectedState.domain_knowledge.length > 0 && /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { children: [
-        /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("h3", { className: "text-sm font-medium text-text-primary mb-2", children: [
-          /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(import_lucide_react5.BookOpen, { className: "size-3.5 inline mr-1" }),
+      selectedState.domain_knowledge.length > 0 && /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("div", { children: [
+        /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("h3", { className: "text-sm font-medium text-text-primary mb-2", children: [
+          /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(import_lucide_react9.BookOpen, { className: "size-3.5 inline mr-1" }),
           "Domain Knowledge"
         ] }),
-        /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("div", { className: "space-y-2", children: selectedState.domain_knowledge.map((dk) => /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)(
+        /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("div", { className: "space-y-2", children: selectedState.domain_knowledge.map((dk) => /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)(
           "div",
           {
             className: "p-3 rounded-lg bg-bg-secondary border border-border-secondary",
             children: [
-              /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("div", { className: "text-xs font-medium text-text-primary", children: dk.title }),
-              /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("div", { className: "text-[10px] text-text-muted mt-1 line-clamp-3", children: dk.content }),
-              dk.tags.length > 0 && /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("div", { className: "flex flex-wrap gap-1 mt-1.5", children: dk.tags.map((tag) => /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(
+              /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("div", { className: "text-xs font-medium text-text-primary", children: dk.title }),
+              /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("div", { className: "text-[10px] text-text-muted mt-1 line-clamp-3", children: dk.content }),
+              dk.tags.length > 0 && /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("div", { className: "flex flex-wrap gap-1 mt-1.5", children: dk.tags.map((tag) => /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(
                 "span",
                 {
                   className: "text-[9px] px-1.5 py-0.5 rounded-full bg-brand-primary/10 text-brand-primary",
@@ -3596,27 +3712,27 @@ function StateViewPanel({
           dk.id
         )) })
       ] }),
-      /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: "text-xs text-text-muted space-y-1 pt-3 border-t border-border-secondary", children: [
-        /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { children: [
+      /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("div", { className: "text-xs text-text-muted space-y-1 pt-3 border-t border-border-secondary", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("div", { children: [
           "State ID:",
           " ",
-          /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("code", { className: "bg-bg-secondary px-1 rounded", children: selectedState.state_id })
+          /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("code", { className: "bg-bg-secondary px-1 rounded", children: selectedState.state_id })
         ] }),
-        /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { children: [
+        /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("div", { children: [
           "Created:",
           " ",
           new Date(selectedState.created_at).toLocaleDateString()
         ] }),
-        /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { children: [
+        /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("div", { children: [
           "Updated:",
           " ",
           new Date(selectedState.updated_at).toLocaleDateString()
         ] })
       ] })
-    ] }) : /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("div", { className: "flex items-center justify-center h-full text-text-muted", children: /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: "text-center", children: [
-      /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(import_lucide_react5.Layers, { className: "size-12 mx-auto mb-3 opacity-30" }),
-      /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("p", { className: "text-sm", children: "Select a state to view its details" }),
-      /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("p", { className: "text-xs mt-1 text-text-muted/70", children: [
+    ] }) : /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("div", { className: "flex items-center justify-center h-full text-text-muted", children: /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("div", { className: "text-center", children: [
+      /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(import_lucide_react9.Layers, { className: "size-12 mx-auto mb-3 opacity-30" }),
+      /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("p", { className: "text-sm", children: "Select a state to view its details" }),
+      /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("p", { className: "text-xs mt-1 text-text-muted/70", children: [
         states.length,
         " state",
         states.length !== 1 ? "s" : "",
@@ -3627,21 +3743,21 @@ function StateViewPanel({
 }
 
 // src/components/state-machine/PathfindingPanel.tsx
-var import_react11 = require("react");
-var import_workflow_utils5 = require("@qontinui/workflow-utils");
-var import_jsx_runtime8 = require("react/jsx-runtime");
+var import_react14 = require("react");
+var import_workflow_utils9 = require("@qontinui/workflow-utils");
+var import_jsx_runtime11 = require("react/jsx-runtime");
 function PathfindingPanel({
   states,
   transitions,
   onPathFound,
   onFindPath
 }) {
-  const [fromStateId, setFromStateId] = (0, import_react11.useState)("");
-  const [targetStateId, setTargetStateId] = (0, import_react11.useState)("");
-  const [algorithm, setAlgorithm] = (0, import_react11.useState)("dijkstra");
-  const [result, setResult] = (0, import_react11.useState)(null);
-  const [isSearching, setIsSearching] = (0, import_react11.useState)(false);
-  const handleFind = (0, import_react11.useCallback)(async () => {
+  const [fromStateId, setFromStateId] = (0, import_react14.useState)("");
+  const [targetStateId, setTargetStateId] = (0, import_react14.useState)("");
+  const [algorithm, setAlgorithm] = (0, import_react14.useState)("dijkstra");
+  const [result, setResult] = (0, import_react14.useState)(null);
+  const [isSearching, setIsSearching] = (0, import_react14.useState)(false);
+  const handleFind = (0, import_react14.useCallback)(async () => {
     if (!fromStateId || !targetStateId) return;
     setIsSearching(true);
     try {
@@ -3649,7 +3765,7 @@ function PathfindingPanel({
       if (onFindPath) {
         pathResult = await onFindPath([fromStateId], [targetStateId]);
       } else {
-        pathResult = (0, import_workflow_utils5.findPath)(
+        pathResult = (0, import_workflow_utils9.findPath)(
           transitions,
           { from_states: [fromStateId], target_states: [targetStateId] },
           algorithm
@@ -3668,17 +3784,17 @@ function PathfindingPanel({
     onFindPath,
     onPathFound
   ]);
-  const clearResult = (0, import_react11.useCallback)(() => {
+  const clearResult = (0, import_react14.useCallback)(() => {
     setResult(null);
     onPathFound?.({ found: false, steps: [], total_cost: 0 });
   }, [onPathFound]);
   const stateName = (stateId) => states.find((s) => s.state_id === stateId)?.name ?? stateId;
-  return /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)("div", { className: "flex flex-col gap-4 p-4", children: [
-    /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("h3", { className: "text-sm font-semibold text-text-primary", children: "Pathfinding" }),
-    /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)("div", { className: "grid grid-cols-2 gap-3", children: [
-      /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)("div", { children: [
-        /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("label", { className: "block text-xs text-text-secondary mb-1", children: "From" }),
-        /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)(
+  return /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { className: "flex flex-col gap-4 p-4", children: [
+    /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("h3", { className: "text-sm font-semibold text-text-primary", children: "Pathfinding" }),
+    /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { className: "grid grid-cols-2 gap-3", children: [
+      /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { children: [
+        /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("label", { className: "block text-xs text-text-secondary mb-1", children: "From" }),
+        /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)(
           "select",
           {
             value: fromStateId,
@@ -3686,15 +3802,15 @@ function PathfindingPanel({
             className: "w-full px-2 py-1.5 text-sm bg-bg-tertiary border border-border-secondary rounded text-text-primary [&>option]:text-black [&>option]:bg-white",
             style: { colorScheme: "dark" },
             children: [
-              /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("option", { value: "", children: "Select state..." }),
-              states.map((s) => /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("option", { value: s.state_id, children: s.name }, s.state_id))
+              /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("option", { value: "", children: "Select state..." }),
+              states.map((s) => /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("option", { value: s.state_id, children: s.name }, s.state_id))
             ]
           }
         )
       ] }),
-      /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)("div", { children: [
-        /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("label", { className: "block text-xs text-text-secondary mb-1", children: "To" }),
-        /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)(
+      /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { children: [
+        /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("label", { className: "block text-xs text-text-secondary mb-1", children: "To" }),
+        /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)(
           "select",
           {
             value: targetStateId,
@@ -3702,15 +3818,15 @@ function PathfindingPanel({
             className: "w-full px-2 py-1.5 text-sm bg-bg-tertiary border border-border-secondary rounded text-text-primary [&>option]:text-black [&>option]:bg-white",
             style: { colorScheme: "dark" },
             children: [
-              /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("option", { value: "", children: "Select state..." }),
-              states.map((s) => /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("option", { value: s.state_id, children: s.name }, s.state_id))
+              /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("option", { value: "", children: "Select state..." }),
+              states.map((s) => /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("option", { value: s.state_id, children: s.name }, s.state_id))
             ]
           }
         )
       ] })
     ] }),
-    /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)("div", { className: "flex gap-2", children: [
-      !onFindPath && /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)(
+    /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { className: "flex gap-2", children: [
+      !onFindPath && /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)(
         "select",
         {
           value: algorithm,
@@ -3718,21 +3834,21 @@ function PathfindingPanel({
           className: "px-2 py-1.5 text-sm bg-bg-tertiary border border-border-secondary rounded text-text-primary [&>option]:text-black [&>option]:bg-white",
           style: { colorScheme: "dark" },
           children: [
-            /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("option", { value: "dijkstra", children: "Dijkstra (cheapest)" }),
-            /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("option", { value: "bfs", children: "BFS (shortest)" })
+            /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("option", { value: "dijkstra", children: "Dijkstra (cheapest)" }),
+            /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("option", { value: "bfs", children: "BFS (shortest)" })
           ]
         }
       ),
-      /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(
+      /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(
         "button",
         {
           onClick: handleFind,
           disabled: !fromStateId || !targetStateId || isSearching,
           className: "flex-1 px-3 py-1.5 text-sm font-medium text-white bg-brand-primary hover:bg-brand-primary/90 disabled:opacity-50 disabled:cursor-not-allowed rounded",
-          children: /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("span", { children: isSearching ? "Searching..." : "Find Path" })
+          children: /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("span", { children: isSearching ? "Searching..." : "Find Path" })
         }
       ),
-      result && /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(
+      result && /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(
         "button",
         {
           onClick: clearResult,
@@ -3741,41 +3857,41 @@ function PathfindingPanel({
         }
       )
     ] }),
-    result && /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("div", { className: "border-t border-border-secondary pt-3", children: result.found ? /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)(import_jsx_runtime8.Fragment, { children: [
-      /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)("div", { className: "flex items-center justify-between mb-2", children: [
-        /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)("span", { className: "text-xs text-green-400 font-medium", children: [
+    result && /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("div", { className: "border-t border-border-secondary pt-3", children: result.found ? /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)(import_jsx_runtime11.Fragment, { children: [
+      /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { className: "flex items-center justify-between mb-2", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("span", { className: "text-xs text-green-400 font-medium", children: [
           "Path found (",
           result.steps.length,
           " step",
           result.steps.length !== 1 ? "s" : "",
           ")"
         ] }),
-        /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)("span", { className: "text-xs text-text-secondary", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("span", { className: "text-xs text-text-secondary", children: [
           "Total cost: ",
           result.total_cost.toFixed(1)
         ] })
       ] }),
-      result.steps.length === 0 ? /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("p", { className: "text-xs text-text-secondary italic", children: "Already at target state" }) : /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("div", { className: "space-y-1.5", children: result.steps.map((step, i) => /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)(
+      result.steps.length === 0 ? /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("p", { className: "text-xs text-text-secondary italic", children: "Already at target state" }) : /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("div", { className: "space-y-1.5", children: result.steps.map((step, i) => /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)(
         "div",
         {
           className: "p-2 bg-bg-tertiary border border-border-secondary rounded text-xs",
           children: [
-            /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)("div", { className: "flex items-center justify-between", children: [
-              /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)("span", { className: "font-medium text-text-primary", children: [
+            /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { className: "flex items-center justify-between", children: [
+              /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("span", { className: "font-medium text-text-primary", children: [
                 i + 1,
                 ". ",
                 step.transition_name
               ] }),
-              /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)("span", { className: "text-text-secondary", children: [
+              /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("span", { className: "text-text-secondary", children: [
                 "cost: ",
                 step.path_cost.toFixed(1)
               ] })
             ] }),
-            /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)("div", { className: "mt-1 text-text-secondary", children: [
+            /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { className: "mt-1 text-text-secondary", children: [
               step.from_states.map(stateName).join(", "),
               " \u2192 ",
               step.activate_states.map(stateName).join(", "),
-              step.exit_states.length > 0 && /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)("span", { className: "text-red-400", children: [
+              step.exit_states.length > 0 && /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("span", { className: "text-red-400", children: [
                 " (exits: ",
                 step.exit_states.map(stateName).join(", "),
                 ")"
@@ -3785,34 +3901,34 @@ function PathfindingPanel({
         },
         i
       )) })
-    ] }) : /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("div", { className: "text-xs text-red-400", children: result.error ?? "No path found between the specified states" }) })
+    ] }) : /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("div", { className: "text-xs text-red-400", children: result.error ?? "No path found between the specified states" }) })
   ] });
 }
 
 // src/components/state-machine/StateViewTable.tsx
-var import_react12 = require("react");
-var import_workflow_utils6 = require("@qontinui/workflow-utils");
-var import_jsx_runtime9 = require("react/jsx-runtime");
+var import_react15 = require("react");
+var import_workflow_utils10 = require("@qontinui/workflow-utils");
+var import_jsx_runtime12 = require("react/jsx-runtime");
 function StateViewTable({
   states,
   selectedStateId,
   onSelectState
 }) {
-  const [filter, setFilter] = (0, import_react12.useState)("");
-  const filteredStates = (0, import_react12.useMemo)(() => {
+  const [filter, setFilter] = (0, import_react15.useState)("");
+  const filteredStates = (0, import_react15.useMemo)(() => {
     if (!filter.trim()) return states;
     const q = filter.toLowerCase();
     return states.filter(
       (s) => s.name.toLowerCase().includes(q) || s.element_ids.some((eid) => eid.toLowerCase().includes(q))
     );
   }, [states, filter]);
-  return /* @__PURE__ */ (0, import_jsx_runtime9.jsxs)("div", { className: "flex flex-col gap-3 p-4", children: [
-    /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("div", { className: "flex items-center justify-between", children: /* @__PURE__ */ (0, import_jsx_runtime9.jsxs)("h3", { className: "text-sm font-semibold text-text-primary", children: [
+  return /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)("div", { className: "flex flex-col gap-3 p-4", children: [
+    /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("div", { className: "flex items-center justify-between", children: /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)("h3", { className: "text-sm font-semibold text-text-primary", children: [
       "States (",
       states.length,
       ")"
     ] }) }),
-    /* @__PURE__ */ (0, import_jsx_runtime9.jsx)(
+    /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(
       "input",
       {
         type: "text",
@@ -3822,42 +3938,42 @@ function StateViewTable({
         className: "w-full px-2 py-1.5 text-sm bg-bg-tertiary border border-border-secondary rounded text-text-primary placeholder:text-text-muted"
       }
     ),
-    /* @__PURE__ */ (0, import_jsx_runtime9.jsxs)("div", { className: "space-y-1", children: [
+    /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)("div", { className: "space-y-1", children: [
       filteredStates.map((state) => {
         const isSelected = state.state_id === selectedStateId;
-        const confidenceColor = (0, import_workflow_utils6.getConfidenceColor)(state.confidence);
+        const confidenceColor = (0, import_workflow_utils10.getConfidenceColor)(state.confidence);
         const confidencePct = Math.round(state.confidence * 100);
         const typeCounts = /* @__PURE__ */ new Map();
         for (const eid of state.element_ids) {
-          const prefix = (0, import_workflow_utils6.getElementTypePrefix)(eid);
+          const prefix = (0, import_workflow_utils10.getElementTypePrefix)(eid);
           typeCounts.set(prefix, (typeCounts.get(prefix) ?? 0) + 1);
         }
         const sortedTypes = Array.from(typeCounts.entries()).sort(
           (a, b) => b[1] - a[1]
         );
-        return /* @__PURE__ */ (0, import_jsx_runtime9.jsxs)(
+        return /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)(
           "button",
           {
             onClick: () => onSelectState(isSelected ? null : state.state_id),
             className: `w-full text-left p-2.5 rounded border transition-colors ${isSelected ? "bg-brand-primary/10 border-brand-primary/30" : "bg-bg-tertiary border-border-secondary hover:border-text-muted"}`,
             children: [
-              /* @__PURE__ */ (0, import_jsx_runtime9.jsxs)("div", { className: "flex items-center justify-between mb-1", children: [
-                /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("span", { className: "text-sm font-medium text-text-primary truncate", children: state.name }),
-                /* @__PURE__ */ (0, import_jsx_runtime9.jsxs)("div", { className: "flex items-center gap-2 text-xs shrink-0 ml-2", children: [
-                  /* @__PURE__ */ (0, import_jsx_runtime9.jsxs)("span", { className: "text-text-secondary", children: [
+              /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)("div", { className: "flex items-center justify-between mb-1", children: [
+                /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("span", { className: "text-sm font-medium text-text-primary truncate", children: state.name }),
+                /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)("div", { className: "flex items-center gap-2 text-xs shrink-0 ml-2", children: [
+                  /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)("span", { className: "text-text-secondary", children: [
                     state.element_ids.length,
                     " el"
                   ] }),
-                  /* @__PURE__ */ (0, import_jsx_runtime9.jsxs)("span", { className: confidenceColor, children: [
+                  /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)("span", { className: confidenceColor, children: [
                     confidencePct,
                     "%"
                   ] })
                 ] })
               ] }),
-              sortedTypes.length > 0 && /* @__PURE__ */ (0, import_jsx_runtime9.jsxs)("div", { className: "flex flex-wrap gap-1 mt-1", children: [
+              sortedTypes.length > 0 && /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)("div", { className: "flex flex-wrap gap-1 mt-1", children: [
                 sortedTypes.slice(0, 5).map(([prefix, count]) => {
-                  const style = (0, import_workflow_utils6.getElementTypeStyle)(`${prefix}:dummy`);
-                  return /* @__PURE__ */ (0, import_jsx_runtime9.jsxs)(
+                  const style = (0, import_workflow_utils10.getElementTypeStyle)(`${prefix}:dummy`);
+                  return /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)(
                     "span",
                     {
                       className: `px-1.5 py-0.5 text-[10px] rounded border ${style.bg} ${style.text} ${style.border}`,
@@ -3870,24 +3986,156 @@ function StateViewTable({
                     prefix
                   );
                 }),
-                sortedTypes.length > 5 && /* @__PURE__ */ (0, import_jsx_runtime9.jsxs)("span", { className: "px-1 py-0.5 text-[10px] text-text-muted", children: [
+                sortedTypes.length > 5 && /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)("span", { className: "px-1 py-0.5 text-[10px] text-text-muted", children: [
                   "+",
                   sortedTypes.length - 5,
                   " more"
                 ] })
               ] }),
-              state.description && /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("p", { className: "text-xs text-text-secondary mt-1 line-clamp-1", children: state.description })
+              state.description && /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("p", { className: "text-xs text-text-secondary mt-1 line-clamp-1", children: state.description })
             ]
           },
           state.state_id
         );
       }),
-      filteredStates.length === 0 && /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("p", { className: "text-xs text-text-muted italic text-center py-4", children: filter ? "No states match the filter" : "No states in this config" })
+      filteredStates.length === 0 && /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("p", { className: "text-xs text-text-muted italic text-center py-4", children: filter ? "No states match the filter" : "No states in this config" })
+    ] })
+  ] });
+}
+
+// src/components/state-machine/DiagramTab.tsx
+var import_react16 = require("react");
+var import_lucide_react10 = require("lucide-react");
+var import_jsx_runtime13 = require("react/jsx-runtime");
+function DiagramTab({
+  activeStateIds,
+  diagramSource,
+  isLoading,
+  onRefresh
+}) {
+  const containerRef = (0, import_react16.useRef)(null);
+  const [importError, setImportError] = (0, import_react16.useState)(null);
+  const [renderError, setRenderError] = (0, import_react16.useState)(null);
+  (0, import_react16.useEffect)(() => {
+    if (!diagramSource || !diagramSource.trim()) {
+      if (containerRef.current) containerRef.current.innerHTML = "";
+      setRenderError(null);
+      return;
+    }
+    let cancelled = false;
+    void (async () => {
+      const specifier = "mermaid";
+      const mod = await import(
+        /* @vite-ignore */
+        specifier
+      ).catch(
+        (e) => {
+          if (!cancelled) {
+            setImportError(
+              e instanceof Error ? e.message : "Failed to load `mermaid`"
+            );
+          }
+          return null;
+        }
+      );
+      if (cancelled || !mod) return;
+      setImportError(null);
+      const mermaid = mod.default;
+      try {
+        mermaid.initialize({
+          startOnLoad: false,
+          theme: "dark",
+          securityLevel: "strict"
+        });
+        const id = `qontinui-sm-diagram-${Date.now()}`;
+        const { svg } = await mermaid.render(id, diagramSource);
+        if (cancelled || !containerRef.current) return;
+        containerRef.current.innerHTML = svg;
+        setRenderError(null);
+      } catch (e) {
+        if (cancelled) return;
+        setRenderError(e instanceof Error ? e.message : String(e));
+        if (containerRef.current) {
+          containerRef.current.innerHTML = "";
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [diagramSource]);
+  const hasSource = !!diagramSource && diagramSource.trim().length > 0;
+  return /* @__PURE__ */ (0, import_jsx_runtime13.jsxs)("div", { className: "flex flex-col h-full w-full", children: [
+    /* @__PURE__ */ (0, import_jsx_runtime13.jsxs)("div", { className: "flex items-center justify-between px-6 py-3 border-b border-border-primary bg-surface-primary", children: [
+      /* @__PURE__ */ (0, import_jsx_runtime13.jsxs)("div", { className: "flex items-center gap-2", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime13.jsx)(import_lucide_react10.Workflow, { className: "size-4 text-brand-primary" }),
+        /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("h2", { className: "text-sm font-semibold text-text-primary", children: "State Machine Diagram" }),
+        activeStateIds && activeStateIds.length > 0 && /* @__PURE__ */ (0, import_jsx_runtime13.jsxs)("span", { className: "text-xs text-text-muted ml-2", children: [
+          "(highlighting ",
+          activeStateIds.length,
+          " hypothetical active state",
+          activeStateIds.length === 1 ? "" : "s",
+          ")"
+        ] })
+      ] }),
+      onRefresh && /* @__PURE__ */ (0, import_jsx_runtime13.jsxs)(
+        "button",
+        {
+          type: "button",
+          onClick: onRefresh,
+          disabled: isLoading,
+          className: "inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium border border-border-primary text-text-primary hover:bg-surface-secondary disabled:opacity-50",
+          children: [
+            /* @__PURE__ */ (0, import_jsx_runtime13.jsx)(
+              import_lucide_react10.RefreshCw,
+              {
+                className: `size-3.5 ${isLoading ? "animate-spin" : ""}`
+              }
+            ),
+            "Refresh"
+          ]
+        }
+      )
+    ] }),
+    /* @__PURE__ */ (0, import_jsx_runtime13.jsxs)("div", { className: "flex-1 min-h-0 overflow-auto p-6 bg-surface-secondary", children: [
+      isLoading && /* @__PURE__ */ (0, import_jsx_runtime13.jsxs)("div", { className: "flex items-center justify-center h-full text-text-muted gap-2", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime13.jsx)(import_lucide_react10.Loader2, { className: "size-4 animate-spin" }),
+        "Loading diagram\u2026"
+      ] }),
+      !isLoading && importError && /* @__PURE__ */ (0, import_jsx_runtime13.jsxs)("div", { className: "max-w-xl mx-auto p-4 border border-border-primary rounded-md bg-surface-primary text-sm text-text-primary", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("p", { className: "font-semibold mb-1", children: "Mermaid is not available in this bundle." }),
+        /* @__PURE__ */ (0, import_jsx_runtime13.jsxs)("p", { className: "text-text-muted", children: [
+          "Install ",
+          /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("code", { className: "font-mono", children: "mermaid" }),
+          " (e.g.",
+          " ",
+          /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("code", { className: "font-mono", children: "npm install mermaid" }),
+          ") to enable the Diagram tab."
+        ] }),
+        /* @__PURE__ */ (0, import_jsx_runtime13.jsxs)("p", { className: "text-xs text-text-muted mt-2", children: [
+          "Import error: ",
+          importError
+        ] })
+      ] }),
+      !isLoading && !importError && !hasSource && /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("div", { className: "flex items-center justify-center h-full text-text-muted", children: "No diagram available" }),
+      !isLoading && !importError && hasSource && renderError && /* @__PURE__ */ (0, import_jsx_runtime13.jsxs)("div", { className: "max-w-xl mx-auto p-4 border border-border-primary rounded-md bg-surface-primary text-sm", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("p", { className: "font-semibold mb-1 text-text-primary", children: "Failed to render diagram." }),
+        /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("pre", { className: "text-xs text-text-muted whitespace-pre-wrap", children: renderError })
+      ] }),
+      /* @__PURE__ */ (0, import_jsx_runtime13.jsx)(
+        "div",
+        {
+          ref: containerRef,
+          className: "mermaid-diagram flex items-center justify-center",
+          style: { display: hasSource && !importError ? void 0 : "none" }
+        }
+      )
     ] })
   ] });
 }
 // Annotate the CommonJS export names for ESM import in node:
 0 && (module.exports = {
+  DiagramTab,
   PathfindingPanel,
   StateDetailPanel,
   StateMachineGraphView,

@@ -909,31 +909,34 @@ function PreviewPhaseSection({
         ] })
       }
     ),
-    isExpanded && /* @__PURE__ */ jsx4("div", { className: "px-2 pb-2 space-y-1", children: steps.map((step, i) => /* @__PURE__ */ jsxs4(
-      "div",
-      {
-        className: "flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-black/20",
-        children: [
-          /* @__PURE__ */ jsx4(StepTypeIcon, { type: step.type }),
-          /* @__PURE__ */ jsx4("div", { className: "flex-1 min-w-0", children: /* @__PURE__ */ jsx4("div", { className: "text-xs text-zinc-200 truncate", children: step.name }) }),
-          /* @__PURE__ */ jsxs4(
-            "svg",
-            {
-              className: "w-3 h-3 text-zinc-600",
-              viewBox: "0 0 24 24",
-              fill: "none",
-              stroke: "currentColor",
-              strokeWidth: "2",
-              children: [
-                /* @__PURE__ */ jsx4("path", { d: "M22 11.08V12a10 10 0 1 1-5.93-9.14" }),
-                /* @__PURE__ */ jsx4("polyline", { points: "22 4 12 14.01 9 11.01" })
-              ]
-            }
-          )
-        ]
-      },
-      step.id || i
-    )) })
+    isExpanded && /* @__PURE__ */ jsx4("div", { className: "px-2 pb-2 space-y-1", children: steps.map((rawStep, i) => {
+      const step = rawStep;
+      return /* @__PURE__ */ jsxs4(
+        "div",
+        {
+          className: "flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-black/20",
+          children: [
+            /* @__PURE__ */ jsx4(StepTypeIcon, { type: step.type }),
+            /* @__PURE__ */ jsx4("div", { className: "flex-1 min-w-0", children: /* @__PURE__ */ jsx4("div", { className: "text-xs text-zinc-200 truncate", children: step.name }) }),
+            /* @__PURE__ */ jsxs4(
+              "svg",
+              {
+                className: "w-3 h-3 text-zinc-600",
+                viewBox: "0 0 24 24",
+                fill: "none",
+                stroke: "currentColor",
+                strokeWidth: "2",
+                children: [
+                  /* @__PURE__ */ jsx4("path", { d: "M22 11.08V12a10 10 0 1 1-5.93-9.14" }),
+                  /* @__PURE__ */ jsx4("polyline", { points: "22 4 12 14.01 9 11.01" })
+                ]
+              }
+            )
+          ]
+        },
+        step.id || i
+      );
+    }) })
   ] });
 }
 function StepTypeIcon({ type }) {
@@ -1010,4 +1013,4 @@ export {
   ChatMessageArea,
   WorkflowPreviewPanel
 };
-//# sourceMappingURL=chunk-EW6Q36TR.js.map
+//# sourceMappingURL=chunk-DHU3K3MY.js.map

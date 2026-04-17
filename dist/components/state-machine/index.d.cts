@@ -2,6 +2,9 @@ import * as react_jsx_runtime from 'react/jsx-runtime';
 import { StateMachineState, StateMachineTransition, PathfindingStep, StateMachineTransitionCreate, StateMachineStateUpdate, PathfindingResult } from '@qontinui/shared-types';
 import * as React$1 from 'react';
 import { NodeProps, EdgeProps } from '@xyflow/react';
+import { P as PermittedTrigger, B as BlockedTrigger } from '../../types-BcoFAlzg.cjs';
+import '@qontinui/shared-types/workflow';
+import '@qontinui/shared-types/library';
 
 /**
  * Dagre library interface. Uses a permissive signature so both
@@ -89,8 +92,24 @@ interface TransitionsPanelProps {
     states: StateMachineState[];
     transitions: StateMachineTransition[];
     onSelectTransition: (id: string | null) => void;
+    /**
+     * Active-state IDs for the "permitted from active states" filter. When
+     * omitted, the filter toggle has no effect (the filter is still visible
+     * but disabled).
+     */
+    activeStateIds?: string[];
+    /**
+     * Permitted triggers computed from the current active state set. Usually
+     * fetched by the parent via ``useWorkflowData().getPermittedTriggers``.
+     */
+    permittedTriggers?: PermittedTrigger[];
+    /**
+     * Blocked triggers (with reasons) computed from the current active state
+     * set.
+     */
+    blockedTriggers?: BlockedTrigger[];
 }
-declare function TransitionsPanel({ states, transitions, onSelectTransition, }: TransitionsPanelProps): react_jsx_runtime.JSX.Element;
+declare function TransitionsPanel({ states, transitions, onSelectTransition, activeStateIds, permittedTriggers, blockedTriggers, }: TransitionsPanelProps): react_jsx_runtime.JSX.Element;
 
 interface StateDetailPanelProps {
     /** The state to display/edit */
@@ -103,6 +122,10 @@ interface StateDetailPanelProps {
     onClose: () => void;
 }
 declare function StateDetailPanel({ state, onSave, onDelete, onClose, }: StateDetailPanelProps): react_jsx_runtime.JSX.Element;
+
+/**
+ * Shared constants and helper functions for StateViewPanel sub-components.
+ */
 
 /** Fingerprint detail from discovery co-occurrence data. */
 interface FingerprintDetail {
@@ -127,6 +150,7 @@ interface CaptureScreenshotMeta {
     fingerprintHashesJson: string;
     capturedAt: string;
 }
+
 interface StateViewPanelProps {
     states: StateMachineState[];
     transitions: StateMachineTransition[];
@@ -165,4 +189,32 @@ interface StateViewTableProps {
 }
 declare function StateViewTable({ states, selectedStateId, onSelectState, }: StateViewTableProps): react_jsx_runtime.JSX.Element;
 
-export { type CaptureScreenshotMeta, type FingerprintDetail, PathfindingPanel, type PathfindingPanelProps, StateDetailPanel, type StateDetailPanelProps, StateMachineGraphView, type StateMachineGraphViewProps, StateMachineStateNode, StateMachineTransitionEdge, StateViewPanel, type StateViewPanelProps, StateViewTable, type StateViewTableProps, TransitionEditor, type TransitionEditorProps, TransitionsPanel, type TransitionsPanelProps };
+/**
+ * DiagramTab — live Mermaid rendering of the loaded state machine.
+ *
+ * Renders a Mermaid ``stateDiagram-v2`` (fetched from the runner's
+ * ``GET /state-machine/mermaid-diagram`` endpoint) with active-state
+ * highlighting baked into the diagram source by ``PathVisualizer``.
+ *
+ * ``mermaid`` is imported dynamically so this package stays headless —
+ * consumers must add ``mermaid`` as a dependency (declared as an optional
+ * peer here). If the dynamic import fails, a helpful install hint is shown
+ * instead of a blank pane.
+ */
+interface DiagramTabProps {
+    /**
+     * Hypothetical active-state IDs the parent used when fetching
+     * ``diagramSource``. Passed through for display purposes only — the
+     * highlighting is already encoded in ``diagramSource``.
+     */
+    activeStateIds?: string[];
+    /** Mermaid diagram source (``stateDiagram-v2``). */
+    diagramSource?: string;
+    /** Whether the parent is currently fetching the diagram. */
+    isLoading?: boolean;
+    /** Optional: manual refresh handler. Shows a refresh button when provided. */
+    onRefresh?: () => void;
+}
+declare function DiagramTab({ activeStateIds, diagramSource, isLoading, onRefresh, }: DiagramTabProps): react_jsx_runtime.JSX.Element;
+
+export { type CaptureScreenshotMeta, DiagramTab, type DiagramTabProps, type FingerprintDetail, PathfindingPanel, type PathfindingPanelProps, StateDetailPanel, type StateDetailPanelProps, StateMachineGraphView, type StateMachineGraphViewProps, StateMachineStateNode, StateMachineTransitionEdge, StateViewPanel, type StateViewPanelProps, StateViewTable, type StateViewTableProps, TransitionEditor, type TransitionEditorProps, TransitionsPanel, type TransitionsPanelProps };

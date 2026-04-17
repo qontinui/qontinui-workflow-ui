@@ -280,7 +280,15 @@ function PreviewPhaseSection({
 
       {isExpanded && (
         <div className="px-2 pb-2 space-y-1">
-          {steps.map((step, i) => (
+          {steps.map((rawStep, i) => {
+            // UnifiedStep's fallback arm collapses fields to `unknown`; narrow
+            // to the common canonical shape used in preview rendering.
+            const step = rawStep as {
+              id?: string;
+              name?: string;
+              type: string;
+            };
+            return (
             <div
               key={step.id || i}
               className="flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-black/20"
@@ -302,7 +310,8 @@ function PreviewPhaseSection({
                 <polyline points="22 4 12 14.01 9 11.01" />
               </svg>
             </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>

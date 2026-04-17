@@ -8,7 +8,7 @@ import {
   ChatInput,
   ChatMessageArea,
   WorkflowPreviewPanel
-} from "./chunk-EW6Q36TR.js";
+} from "./chunk-DHU3K3MY.js";
 
 // src/WorkflowDataProvider.tsx
 import { createContext, useContext } from "react";
@@ -234,10 +234,11 @@ function workflowBuilderReducer(state, action) {
       );
       const original = steps.find((s) => s.id === action.stepId);
       if (!original) return state;
+      const cloneId = generateStepId();
       const clone = {
         ...original,
-        id: generateStepId(),
-        name: `${original.name} (copy)`
+        id: cloneId,
+        name: `${original.name ?? ""} (copy)`
       };
       const idx = steps.findIndex((s) => s.id === action.stepId);
       const newSteps = [...steps];
@@ -250,7 +251,7 @@ function workflowBuilderReducer(state, action) {
           state.currentStageIndex,
           newSteps
         ),
-        selectedStepId: clone.id
+        selectedStepId: cloneId
       };
     }
     case "SELECT_STEP":
@@ -317,7 +318,9 @@ function workflowBuilderReducer(state, action) {
         max_iterations: wf.max_iterations,
         timeout_seconds: wf.timeout_seconds,
         provider: wf.provider,
-        model: wf.model
+        model: wf.model,
+        approval_gate: false,
+        completion_prompts_first: false
       };
       return {
         ...state,
