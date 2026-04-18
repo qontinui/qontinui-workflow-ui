@@ -87,13 +87,13 @@ function getPhaseSteps(
       : workflow;
   switch (phase) {
     case "setup":
-      return source.setup_steps;
+      return source.setupSteps;
     case "verification":
-      return source.verification_steps;
+      return source.verificationSteps;
     case "agentic":
-      return source.agentic_steps;
+      return source.agenticSteps;
     case "completion":
-      return source.completion_steps ?? [];
+      return source.completionSteps ?? [];
   }
 }
 
@@ -112,17 +112,16 @@ function setPhaseSteps(
     const stage = { ...stages[stageIndex] };
     switch (phase) {
       case "setup":
-        stage.setup_steps = steps as WorkflowStage["setup_steps"];
+        stage.setupSteps = steps;
         break;
       case "verification":
-        stage.verification_steps =
-          steps as WorkflowStage["verification_steps"];
+        stage.verificationSteps = steps;
         break;
       case "agentic":
-        stage.agentic_steps = steps as WorkflowStage["agentic_steps"];
+        stage.agenticSteps = steps;
         break;
       case "completion":
-        stage.completion_steps = steps as WorkflowStage["completion_steps"];
+        stage.completionSteps = steps;
         break;
     }
     stages[stageIndex] = stage;
@@ -132,22 +131,22 @@ function setPhaseSteps(
     case "setup":
       return {
         ...workflow,
-        setup_steps: steps as UnifiedWorkflow["setup_steps"],
+        setupSteps: steps,
       };
     case "verification":
       return {
         ...workflow,
-        verification_steps: steps as UnifiedWorkflow["verification_steps"],
+        verificationSteps: steps,
       };
     case "agentic":
       return {
         ...workflow,
-        agentic_steps: steps as UnifiedWorkflow["agentic_steps"],
+        agenticSteps: steps,
       };
     case "completion":
       return {
         ...workflow,
-        completion_steps: steps as UnifiedWorkflow["completion_steps"],
+        completionSteps: steps,
       };
   }
 }
@@ -221,36 +220,20 @@ function workflowBuilderReducer(
         );
       let updated: UnifiedWorkflow = {
         ...wf,
-        setup_steps: updateInSteps(
-          wf.setup_steps,
-        ) as UnifiedWorkflow["setup_steps"],
-        verification_steps: updateInSteps(
-          wf.verification_steps,
-        ) as UnifiedWorkflow["verification_steps"],
-        agentic_steps: updateInSteps(
-          wf.agentic_steps,
-        ) as UnifiedWorkflow["agentic_steps"],
-        completion_steps: updateInSteps(
-          wf.completion_steps ?? [],
-        ) as UnifiedWorkflow["completion_steps"],
+        setupSteps: updateInSteps(wf.setupSteps),
+        verificationSteps: updateInSteps(wf.verificationSteps),
+        agenticSteps: updateInSteps(wf.agenticSteps),
+        completionSteps: updateInSteps(wf.completionSteps ?? []),
       };
       if (updated.stages) {
         updated = {
           ...updated,
           stages: updated.stages.map((s) => ({
             ...s,
-            setup_steps: updateInSteps(
-              s.setup_steps,
-            ) as WorkflowStage["setup_steps"],
-            verification_steps: updateInSteps(
-              s.verification_steps,
-            ) as WorkflowStage["verification_steps"],
-            agentic_steps: updateInSteps(
-              s.agentic_steps,
-            ) as WorkflowStage["agentic_steps"],
-            completion_steps: updateInSteps(
-              s.completion_steps ?? [],
-            ) as WorkflowStage["completion_steps"],
+            setupSteps: updateInSteps(s.setupSteps),
+            verificationSteps: updateInSteps(s.verificationSteps),
+            agenticSteps: updateInSteps(s.agenticSteps),
+            completionSteps: updateInSteps(s.completionSteps ?? []),
           })),
         };
       }
@@ -394,28 +377,26 @@ function workflowBuilderReducer(
         id: generateStepId(),
         name: wf.name || "Stage 1",
         description: wf.description,
-        setup_steps: wf.setup_steps,
-        verification_steps: wf.verification_steps,
-        agentic_steps: wf.agentic_steps,
-        completion_steps: wf.completion_steps ?? [],
-        max_iterations: wf.max_iterations,
-        timeout_seconds: wf.timeout_seconds,
+        setupSteps: wf.setupSteps,
+        verificationSteps: wf.verificationSteps,
+        agenticSteps: wf.agenticSteps,
+        completionSteps: wf.completionSteps ?? [],
+        maxIterations: wf.maxIterations,
+        timeoutSeconds: wf.timeoutSeconds,
         provider: wf.provider,
         model: wf.model,
-        approval_gate: false,
-        completion_prompts_first: false,
+        approvalGate: false,
+        completionPromptsFirst: false,
       };
       return {
         ...state,
         workflow: {
           ...wf,
           stages: [initialStage],
-          setup_steps: [] as unknown as UnifiedWorkflow["setup_steps"],
-          verification_steps:
-            [] as unknown as UnifiedWorkflow["verification_steps"],
-          agentic_steps: [] as unknown as UnifiedWorkflow["agentic_steps"],
-          completion_steps:
-            [] as unknown as UnifiedWorkflow["completion_steps"],
+          setupSteps: [],
+          verificationSteps: [],
+          agenticSteps: [],
+          completionSteps: [],
         },
         currentStageIndex: 0,
       };
@@ -429,15 +410,11 @@ function workflowBuilderReducer(
         ...state,
         workflow: {
           ...wf,
-          stages: undefined as unknown as UnifiedWorkflow["stages"],
-          setup_steps:
-            first.setup_steps as unknown as UnifiedWorkflow["setup_steps"],
-          verification_steps:
-            first.verification_steps as unknown as UnifiedWorkflow["verification_steps"],
-          agentic_steps:
-            first.agentic_steps as unknown as UnifiedWorkflow["agentic_steps"],
-          completion_steps:
-            first.completion_steps as unknown as UnifiedWorkflow["completion_steps"],
+          stages: undefined,
+          setupSteps: first.setupSteps,
+          verificationSteps: first.verificationSteps,
+          agenticSteps: first.agenticSteps,
+          completionSteps: first.completionSteps,
         },
         currentStageIndex: 0,
       };
@@ -453,13 +430,18 @@ function workflowBuilderReducer(
 
 function createInitialState(): WorkflowBuilderState {
   const defaultWf = createDefaultWorkflow();
+  // The `createDefaultWorkflow` factory (in @qontinui/workflow-utils) still
+  // returns snake_case step fields from the pre-camelCase era. Cast through
+  // `unknown` so the rest of this file — which treats the workflow as the
+  // current camelCase `UnifiedWorkflow` — type-checks. Runtime serialization
+  // remains governed by whatever the factory and reducer write out.
   return {
     workflow: {
       ...defaultWf,
       id: "",
       created_at: "",
       modified_at: "",
-    } as UnifiedWorkflow,
+    } as unknown as UnifiedWorkflow,
     originalWorkflow: null,
     selectedStepId: null,
     currentStageIndex: 0,
@@ -522,15 +504,15 @@ export function WorkflowBuilderProvider({
   const selectedStep = (() => {
     if (!state.selectedStepId) return null;
     const allSteps: UnifiedStep[] = [
-      ...state.workflow.setup_steps,
-      ...state.workflow.verification_steps,
-      ...state.workflow.agentic_steps,
-      ...(state.workflow.completion_steps ?? []),
+      ...state.workflow.setupSteps,
+      ...state.workflow.verificationSteps,
+      ...state.workflow.agenticSteps,
+      ...(state.workflow.completionSteps ?? []),
       ...(state.workflow.stages ?? []).flatMap((s) => [
-        ...(s.setup_steps as UnifiedStep[]),
-        ...(s.verification_steps as UnifiedStep[]),
-        ...(s.agentic_steps as UnifiedStep[]),
-        ...((s.completion_steps ?? []) as UnifiedStep[]),
+        ...s.setupSteps,
+        ...s.verificationSteps,
+        ...s.agenticSteps,
+        ...(s.completionSteps ?? []),
       ]),
     ];
     return allSteps.find((s) => s.id === state.selectedStepId) ?? null;
