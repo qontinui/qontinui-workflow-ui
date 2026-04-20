@@ -748,6 +748,15 @@ function StateMachineGraphView(props) {
 // src/components/state-machine/TransitionEditor.tsx
 import { useState as useState2, useEffect as useEffect2, useCallback as useCallback2 } from "react";
 import { jsx as jsx4, jsxs as jsxs4 } from "react/jsx-runtime";
+function makeActionUid() {
+  return typeof crypto !== "undefined" && typeof crypto.randomUUID === "function" ? crypto.randomUUID() : `act-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+}
+function toEditableAction(action) {
+  return { ...action, _uid: makeActionUid() };
+}
+function stripUid({ _uid, ...rest }) {
+  return rest;
+}
 var ACTION_TYPES = [
   { value: "click", label: "Click" },
   { value: "doubleClick", label: "Double Click" },
@@ -792,7 +801,7 @@ function TransitionEditor({
       setFromStates([...transition.from_states]);
       setActivateStates([...transition.activate_states]);
       setExitStates([...transition.exit_states]);
-      setActions([...transition.actions]);
+      setActions(transition.actions.map(toEditableAction));
       setPathCost(transition.path_cost);
       setStaysVisible(transition.stays_visible);
     } else {
@@ -800,7 +809,7 @@ function TransitionEditor({
       setFromStates([]);
       setActivateStates([]);
       setExitStates([]);
-      setActions([{ type: "click" }]);
+      setActions([toEditableAction({ type: "click" })]);
       setPathCost(1);
       setStaysVisible(false);
     }
@@ -816,7 +825,7 @@ function TransitionEditor({
     []
   );
   const addAction = useCallback2(() => {
-    setActions((prev) => [...prev, { type: "click" }]);
+    setActions((prev) => [...prev, toEditableAction({ type: "click" })]);
   }, []);
   const removeAction = useCallback2((index) => {
     setActions((prev) => prev.filter((_, i) => i !== index));
@@ -838,7 +847,7 @@ function TransitionEditor({
         from_states: fromStates,
         activate_states: activateStates,
         exit_states: exitStates,
-        actions,
+        actions: actions.map(stripUid),
         path_cost: pathCost,
         stays_visible: staysVisible
       };
@@ -948,7 +957,7 @@ function TransitionEditor({
           onRemove: removeAction,
           canRemove: actions.length > 1
         },
-        index
+        action._uid
       )) })
     ] }),
     /* @__PURE__ */ jsxs4("div", { className: "flex gap-4", children: [
@@ -1685,7 +1694,7 @@ function TransitionsPanel({
                 /* @__PURE__ */ jsx5("span", { children: idx + 1 })
               ]
             },
-            idx
+            `${idx}-${action.type}`
           );
         }) }),
         /* @__PURE__ */ jsx5("div", { className: "mt-1.5 text-center text-[10px] text-text-muted", children: animation.currentActionIndex >= 0 ? `Action ${animation.currentActionIndex + 1} of ${selectedTransition.actions.length}` : "Ready to play" })
@@ -1802,7 +1811,7 @@ function TransitionsPanel({
                 ) })
               ]
             },
-            idx
+            `${idx}-${action.type}`
           );
         }) })
       ] }),
@@ -2132,7 +2141,7 @@ function StateDetailPanel({
             children: "\xD7"
           }
         )
-      ] }) }, i)) }),
+      ] }) }, `${i}-${c}`)) }),
       /* @__PURE__ */ jsxs6("div", { className: "flex gap-1", children: [
         /* @__PURE__ */ jsx6(
           "input",
@@ -3754,7 +3763,7 @@ function StateViewPanel({
               criteria
             ]
           },
-          i
+          `${i}-${criteria}`
         )) })
       ] }),
       selectedState.domain_knowledge.length > 0 && /* @__PURE__ */ jsxs10("div", { children: [
@@ -3971,7 +3980,7 @@ function PathfindingPanel({
             ] })
           ]
         },
-        i
+        `${i}-${step.transition_name}`
       )) })
     ] }) : /* @__PURE__ */ jsx11("div", { className: "text-xs text-red-400", children: result.error ?? "No path found between the specified states" }) })
   ] });

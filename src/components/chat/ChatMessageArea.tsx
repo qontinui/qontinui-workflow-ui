@@ -91,7 +91,7 @@ export function ChatMessageArea({
 
       {messages.map((msg, i) => (
         <MessageBubble
-          key={i}
+          key={`${msg.timestamp ?? i}-${msg.role}`}
           message={msg}
           index={i}
           renderContent={renderContent}

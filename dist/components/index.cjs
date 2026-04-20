@@ -485,7 +485,7 @@ function SkillParamForm({
         param.name
       );
     }),
-    errors && errors.length > 0 && /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("div", { className: "space-y-1", children: errors.map((err, i) => /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("p", { className: "text-xs text-red-400", children: err }, i)) })
+    errors && errors.length > 0 && /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("div", { className: "space-y-1", children: errors.map((err, i) => /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("p", { className: "text-xs text-red-400", children: err }, `${i}-${err}`)) })
   ] });
 }
 function SkillParamField({ param, value, onChange }) {
@@ -853,6 +853,9 @@ var import_react4 = require("react");
 var import_workflow_utils4 = require("@qontinui/workflow-utils");
 var import_jsx_runtime7 = require("react/jsx-runtime");
 var EMPTY_INITIAL_REFS = [];
+function makeUid() {
+  return typeof crypto !== "undefined" && typeof crypto.randomUUID === "function" ? crypto.randomUUID() : `uid-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+}
 var ChevronUpIcon = ({ className }) => /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("svg", { className, fill: "none", viewBox: "0 0 24 24", stroke: "currentColor", strokeWidth: 2, children: /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("path", { strokeLinecap: "round", strokeLinejoin: "round", d: "m5 15 7-7 7 7" }) });
 var ChevronDownIcon = ({ className }) => /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("svg", { className, fill: "none", viewBox: "0 0 24 24", stroke: "currentColor", strokeWidth: 2, children: /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("path", { strokeLinecap: "round", strokeLinejoin: "round", d: "m19 9-7 7-7-7" }) });
 var XMarkIcon = ({ className }) => /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("svg", { className, fill: "none", viewBox: "0 0 24 24", stroke: "currentColor", strokeWidth: 2, children: /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("path", { strokeLinecap: "round", strokeLinejoin: "round", d: "M6 18 18 6M6 6l12 12" }) });
@@ -865,7 +868,8 @@ function resolveRef(ref) {
   const skill = (0, import_workflow_utils4.getSkill)(ref.skill_id);
   return {
     ...ref,
-    _skill: skill
+    _skill: skill,
+    _uid: makeUid()
   };
 }
 function CompositionSkillBuilder({
@@ -883,7 +887,8 @@ function CompositionSkillBuilder({
     const newRef = {
       skill_id: skill.id,
       parameter_overrides: {},
-      _skill: skill
+      _skill: skill,
+      _uid: makeUid()
     };
     setRefs((prev) => [...prev, newRef]);
     setShowPicker(false);
@@ -943,7 +948,7 @@ function CompositionSkillBuilder({
     []
   );
   const handleSave = (0, import_react4.useCallback)(() => {
-    const cleanRefs = refs.map(({ _skill, ...rest }) => {
+    const cleanRefs = refs.map(({ _skill, _uid, ...rest }) => {
       const clean = { skill_id: rest.skill_id };
       if (rest.parameter_overrides && Object.keys(rest.parameter_overrides).length > 0) {
         clean.parameter_overrides = rest.parameter_overrides;
@@ -971,7 +976,7 @@ function CompositionSkillBuilder({
         onParamChange: (name, value) => handleParamOverrideChange(index, name, value),
         resolveIcon
       },
-      `${ref.skill_id}-${index}`
+      ref._uid
     )) }),
     /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("div", { className: "px-4 py-2 border-t border-zinc-800", children: showPicker ? /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(
       MiniSkillPicker,
@@ -1629,7 +1634,7 @@ function ChatMessageArea({
             renderContent,
             onCreateWorkflow: onCreateWorkflowFromMessage
           },
-          i
+          `${msg.timestamp ?? i}-${msg.role}`
         )),
         isStreaming && streamingContent && /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("div", { className: "flex gap-3 items-start", children: [
           /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("div", { className: "shrink-0 w-7 h-7 rounded-full bg-purple-900/50 flex items-center justify-center", children: /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(AiBotIcon, {}) }),

@@ -19,6 +19,24 @@ import type {
   StandardActionType,
 } from "@qontinui/shared-types";
 
+/** Editor-local action: adds a stable id so reorder/add/remove keeps React
+ * reconciliation on the right row even though the schema type has no id. */
+type EditableAction = TransitionAction & { _uid: string };
+
+function makeActionUid(): string {
+  return typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+    ? crypto.randomUUID()
+    : `act-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
+function toEditableAction(action: TransitionAction): EditableAction {
+  return { ...action, _uid: makeActionUid() };
+}
+
+function stripUid({ _uid, ...rest }: EditableAction): TransitionAction {
+  return rest;
+}
+
 // =============================================================================
 // Props
 // =============================================================================
@@ -86,7 +104,7 @@ export function TransitionEditor({
   const [fromStates, setFromStates] = useState<string[]>([]);
   const [activateStates, setActivateStates] = useState<string[]>([]);
   const [exitStates, setExitStates] = useState<string[]>([]);
-  const [actions, setActions] = useState<TransitionAction[]>([]);
+  const [actions, setActions] = useState<EditableAction[]>([]);
   const [pathCost, setPathCost] = useState(1.0);
   const [staysVisible, setStaysVisible] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -98,7 +116,7 @@ export function TransitionEditor({
       setFromStates([...transition.from_states]);
       setActivateStates([...transition.activate_states]);
       setExitStates([...transition.exit_states]);
-      setActions([...transition.actions]);
+      setActions(transition.actions.map(toEditableAction));
       setPathCost(transition.path_cost);
       setStaysVisible(transition.stays_visible);
     } else {
@@ -106,7 +124,7 @@ export function TransitionEditor({
       setFromStates([]);
       setActivateStates([]);
       setExitStates([]);
-      setActions([{ type: "click" }]);
+      setActions([toEditableAction({ type: "click" })]);
       setPathCost(1.0);
       setStaysVisible(false);
     }
@@ -130,7 +148,7 @@ export function TransitionEditor({
 
   // Action helpers
   const addAction = useCallback(() => {
-    setActions((prev) => [...prev, { type: "click" }]);
+    setActions((prev) => [...prev, toEditableAction({ type: "click" })]);
   }, []);
 
   const removeAction = useCallback((index: number) => {
@@ -156,7 +174,7 @@ export function TransitionEditor({
         from_states: fromStates,
         activate_states: activateStates,
         exit_states: exitStates,
-        actions,
+        actions: actions.map(stripUid),
         path_cost: pathCost,
         stays_visible: staysVisible,
       };
@@ -257,7 +275,7 @@ export function TransitionEditor({
         <div className="flex flex-col gap-2">
           {actions.map((action, index) => (
             <ActionField
-              key={index}
+              key={action._uid}
               action={action}
               index={index}
               onUpdate={updateAction}

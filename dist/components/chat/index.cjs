@@ -475,7 +475,7 @@ function ChatMessageArea({
             renderContent,
             onCreateWorkflow: onCreateWorkflowFromMessage
           },
-          i
+          `${msg.timestamp ?? i}-${msg.role}`
         )),
         isStreaming && streamingContent && /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "flex gap-3 items-start", children: [
           /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("div", { className: "shrink-0 w-7 h-7 rounded-full bg-purple-900/50 flex items-center justify-center", children: /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(AiBotIcon, {}) }),

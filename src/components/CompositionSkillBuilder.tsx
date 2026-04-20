@@ -39,6 +39,15 @@ const EMPTY_INITIAL_REFS: SkillRef[] = [];
 interface EditableSkillRef extends SkillRef {
   /** Resolved skill definition for display */
   _skill?: SkillDefinition;
+  /** Client-side stable id — the same skill can appear twice, and the list can
+   * be reordered, so we need an identity independent of skill_id and position. */
+  _uid: string;
+}
+
+function makeUid(): string {
+  return typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+    ? crypto.randomUUID()
+    : `uid-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
 }
 
 // =============================================================================
@@ -85,6 +94,7 @@ function resolveRef(ref: SkillRef): EditableSkillRef {
   return {
     ...ref,
     _skill: skill,
+    _uid: makeUid(),
   };
 }
 
@@ -111,6 +121,7 @@ export function CompositionSkillBuilder({
       skill_id: skill.id,
       parameter_overrides: {},
       _skill: skill,
+      _uid: makeUid(),
     };
     setRefs((prev) => [...prev, newRef]);
     setShowPicker(false);
@@ -177,7 +188,7 @@ export function CompositionSkillBuilder({
 
   const handleSave = useCallback(() => {
     // Strip internal fields before saving
-    const cleanRefs: SkillRef[] = refs.map(({ _skill, ...rest }) => {
+    const cleanRefs: SkillRef[] = refs.map(({ _skill, _uid, ...rest }) => {
       const clean: SkillRef = { skill_id: rest.skill_id };
       if (
         rest.parameter_overrides &&
@@ -211,7 +222,7 @@ export function CompositionSkillBuilder({
         ) : (
           refs.map((ref, index) => (
             <SkillRefItem
-              key={`${ref.skill_id}-${index}`}
+              key={ref._uid}
               ref_={ref}
               index={index}
               total={refs.length}

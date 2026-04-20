@@ -647,7 +647,7 @@ export function StateViewPanel({
                 <ul className="space-y-1">
                   {selectedState.acceptance_criteria.map((criteria, i) => (
                     <li
-                      key={i}
+                      key={`${i}-${criteria}`}
                       className="text-xs text-text-muted flex items-start gap-1.5"
                     >
                       <CheckCircle className="size-3 text-green-500 mt-0.5 shrink-0" />

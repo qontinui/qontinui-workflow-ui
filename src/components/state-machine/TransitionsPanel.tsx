@@ -663,7 +663,7 @@ export function TransitionsPanel({
                     const color = getActionColorConfig(action.type);
                     return (
                       <button
-                        key={idx}
+                        key={`${idx}-${action.type}`}
                         onClick={() => {
                           stopAnimation();
                           setAnimation((prev) => ({
@@ -720,7 +720,7 @@ export function TransitionsPanel({
 
                     return (
                       <div
-                        key={idx}
+                        key={`${idx}-${action.type}`}
                         className={`
                           flex items-start gap-3 p-3 rounded-lg border transition-all duration-200
                           ${

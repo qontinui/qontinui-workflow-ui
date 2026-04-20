@@ -338,7 +338,7 @@ export function StateDetailPanel({
         {acceptanceCriteria.length > 0 && (
           <ul className="space-y-0.5 mb-1.5">
             {acceptanceCriteria.map((c, i) => (
-              <li key={i} className="group flex items-start gap-1.5 text-xs">
+              <li key={`${i}-${c}`} className="group flex items-start gap-1.5 text-xs">
                 {editingCriterionIdx === i ? (
                   <input
                     type="text"

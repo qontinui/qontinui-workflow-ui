@@ -189,7 +189,7 @@ export function PathfindingPanel({
                 <div className="space-y-1.5">
                   {result.steps.map((step, i) => (
                     <div
-                      key={i}
+                      key={`${i}-${step.transition_name}`}
                       className="p-2 bg-bg-tertiary border border-border-secondary rounded text-xs"
                     >
                       <div className="flex items-center justify-between">

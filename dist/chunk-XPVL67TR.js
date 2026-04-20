@@ -446,7 +446,7 @@ function ChatMessageArea({
             renderContent,
             onCreateWorkflow: onCreateWorkflowFromMessage
           },
-          i
+          `${msg.timestamp ?? i}-${msg.role}`
         )),
         isStreaming && streamingContent && /* @__PURE__ */ jsxs3("div", { className: "flex gap-3 items-start", children: [
           /* @__PURE__ */ jsx3("div", { className: "shrink-0 w-7 h-7 rounded-full bg-purple-900/50 flex items-center justify-center", children: /* @__PURE__ */ jsx3(AiBotIcon, {}) }),
@@ -1015,4 +1015,4 @@ export {
   ChatMessageArea,
   WorkflowPreviewPanel
 };
-//# sourceMappingURL=chunk-IICFUDT5.js.map
+//# sourceMappingURL=chunk-XPVL67TR.js.map

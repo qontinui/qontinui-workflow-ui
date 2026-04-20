@@ -10,7 +10,7 @@ import {
   ChatInput,
   ChatMessageArea,
   WorkflowPreviewPanel
-} from "../chunk-IICFUDT5.js";
+} from "../chunk-XPVL67TR.js";
 
 // src/components/PhaseSection.tsx
 import { useState, useCallback } from "react";
@@ -292,7 +292,7 @@ function SkillParamForm({
         param.name
       );
     }),
-    errors && errors.length > 0 && /* @__PURE__ */ jsx3("div", { className: "space-y-1", children: errors.map((err, i) => /* @__PURE__ */ jsx3("p", { className: "text-xs text-red-400", children: err }, i)) })
+    errors && errors.length > 0 && /* @__PURE__ */ jsx3("div", { className: "space-y-1", children: errors.map((err, i) => /* @__PURE__ */ jsx3("p", { className: "text-xs text-red-400", children: err }, `${i}-${err}`)) })
   ] });
 }
 function SkillParamField({ param, value, onChange }) {
@@ -664,6 +664,9 @@ import {
 } from "@qontinui/workflow-utils";
 import { jsx as jsx5, jsxs as jsxs5 } from "react/jsx-runtime";
 var EMPTY_INITIAL_REFS = [];
+function makeUid() {
+  return typeof crypto !== "undefined" && typeof crypto.randomUUID === "function" ? crypto.randomUUID() : `uid-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+}
 var ChevronUpIcon = ({ className }) => /* @__PURE__ */ jsx5("svg", { className, fill: "none", viewBox: "0 0 24 24", stroke: "currentColor", strokeWidth: 2, children: /* @__PURE__ */ jsx5("path", { strokeLinecap: "round", strokeLinejoin: "round", d: "m5 15 7-7 7 7" }) });
 var ChevronDownIcon = ({ className }) => /* @__PURE__ */ jsx5("svg", { className, fill: "none", viewBox: "0 0 24 24", stroke: "currentColor", strokeWidth: 2, children: /* @__PURE__ */ jsx5("path", { strokeLinecap: "round", strokeLinejoin: "round", d: "m19 9-7 7-7-7" }) });
 var XMarkIcon = ({ className }) => /* @__PURE__ */ jsx5("svg", { className, fill: "none", viewBox: "0 0 24 24", stroke: "currentColor", strokeWidth: 2, children: /* @__PURE__ */ jsx5("path", { strokeLinecap: "round", strokeLinejoin: "round", d: "M6 18 18 6M6 6l12 12" }) });
@@ -676,7 +679,8 @@ function resolveRef(ref) {
   const skill = getSkill(ref.skill_id);
   return {
     ...ref,
-    _skill: skill
+    _skill: skill,
+    _uid: makeUid()
   };
 }
 function CompositionSkillBuilder({
@@ -694,7 +698,8 @@ function CompositionSkillBuilder({
     const newRef = {
       skill_id: skill.id,
       parameter_overrides: {},
-      _skill: skill
+      _skill: skill,
+      _uid: makeUid()
     };
     setRefs((prev) => [...prev, newRef]);
     setShowPicker(false);
@@ -754,7 +759,7 @@ function CompositionSkillBuilder({
     []
   );
   const handleSave = useCallback2(() => {
-    const cleanRefs = refs.map(({ _skill, ...rest }) => {
+    const cleanRefs = refs.map(({ _skill, _uid, ...rest }) => {
       const clean = { skill_id: rest.skill_id };
       if (rest.parameter_overrides && Object.keys(rest.parameter_overrides).length > 0) {
         clean.parameter_overrides = rest.parameter_overrides;
@@ -782,7 +787,7 @@ function CompositionSkillBuilder({
         onParamChange: (name, value) => handleParamOverrideChange(index, name, value),
         resolveIcon
       },
-      `${ref.skill_id}-${index}`
+      ref._uid
     )) }),
     /* @__PURE__ */ jsx5("div", { className: "px-4 py-2 border-t border-zinc-800", children: showPicker ? /* @__PURE__ */ jsx5(
       MiniSkillPicker,
