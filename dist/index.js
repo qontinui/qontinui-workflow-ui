@@ -8,7 +8,7 @@ import {
   ChatInput,
   ChatMessageArea,
   WorkflowPreviewPanel
-} from "./chunk-DHU3K3MY.js";
+} from "./chunk-IICFUDT5.js";
 
 // src/WorkflowDataProvider.tsx
 import { createContext, useContext } from "react";
@@ -50,13 +50,13 @@ function getPhaseSteps(workflow, phase, stageIndex) {
   const source = workflow.stages && workflow.stages.length > 0 && stageIndex < workflow.stages.length ? workflow.stages[stageIndex] : workflow;
   switch (phase) {
     case "setup":
-      return source.setup_steps;
+      return source.setupSteps;
     case "verification":
-      return source.verification_steps;
+      return source.verificationSteps;
     case "agentic":
-      return source.agentic_steps;
+      return source.agenticSteps;
     case "completion":
-      return source.completion_steps ?? [];
+      return source.completionSteps ?? [];
   }
 }
 function setPhaseSteps(workflow, phase, stageIndex, steps) {
@@ -65,16 +65,16 @@ function setPhaseSteps(workflow, phase, stageIndex, steps) {
     const stage = { ...stages[stageIndex] };
     switch (phase) {
       case "setup":
-        stage.setup_steps = steps;
+        stage.setupSteps = steps;
         break;
       case "verification":
-        stage.verification_steps = steps;
+        stage.verificationSteps = steps;
         break;
       case "agentic":
-        stage.agentic_steps = steps;
+        stage.agenticSteps = steps;
         break;
       case "completion":
-        stage.completion_steps = steps;
+        stage.completionSteps = steps;
         break;
     }
     stages[stageIndex] = stage;
@@ -84,22 +84,22 @@ function setPhaseSteps(workflow, phase, stageIndex, steps) {
     case "setup":
       return {
         ...workflow,
-        setup_steps: steps
+        setupSteps: steps
       };
     case "verification":
       return {
         ...workflow,
-        verification_steps: steps
+        verificationSteps: steps
       };
     case "agentic":
       return {
         ...workflow,
-        agentic_steps: steps
+        agenticSteps: steps
       };
     case "completion":
       return {
         ...workflow,
-        completion_steps: steps
+        completionSteps: steps
       };
   }
 }
@@ -156,36 +156,20 @@ function workflowBuilderReducer(state, action) {
       );
       let updated = {
         ...wf,
-        setup_steps: updateInSteps(
-          wf.setup_steps
-        ),
-        verification_steps: updateInSteps(
-          wf.verification_steps
-        ),
-        agentic_steps: updateInSteps(
-          wf.agentic_steps
-        ),
-        completion_steps: updateInSteps(
-          wf.completion_steps ?? []
-        )
+        setupSteps: updateInSteps(wf.setupSteps),
+        verificationSteps: updateInSteps(wf.verificationSteps),
+        agenticSteps: updateInSteps(wf.agenticSteps),
+        completionSteps: updateInSteps(wf.completionSteps ?? [])
       };
       if (updated.stages) {
         updated = {
           ...updated,
           stages: updated.stages.map((s) => ({
             ...s,
-            setup_steps: updateInSteps(
-              s.setup_steps
-            ),
-            verification_steps: updateInSteps(
-              s.verification_steps
-            ),
-            agentic_steps: updateInSteps(
-              s.agentic_steps
-            ),
-            completion_steps: updateInSteps(
-              s.completion_steps ?? []
-            )
+            setupSteps: updateInSteps(s.setupSteps),
+            verificationSteps: updateInSteps(s.verificationSteps),
+            agenticSteps: updateInSteps(s.agenticSteps),
+            completionSteps: updateInSteps(s.completionSteps ?? [])
           }))
         };
       }
@@ -311,26 +295,26 @@ function workflowBuilderReducer(state, action) {
         id: generateStepId(),
         name: wf.name || "Stage 1",
         description: wf.description,
-        setup_steps: wf.setup_steps,
-        verification_steps: wf.verification_steps,
-        agentic_steps: wf.agentic_steps,
-        completion_steps: wf.completion_steps ?? [],
-        max_iterations: wf.max_iterations,
-        timeout_seconds: wf.timeout_seconds,
+        setupSteps: wf.setupSteps,
+        verificationSteps: wf.verificationSteps,
+        agenticSteps: wf.agenticSteps,
+        completionSteps: wf.completionSteps ?? [],
+        maxIterations: wf.maxIterations,
+        timeoutSeconds: wf.timeoutSeconds,
         provider: wf.provider,
         model: wf.model,
-        approval_gate: false,
-        completion_prompts_first: false
+        approvalGate: false,
+        completionPromptsFirst: false
       };
       return {
         ...state,
         workflow: {
           ...wf,
           stages: [initialStage],
-          setup_steps: [],
-          verification_steps: [],
-          agentic_steps: [],
-          completion_steps: []
+          setupSteps: [],
+          verificationSteps: [],
+          agenticSteps: [],
+          completionSteps: []
         },
         currentStageIndex: 0
       };
@@ -344,10 +328,10 @@ function workflowBuilderReducer(state, action) {
         workflow: {
           ...wf,
           stages: void 0,
-          setup_steps: first.setup_steps,
-          verification_steps: first.verification_steps,
-          agentic_steps: first.agentic_steps,
-          completion_steps: first.completion_steps
+          setupSteps: first.setupSteps,
+          verificationSteps: first.verificationSteps,
+          agenticSteps: first.agenticSteps,
+          completionSteps: first.completionSteps
         },
         currentStageIndex: 0
       };
@@ -402,15 +386,15 @@ function WorkflowBuilderProvider({
   const selectedStep = (() => {
     if (!state.selectedStepId) return null;
     const allSteps = [
-      ...state.workflow.setup_steps,
-      ...state.workflow.verification_steps,
-      ...state.workflow.agentic_steps,
-      ...state.workflow.completion_steps ?? [],
+      ...state.workflow.setupSteps,
+      ...state.workflow.verificationSteps,
+      ...state.workflow.agenticSteps,
+      ...state.workflow.completionSteps ?? [],
       ...(state.workflow.stages ?? []).flatMap((s) => [
-        ...s.setup_steps,
-        ...s.verification_steps,
-        ...s.agentic_steps,
-        ...s.completion_steps ?? []
+        ...s.setupSteps,
+        ...s.verificationSteps,
+        ...s.agenticSteps,
+        ...s.completionSteps ?? []
       ])
     ];
     return allSteps.find((s) => s.id === state.selectedStepId) ?? null;

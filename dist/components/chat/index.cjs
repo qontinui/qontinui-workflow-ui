@@ -872,6 +872,8 @@ function WorkflowPreviewPanel({
           "button",
           {
             onClick: onSave,
+            title: "Save workflow to library",
+            "aria-label": "Save workflow to library",
             className: "flex-1 h-8 rounded-md border border-border-subtle/50 text-text-primary text-xs hover:bg-surface-hover flex items-center justify-center gap-1.5",
             children: [
               /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)(
@@ -889,7 +891,7 @@ function WorkflowPreviewPanel({
                   ]
                 }
               ),
-              "Save to Library"
+              "Save"
             ]
           }
         )

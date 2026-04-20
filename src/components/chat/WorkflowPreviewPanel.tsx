@@ -217,6 +217,8 @@ export function WorkflowPreviewPanel({
             </button>
             <button
               onClick={onSave}
+              title="Save workflow to library"
+              aria-label="Save workflow to library"
               className="flex-1 h-8 rounded-md border border-border-subtle/50 text-text-primary text-xs hover:bg-surface-hover flex items-center justify-center gap-1.5"
             >
               <svg
@@ -230,7 +232,7 @@ export function WorkflowPreviewPanel({
                 <polyline points="17 21 17 13 7 13 7 21" />
                 <polyline points="7 3 7 8 15 8" />
               </svg>
-              Save to Library
+              Save
             </button>
           </div>
         </div>

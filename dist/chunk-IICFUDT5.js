@@ -843,6 +843,8 @@ function WorkflowPreviewPanel({
           "button",
           {
             onClick: onSave,
+            title: "Save workflow to library",
+            "aria-label": "Save workflow to library",
             className: "flex-1 h-8 rounded-md border border-border-subtle/50 text-text-primary text-xs hover:bg-surface-hover flex items-center justify-center gap-1.5",
             children: [
               /* @__PURE__ */ jsxs4(
@@ -860,7 +862,7 @@ function WorkflowPreviewPanel({
                   ]
                 }
               ),
-              "Save to Library"
+              "Save"
             ]
           }
         )
@@ -1013,4 +1015,4 @@ export {
   ChatMessageArea,
   WorkflowPreviewPanel
 };
-//# sourceMappingURL=chunk-DHU3K3MY.js.map
+//# sourceMappingURL=chunk-IICFUDT5.js.map
