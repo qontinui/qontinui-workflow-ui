@@ -852,6 +852,7 @@ function SkillCard({
 var import_react4 = require("react");
 var import_workflow_utils4 = require("@qontinui/workflow-utils");
 var import_jsx_runtime7 = require("react/jsx-runtime");
+var EMPTY_INITIAL_REFS = [];
 var ChevronUpIcon = ({ className }) => /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("svg", { className, fill: "none", viewBox: "0 0 24 24", stroke: "currentColor", strokeWidth: 2, children: /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("path", { strokeLinecap: "round", strokeLinejoin: "round", d: "m5 15 7-7 7 7" }) });
 var ChevronDownIcon = ({ className }) => /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("svg", { className, fill: "none", viewBox: "0 0 24 24", stroke: "currentColor", strokeWidth: 2, children: /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("path", { strokeLinecap: "round", strokeLinejoin: "round", d: "m19 9-7 7-7-7" }) });
 var XMarkIcon = ({ className }) => /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("svg", { className, fill: "none", viewBox: "0 0 24 24", stroke: "currentColor", strokeWidth: 2, children: /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("path", { strokeLinecap: "round", strokeLinejoin: "round", d: "M6 18 18 6M6 6l12 12" }) });
@@ -868,7 +869,7 @@ function resolveRef(ref) {
   };
 }
 function CompositionSkillBuilder({
-  initialRefs = [],
+  initialRefs = EMPTY_INITIAL_REFS,
   onSave,
   onCancel,
   resolveIcon

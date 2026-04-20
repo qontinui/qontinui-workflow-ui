@@ -34,6 +34,8 @@ export interface CompositionSkillBuilderProps {
   resolveIcon: (iconId: string) => React.ComponentType<{ className?: string }>;
 }
 
+const EMPTY_INITIAL_REFS: SkillRef[] = [];
+
 interface EditableSkillRef extends SkillRef {
   /** Resolved skill definition for display */
   _skill?: SkillDefinition;
@@ -91,7 +93,7 @@ function resolveRef(ref: SkillRef): EditableSkillRef {
 // =============================================================================
 
 export function CompositionSkillBuilder({
-  initialRefs = [],
+  initialRefs = EMPTY_INITIAL_REFS,
   onSave,
   onCancel,
   resolveIcon,

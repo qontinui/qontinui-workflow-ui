@@ -1954,7 +1954,10 @@ function StateDetailPanel({
     const title = newDkTitle.trim();
     const content = newDkContent.trim();
     if (!title || !content) return;
-    const tags = newDkTags.split(",").map((t) => t.trim()).filter(Boolean);
+    const tags = newDkTags.split(",").flatMap((t) => {
+      const trimmed = t.trim();
+      return trimmed ? [trimmed] : [];
+    });
     setDomainKnowledge((prev) => [
       ...prev,
       {

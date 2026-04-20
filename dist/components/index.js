@@ -663,6 +663,7 @@ import {
   getSkillCategoryIconData as getSkillCategoryIconData2
 } from "@qontinui/workflow-utils";
 import { jsx as jsx5, jsxs as jsxs5 } from "react/jsx-runtime";
+var EMPTY_INITIAL_REFS = [];
 var ChevronUpIcon = ({ className }) => /* @__PURE__ */ jsx5("svg", { className, fill: "none", viewBox: "0 0 24 24", stroke: "currentColor", strokeWidth: 2, children: /* @__PURE__ */ jsx5("path", { strokeLinecap: "round", strokeLinejoin: "round", d: "m5 15 7-7 7 7" }) });
 var ChevronDownIcon = ({ className }) => /* @__PURE__ */ jsx5("svg", { className, fill: "none", viewBox: "0 0 24 24", stroke: "currentColor", strokeWidth: 2, children: /* @__PURE__ */ jsx5("path", { strokeLinecap: "round", strokeLinejoin: "round", d: "m19 9-7 7-7-7" }) });
 var XMarkIcon = ({ className }) => /* @__PURE__ */ jsx5("svg", { className, fill: "none", viewBox: "0 0 24 24", stroke: "currentColor", strokeWidth: 2, children: /* @__PURE__ */ jsx5("path", { strokeLinecap: "round", strokeLinejoin: "round", d: "M6 18 18 6M6 6l12 12" }) });
@@ -679,7 +680,7 @@ function resolveRef(ref) {
   };
 }
 function CompositionSkillBuilder({
-  initialRefs = [],
+  initialRefs = EMPTY_INITIAL_REFS,
   onSave,
   onCancel,
   resolveIcon
