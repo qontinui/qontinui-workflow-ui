@@ -27,6 +27,12 @@ export interface DiagramTabProps {
   isLoading?: boolean;
   /** Optional: manual refresh handler. Shows a refresh button when provided. */
   onRefresh?: () => void;
+  /**
+   * If set, render this message instead of the diagram. Caller uses this to
+   * signal "too large to render" without DiagramTab needing to know about
+   * state counts or other domain concepts.
+   */
+  unavailableReason?: string;
 }
 
 export function DiagramTab({
@@ -34,12 +40,20 @@ export function DiagramTab({
   diagramSource,
   isLoading,
   onRefresh,
+  unavailableReason,
 }: DiagramTabProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const [importError, setImportError] = useState<string | null>(null);
   const [renderError, setRenderError] = useState<string | null>(null);
 
   useEffect(() => {
+    // Skip rendering when the caller says the diagram is unavailable —
+    // protects mermaid from trying to lay out huge graphs.
+    if (unavailableReason) {
+      if (containerRef.current) containerRef.current.innerHTML = "";
+      setRenderError(null);
+      return;
+    }
     if (!diagramSource || !diagramSource.trim()) {
       // Clear any prior render when source becomes empty
       if (containerRef.current) containerRef.current.innerHTML = "";
@@ -105,7 +119,7 @@ export function DiagramTab({
     return () => {
       cancelled = true;
     };
-  }, [diagramSource]);
+  }, [diagramSource, unavailableReason]);
 
   const hasSource = !!diagramSource && diagramSource.trim().length > 0;
 
@@ -142,14 +156,20 @@ export function DiagramTab({
 
       {/* Body */}
       <div className="flex-1 min-h-0 overflow-auto p-6 bg-surface-secondary">
-        {isLoading && (
+        {unavailableReason && (
+          <div className="flex items-center justify-center h-full text-text-muted text-sm text-center px-6">
+            {unavailableReason}
+          </div>
+        )}
+
+        {!unavailableReason && isLoading && (
           <div className="flex items-center justify-center h-full text-text-muted gap-2">
             <Loader2 className="size-4 animate-spin" />
             Loading diagram…
           </div>
         )}
 
-        {!isLoading && importError && (
+        {!unavailableReason && !isLoading && importError && (
           <div className="max-w-xl mx-auto p-4 border border-border-primary rounded-md bg-surface-primary text-sm text-text-primary">
             <p className="font-semibold mb-1">
               Mermaid is not available in this bundle.
@@ -165,13 +185,13 @@ export function DiagramTab({
           </div>
         )}
 
-        {!isLoading && !importError && !hasSource && (
+        {!unavailableReason && !isLoading && !importError && !hasSource && (
           <div className="flex items-center justify-center h-full text-text-muted">
             No diagram available
           </div>
         )}
 
-        {!isLoading && !importError && hasSource && renderError && (
+        {!unavailableReason && !isLoading && !importError && hasSource && renderError && (
           <div className="max-w-xl mx-auto p-4 border border-border-primary rounded-md bg-surface-primary text-sm">
             <p className="font-semibold mb-1 text-text-primary">
               Failed to render diagram.
@@ -187,7 +207,9 @@ export function DiagramTab({
         <div
           ref={containerRef}
           className="mermaid-diagram flex items-center justify-center"
-          style={{ display: hasSource && !importError ? undefined : "none" }}
+          style={{
+            display: hasSource && !importError && !unavailableReason ? undefined : "none",
+          }}
         />
       </div>
     </div>

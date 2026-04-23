@@ -91,6 +91,13 @@ declare function TransitionEditor({ transition, states, onSave, onUpdate, onDele
 interface TransitionsPanelProps {
     states: StateMachineState[];
     transitions: StateMachineTransition[];
+    /**
+     * Currently-selected transition id. Fully controlled — the panel never
+     * keeps its own shadow copy, so external selections (e.g., from the Graph
+     * Editor tab) show up here and internal clicks flow out to the parent via
+     * `onSelectTransition`.
+     */
+    selectedTransitionId: string | null;
     onSelectTransition: (id: string | null) => void;
     /**
      * Active-state IDs for the "permitted from active states" filter. When
@@ -109,7 +116,7 @@ interface TransitionsPanelProps {
      */
     blockedTriggers?: BlockedTrigger[];
 }
-declare function TransitionsPanel({ states, transitions, onSelectTransition, activeStateIds, permittedTriggers, blockedTriggers, }: TransitionsPanelProps): react_jsx_runtime.JSX.Element;
+declare function TransitionsPanel({ states, transitions, selectedTransitionId, onSelectTransition, activeStateIds, permittedTriggers, blockedTriggers, }: TransitionsPanelProps): react_jsx_runtime.JSX.Element;
 
 interface StateDetailPanelProps {
     /** The state to display/edit */
@@ -214,7 +221,13 @@ interface DiagramTabProps {
     isLoading?: boolean;
     /** Optional: manual refresh handler. Shows a refresh button when provided. */
     onRefresh?: () => void;
+    /**
+     * If set, render this message instead of the diagram. Caller uses this to
+     * signal "too large to render" without DiagramTab needing to know about
+     * state counts or other domain concepts.
+     */
+    unavailableReason?: string;
 }
-declare function DiagramTab({ activeStateIds, diagramSource, isLoading, onRefresh, }: DiagramTabProps): react_jsx_runtime.JSX.Element;
+declare function DiagramTab({ activeStateIds, diagramSource, isLoading, onRefresh, unavailableReason, }: DiagramTabProps): react_jsx_runtime.JSX.Element;
 
 export { type CaptureScreenshotMeta, DiagramTab, type DiagramTabProps, type FingerprintDetail, PathfindingPanel, type PathfindingPanelProps, StateDetailPanel, type StateDetailPanelProps, StateMachineGraphView, type StateMachineGraphViewProps, StateMachineStateNode, StateMachineTransitionEdge, StateViewPanel, type StateViewPanelProps, StateViewTable, type StateViewTableProps, TransitionEditor, type TransitionEditorProps, TransitionsPanel, type TransitionsPanelProps };

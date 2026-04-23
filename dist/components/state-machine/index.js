@@ -391,6 +391,9 @@ var StateMachineTransitionEdge = memo2(StateMachineTransitionEdgeInner);
 import { Fragment as Fragment2, jsx as jsx3, jsxs as jsxs3 } from "react/jsx-runtime";
 var nodeTypes = { stateNode: StateMachineStateNode };
 var edgeTypes = { transitionEdge: StateMachineTransitionEdge };
+var FIT_VIEW_OPTIONS = { padding: 0.2, minZoom: 0.3 };
+var FIT_VIEW_OPTIONS_ANIMATED = { ...FIT_VIEW_OPTIONS, duration: 300 };
+var GRAPH_MAX_NODES = 150;
 function StateMachineGraphViewInner({
   dagre: dagreLib,
   states,
@@ -513,7 +516,7 @@ function StateMachineGraphViewInner({
   }, [layouted, setNodes, setEdges]);
   useEffect(() => {
     if (states.length > prevStateCountRef.current) {
-      setTimeout(() => reactFlowInstance.fitView({ padding: 0.2, duration: 300 }), 100);
+      setTimeout(() => reactFlowInstance.fitView(FIT_VIEW_OPTIONS_ANIMATED), 100);
     }
     prevStateCountRef.current = states.length;
   }, [states.length, reactFlowInstance]);
@@ -541,7 +544,7 @@ function StateMachineGraphViewInner({
     const result = getLayoutedElements(dagreLib, nodes, edges, STATE_MACHINE_LAYOUT_OPTIONS);
     setNodes(result.nodes);
     setEdges(result.edges);
-    setTimeout(() => reactFlowInstance.fitView({ padding: 0.2, duration: 300 }), 50);
+    setTimeout(() => reactFlowInstance.fitView(FIT_VIEW_OPTIONS_ANIMATED), 50);
   }, [dagreLib, nodes, edges, setNodes, setEdges, reactFlowInstance]);
   useEffect(() => {
     const handleKeyDown = (e) => {
@@ -554,7 +557,7 @@ function StateMachineGraphViewInner({
       }
       if (e.key === "?" && !e.ctrlKey && !e.metaKey) setShowShortcuts((p) => !p);
       if (e.key === "f" && !e.ctrlKey && !e.metaKey && !e.altKey)
-        reactFlowInstance.fitView({ padding: 0.2, duration: 300 });
+        reactFlowInstance.fitView(FIT_VIEW_OPTIONS_ANIMATED);
       if (e.key === "l" && !e.ctrlKey && !e.metaKey && !e.altKey) handleRelayout();
       if (e.key === "=" || e.key === "+") reactFlowInstance.zoomIn({ duration: 200 });
       if (e.key === "-") reactFlowInstance.zoomOut({ duration: 200 });
@@ -628,6 +631,25 @@ function StateMachineGraphViewInner({
   if (states.length === 0) {
     return /* @__PURE__ */ jsx3("div", { className: "flex items-center justify-center h-full text-text-muted", children: /* @__PURE__ */ jsx3("p", { children: emptyMessage }) });
   }
+  if (states.length > GRAPH_MAX_NODES) {
+    return /* @__PURE__ */ jsxs3("div", { className: "flex flex-col items-center justify-center h-full gap-3 text-center px-8 text-text-muted", children: [
+      /* @__PURE__ */ jsx3(LayoutGrid, { className: "size-10 opacity-40" }),
+      /* @__PURE__ */ jsxs3("p", { className: "text-sm font-medium text-text-primary", children: [
+        "Graph too large to render (",
+        states.length,
+        " states, ",
+        transitions.length,
+        " transitions)."
+      ] }),
+      /* @__PURE__ */ jsxs3("p", { className: "text-xs max-w-md", children: [
+        "Graphs above ",
+        GRAPH_MAX_NODES,
+        " nodes overwhelm the browser's layout engine. Use the ",
+        /* @__PURE__ */ jsx3("span", { className: "text-brand-primary", children: "State View" }),
+        " tab to browse all states with search, filter, and detail panels."
+      ] })
+    ] });
+  }
   return /* @__PURE__ */ jsx3("div", { className: "h-full w-full", onDragOver, onDrop, children: /* @__PURE__ */ jsxs3(
     ReactFlow,
     {
@@ -639,9 +661,10 @@ function StateMachineGraphViewInner({
       nodeTypes,
       edgeTypes,
       fitView: true,
-      fitViewOptions: { padding: 0.2 },
+      fitViewOptions: FIT_VIEW_OPTIONS,
       minZoom: 0.05,
       maxZoom: 3,
+      onlyRenderVisibleElements: true,
       deleteKeyCode: null,
       selectNodesOnDrag: false,
       children: [
@@ -664,7 +687,7 @@ function StateMachineGraphViewInner({
           /* @__PURE__ */ jsxs3(
             "button",
             {
-              onClick: () => reactFlowInstance.fitView({ padding: 0.2, duration: 300 }),
+              onClick: () => reactFlowInstance.fitView(FIT_VIEW_OPTIONS_ANIMATED),
               className: "flex items-center gap-1.5 h-7 px-2 text-xs text-text-secondary hover:text-text-primary hover:bg-bg-tertiary rounded",
               title: "Fit to view (F)",
               children: [
@@ -1270,12 +1293,12 @@ function shortBlockedLabel(reason) {
 function TransitionsPanel({
   states,
   transitions,
+  selectedTransitionId,
   onSelectTransition,
   activeStateIds,
   permittedTriggers,
   blockedTriggers
 }) {
-  const [selectedTransitionId, setSelectedTransitionId] = useState3(null);
   const [filterFromState, setFilterFromState] = useState3(null);
   const [filterToState, setFilterToState] = useState3(null);
   const [searchFilter, setSearchFilter] = useState3("");
@@ -1417,7 +1440,6 @@ function TransitionsPanel({
   }, [selectedTransitionId, resetAnimation]);
   const handleSelectTransition = useCallback3(
     (tid) => {
-      setSelectedTransitionId(tid === selectedTransitionId ? null : tid);
       onSelectTransition(tid === selectedTransitionId ? null : tid);
     },
     [selectedTransitionId, onSelectTransition]
@@ -4156,12 +4178,18 @@ function DiagramTab({
   activeStateIds,
   diagramSource,
   isLoading,
-  onRefresh
+  onRefresh,
+  unavailableReason
 }) {
   const containerRef = useRef5(null);
   const [importError, setImportError] = useState11(null);
   const [renderError, setRenderError] = useState11(null);
   useEffect8(() => {
+    if (unavailableReason) {
+      if (containerRef.current) containerRef.current.innerHTML = "";
+      setRenderError(null);
+      return;
+    }
     if (!diagramSource || !diagramSource.trim()) {
       if (containerRef.current) containerRef.current.innerHTML = "";
       setRenderError(null);
@@ -4208,7 +4236,7 @@ function DiagramTab({
     return () => {
       cancelled = true;
     };
-  }, [diagramSource]);
+  }, [diagramSource, unavailableReason]);
   const hasSource = !!diagramSource && diagramSource.trim().length > 0;
   return /* @__PURE__ */ jsxs13("div", { className: "flex flex-col h-full w-full", children: [
     /* @__PURE__ */ jsxs13("div", { className: "flex items-center justify-between px-6 py-3 border-b border-border-primary bg-surface-primary", children: [
@@ -4243,11 +4271,12 @@ function DiagramTab({
       )
     ] }),
     /* @__PURE__ */ jsxs13("div", { className: "flex-1 min-h-0 overflow-auto p-6 bg-surface-secondary", children: [
-      isLoading && /* @__PURE__ */ jsxs13("div", { className: "flex items-center justify-center h-full text-text-muted gap-2", children: [
+      unavailableReason && /* @__PURE__ */ jsx13("div", { className: "flex items-center justify-center h-full text-text-muted text-sm text-center px-6", children: unavailableReason }),
+      !unavailableReason && isLoading && /* @__PURE__ */ jsxs13("div", { className: "flex items-center justify-center h-full text-text-muted gap-2", children: [
         /* @__PURE__ */ jsx13(Loader2, { className: "size-4 animate-spin" }),
         "Loading diagram\u2026"
       ] }),
-      !isLoading && importError && /* @__PURE__ */ jsxs13("div", { className: "max-w-xl mx-auto p-4 border border-border-primary rounded-md bg-surface-primary text-sm text-text-primary", children: [
+      !unavailableReason && !isLoading && importError && /* @__PURE__ */ jsxs13("div", { className: "max-w-xl mx-auto p-4 border border-border-primary rounded-md bg-surface-primary text-sm text-text-primary", children: [
         /* @__PURE__ */ jsx13("p", { className: "font-semibold mb-1", children: "Mermaid is not available in this bundle." }),
         /* @__PURE__ */ jsxs13("p", { className: "text-text-muted", children: [
           "Install ",
@@ -4262,8 +4291,8 @@ function DiagramTab({
           importError
         ] })
       ] }),
-      !isLoading && !importError && !hasSource && /* @__PURE__ */ jsx13("div", { className: "flex items-center justify-center h-full text-text-muted", children: "No diagram available" }),
-      !isLoading && !importError && hasSource && renderError && /* @__PURE__ */ jsxs13("div", { className: "max-w-xl mx-auto p-4 border border-border-primary rounded-md bg-surface-primary text-sm", children: [
+      !unavailableReason && !isLoading && !importError && !hasSource && /* @__PURE__ */ jsx13("div", { className: "flex items-center justify-center h-full text-text-muted", children: "No diagram available" }),
+      !unavailableReason && !isLoading && !importError && hasSource && renderError && /* @__PURE__ */ jsxs13("div", { className: "max-w-xl mx-auto p-4 border border-border-primary rounded-md bg-surface-primary text-sm", children: [
         /* @__PURE__ */ jsx13("p", { className: "font-semibold mb-1 text-text-primary", children: "Failed to render diagram." }),
         /* @__PURE__ */ jsx13("pre", { className: "text-xs text-text-muted whitespace-pre-wrap", children: renderError })
       ] }),
@@ -4272,7 +4301,9 @@ function DiagramTab({
         {
           ref: containerRef,
           className: "mermaid-diagram flex items-center justify-center",
-          style: { display: hasSource && !importError ? void 0 : "none" }
+          style: {
+            display: hasSource && !importError && !unavailableReason ? void 0 : "none"
+          }
         }
       )
     ] })

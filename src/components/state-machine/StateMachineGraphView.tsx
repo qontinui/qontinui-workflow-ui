@@ -42,6 +42,18 @@ import { StateMachineTransitionEdge } from "./StateMachineTransitionEdge";
 const nodeTypes = { stateNode: StateMachineStateNode };
 const edgeTypes = { transitionEdge: StateMachineTransitionEdge };
 
+// Shared fitView options. minZoom prevents fitView from zooming so far out
+// that every node lands in the viewport on large graphs, which would defeat
+// <ReactFlow onlyRenderVisibleElements>.
+const FIT_VIEW_OPTIONS = { padding: 0.2, minZoom: 0.3 } as const;
+const FIT_VIEW_OPTIONS_ANIMATED = { ...FIT_VIEW_OPTIONS, duration: 300 } as const;
+
+// Hard ceiling for node count. Above this, even with viewport virtualization,
+// dagre layout + ReactFlow store initialization is enough to crash WebView2
+// before the viewport filter can kick in. SCC-based chunked rendering is the
+// planned follow-up that will raise or remove this ceiling.
+const GRAPH_MAX_NODES = 150;
+
 // =============================================================================
 // Types
 // =============================================================================
@@ -258,7 +270,7 @@ function StateMachineGraphViewInner({
   // Auto-fit when states are added
   useEffect(() => {
     if (states.length > prevStateCountRef.current) {
-      setTimeout(() => reactFlowInstance.fitView({ padding: 0.2, duration: 300 }), 100);
+      setTimeout(() => reactFlowInstance.fitView(FIT_VIEW_OPTIONS_ANIMATED), 100);
     }
     prevStateCountRef.current = states.length;
   }, [states.length, reactFlowInstance]);
@@ -290,7 +302,7 @@ function StateMachineGraphViewInner({
     const result = getLayoutedElements(dagreLib as Parameters<typeof getLayoutedElements>[0], nodes, edges, STATE_MACHINE_LAYOUT_OPTIONS);
     setNodes(result.nodes);
     setEdges(result.edges);
-    setTimeout(() => reactFlowInstance.fitView({ padding: 0.2, duration: 300 }), 50);
+    setTimeout(() => reactFlowInstance.fitView(FIT_VIEW_OPTIONS_ANIMATED), 50);
   }, [dagreLib, nodes, edges, setNodes, setEdges, reactFlowInstance]);
 
   // Keyboard shortcuts
@@ -306,7 +318,7 @@ function StateMachineGraphViewInner({
       }
       if (e.key === "?" && !e.ctrlKey && !e.metaKey) setShowShortcuts((p) => !p);
       if (e.key === "f" && !e.ctrlKey && !e.metaKey && !e.altKey)
-        reactFlowInstance.fitView({ padding: 0.2, duration: 300 });
+        reactFlowInstance.fitView(FIT_VIEW_OPTIONS_ANIMATED);
       if (e.key === "l" && !e.ctrlKey && !e.metaKey && !e.altKey) handleRelayout();
       if (e.key === "=" || e.key === "+") reactFlowInstance.zoomIn({ duration: 200 });
       if (e.key === "-") reactFlowInstance.zoomOut({ duration: 200 });
@@ -396,6 +408,28 @@ function StateMachineGraphViewInner({
     );
   }
 
+  // Hard safeguard — very large graphs crash WebView2 on mount even with
+  // onlyRenderVisibleElements, because dagre layout + ReactFlow's internal
+  // store still process every node before the viewport filter kicks in.
+  // Until the planned SCC-based decomposition lands, refuse to mount the
+  // graph above a practical ceiling and point the user at the State View
+  // tab (which IS virtualized end-to-end).
+  if (states.length > GRAPH_MAX_NODES) {
+    return (
+      <div className="flex flex-col items-center justify-center h-full gap-3 text-center px-8 text-text-muted">
+        <LayoutGrid className="size-10 opacity-40" />
+        <p className="text-sm font-medium text-text-primary">
+          Graph too large to render ({states.length} states, {transitions.length} transitions).
+        </p>
+        <p className="text-xs max-w-md">
+          Graphs above {GRAPH_MAX_NODES} nodes overwhelm the browser's layout
+          engine. Use the <span className="text-brand-primary">State View</span> tab
+          to browse all states with search, filter, and detail panels.
+        </p>
+      </div>
+    );
+  }
+
   return (
     <div className="h-full w-full" onDragOver={onDragOver} onDrop={onDrop}>
       <ReactFlow
@@ -407,9 +441,13 @@ function StateMachineGraphViewInner({
         nodeTypes={nodeTypes}
         edgeTypes={edgeTypes}
         fitView
-        fitViewOptions={{ padding: 0.2 }}
+        fitViewOptions={FIT_VIEW_OPTIONS}
         minZoom={0.05}
         maxZoom={3}
+        // Viewport-based virtualization: only mount nodes/edges that are
+        // actually on-screen. Combined with fitView's minZoom cap, this
+        // keeps the active DOM subtree tractable regardless of graph size.
+        onlyRenderVisibleElements
         deleteKeyCode={null}
         selectNodesOnDrag={false}
       >
@@ -430,7 +468,7 @@ function StateMachineGraphViewInner({
         <Panel position="top-right">
           <div className="flex items-center gap-1.5">
             <button
-              onClick={() => reactFlowInstance.fitView({ padding: 0.2, duration: 300 })}
+              onClick={() => reactFlowInstance.fitView(FIT_VIEW_OPTIONS_ANIMATED)}
               className="flex items-center gap-1.5 h-7 px-2 text-xs text-text-secondary hover:text-text-primary hover:bg-bg-tertiary rounded"
               title="Fit to view (F)"
             >

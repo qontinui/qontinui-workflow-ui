@@ -49,6 +49,13 @@ import {
 export interface TransitionsPanelProps {
   states: StateMachineState[];
   transitions: StateMachineTransition[];
+  /**
+   * Currently-selected transition id. Fully controlled — the panel never
+   * keeps its own shadow copy, so external selections (e.g., from the Graph
+   * Editor tab) show up here and internal clicks flow out to the parent via
+   * `onSelectTransition`.
+   */
+  selectedTransitionId: string | null;
   onSelectTransition: (id: string | null) => void;
   /**
    * Active-state IDs for the "permitted from active states" filter. When
@@ -137,14 +144,12 @@ function shortBlockedLabel(reason: string): string {
 export function TransitionsPanel({
   states,
   transitions,
+  selectedTransitionId,
   onSelectTransition,
   activeStateIds,
   permittedTriggers,
   blockedTriggers,
 }: TransitionsPanelProps) {
-  const [selectedTransitionId, setSelectedTransitionId] = useState<
-    string | null
-  >(null);
   const [filterFromState, setFilterFromState] = useState<string | null>(null);
   const [filterToState, setFilterToState] = useState<string | null>(null);
   const [searchFilter, setSearchFilter] = useState("");
@@ -327,7 +332,6 @@ export function TransitionsPanel({
 
   const handleSelectTransition = useCallback(
     (tid: string) => {
-      setSelectedTransitionId(tid === selectedTransitionId ? null : tid);
       onSelectTransition(tid === selectedTransitionId ? null : tid);
     },
     [selectedTransitionId, onSelectTransition],
