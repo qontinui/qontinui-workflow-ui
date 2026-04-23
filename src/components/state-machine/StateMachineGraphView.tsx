@@ -37,6 +37,7 @@ import type {
 import { getLayoutedElements, STATE_MACHINE_LAYOUT_OPTIONS } from "@qontinui/workflow-utils";
 import { StateMachineStateNode } from "./StateMachineStateNode";
 import { StateMachineTransitionEdge } from "./StateMachineTransitionEdge";
+import { ChunkedGraphView } from "./ChunkedGraphView";
 
 // Register custom node/edge types once (outside component to avoid re-renders)
 const nodeTypes = { stateNode: StateMachineStateNode };
@@ -48,11 +49,19 @@ const edgeTypes = { transitionEdge: StateMachineTransitionEdge };
 const FIT_VIEW_OPTIONS = { padding: 0.2, minZoom: 0.3 } as const;
 const FIT_VIEW_OPTIONS_ANIMATED = { ...FIT_VIEW_OPTIONS, duration: 300 } as const;
 
-// Hard ceiling for node count. Above this, even with viewport virtualization,
-// dagre layout + ReactFlow store initialization is enough to crash WebView2
-// before the viewport filter can kick in. SCC-based chunked rendering is the
-// planned follow-up that will raise or remove this ceiling.
-const GRAPH_MAX_NODES = 150;
+// Threshold above which the single-view path is replaced with the SCC-based
+// `ChunkedGraphView`. Small graphs keep the classic direct-render experience;
+// anything above this count is decomposed into chunks so dagre + ReactFlow
+// don't process hundreds of nodes at once.
+const CHUNKED_VIEW_THRESHOLD = 80;
+
+// Outer safety ceiling. The chunked view handles the 80–500 band. Above 500,
+// even chain-compacted chunk counts can blow up on pathological inputs
+// (giant SCCs, fully-connected graphs), so we still fall through to the
+// "too large" message as a final escape hatch. Normal operation should never
+// hit this — ChunkedGraphView has its own in-chunk fallback (CHUNK_MAX_NODES)
+// for giant SCCs.
+const GRAPH_MAX_NODES = 500;
 
 // =============================================================================
 // Types
@@ -408,12 +417,14 @@ function StateMachineGraphViewInner({
     );
   }
 
-  // Hard safeguard — very large graphs crash WebView2 on mount even with
-  // onlyRenderVisibleElements, because dagre layout + ReactFlow's internal
-  // store still process every node before the viewport filter kicks in.
-  // Until the planned SCC-based decomposition lands, refuse to mount the
-  // graph above a practical ceiling and point the user at the State View
-  // tab (which IS virtualized end-to-end).
+  // Hard safeguard — this branch should rarely fire in normal use because
+  // graphs above CHUNKED_VIEW_THRESHOLD (80) are delegated to
+  // `ChunkedGraphView` in the outer wrapper, which decomposes the graph
+  // into SCC + chain-compacted chunks. It only fires if an external caller
+  // mounts `StateMachineGraphViewInner` directly (bypassing the wrapper)
+  // with an oversized graph. Treat it as a final escape hatch for
+  // pathological inputs — dagre + the ReactFlow store can exhaust WebView2
+  // memory above a few hundred nodes even with viewport virtualization.
   if (states.length > GRAPH_MAX_NODES) {
     return (
       <div className="flex flex-col items-center justify-center h-full gap-3 text-center px-8 text-text-muted">
@@ -556,6 +567,16 @@ function StateMachineGraphViewInner({
 // =============================================================================
 
 export function StateMachineGraphView(props: StateMachineGraphViewProps) {
+  // Delegate to ChunkedGraphView above the threshold. The empty-state
+  // guard inside the inner component still wins for zero states — we only
+  // chunk when there's actually a non-trivial graph to decompose.
+  //
+  // `ChunkedGraphView` owns its own ReactFlowProvider(s) internally (each
+  // of its sub-canvases wraps itself), so we short-circuit BEFORE mounting
+  // the outer provider here to avoid nesting a redundant one.
+  if (props.states.length > CHUNKED_VIEW_THRESHOLD) {
+    return <ChunkedGraphView {...props} />;
+  }
   return (
     <ReactFlowProvider>
       <StateMachineGraphViewInner {...props} />

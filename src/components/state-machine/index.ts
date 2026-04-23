@@ -20,6 +20,15 @@
 export { StateMachineGraphView } from "./StateMachineGraphView";
 export type { StateMachineGraphViewProps } from "./StateMachineGraphView";
 
+export { ChunkedGraphView } from "./ChunkedGraphView";
+export type { ChunkedGraphViewProps } from "./ChunkedGraphView";
+
+export { ChunkOverviewNode } from "./ChunkOverviewNode";
+export type { ChunkNodeData } from "./ChunkOverviewNode";
+
+export { ChunkPortNode } from "./ChunkPortNode";
+export type { ChunkPortNodeData } from "./ChunkPortNode";
+
 export { StateMachineStateNode } from "./StateMachineStateNode";
 
 export { StateMachineTransitionEdge } from "./StateMachineTransitionEdge";

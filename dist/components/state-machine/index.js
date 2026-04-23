@@ -1,20 +1,20 @@
 // src/components/state-machine/StateMachineGraphView.tsx
-import { useCallback, useMemo as useMemo2, useEffect, useState, useRef } from "react";
+import { useCallback as useCallback2, useMemo as useMemo3, useEffect as useEffect2, useState as useState2, useRef as useRef2 } from "react";
 import {
-  ReactFlow,
-  ReactFlowProvider,
-  Background,
-  Controls,
-  MiniMap,
-  useNodesState,
-  useEdgesState,
-  useReactFlow,
-  MarkerType,
-  Panel,
-  BackgroundVariant
+  ReactFlow as ReactFlow2,
+  ReactFlowProvider as ReactFlowProvider2,
+  Background as Background2,
+  Controls as Controls2,
+  MiniMap as MiniMap2,
+  useNodesState as useNodesState2,
+  useEdgesState as useEdgesState2,
+  useReactFlow as useReactFlow2,
+  MarkerType as MarkerType2,
+  Panel as Panel2,
+  BackgroundVariant as BackgroundVariant2
 } from "@xyflow/react";
-import { LayoutGrid, Keyboard, Maximize, Play as Play2 } from "lucide-react";
-import { getLayoutedElements, STATE_MACHINE_LAYOUT_OPTIONS } from "@qontinui/workflow-utils";
+import { LayoutGrid, Keyboard, Maximize, Play as Play3 } from "lucide-react";
+import { getLayoutedElements as getLayoutedElements2, STATE_MACHINE_LAYOUT_OPTIONS as STATE_MACHINE_LAYOUT_OPTIONS2 } from "@qontinui/workflow-utils";
 
 // src/components/state-machine/StateMachineStateNode.tsx
 import { memo, useMemo } from "react";
@@ -387,13 +387,953 @@ function StateMachineTransitionEdgeInner(props) {
 }
 var StateMachineTransitionEdge = memo2(StateMachineTransitionEdgeInner);
 
+// src/components/state-machine/ChunkedGraphView.tsx
+import {
+  useCallback,
+  useEffect,
+  useMemo as useMemo2,
+  useRef,
+  useState
+} from "react";
+import {
+  ReactFlow,
+  ReactFlowProvider,
+  Background,
+  BackgroundVariant,
+  Controls,
+  MiniMap,
+  useNodesState,
+  useEdgesState,
+  useReactFlow,
+  MarkerType,
+  Panel
+} from "@xyflow/react";
+import { ArrowLeft as ArrowLeft2, Layers as Layers2 } from "lucide-react";
+import {
+  chunkStateMachine,
+  getLayoutedElements,
+  STATE_MACHINE_LAYOUT_OPTIONS
+} from "@qontinui/workflow-utils";
+
+// src/components/state-machine/ChunkOverviewNode.tsx
+import { memo as memo3 } from "react";
+import { Handle as Handle2, Position as Position2 } from "@xyflow/react";
+import { Play as Play2, RefreshCw, ArrowRight } from "lucide-react";
+import { jsx as jsx3, jsxs as jsxs3 } from "react/jsx-runtime";
+function ChunkOverviewNodeInner({ data, selected }) {
+  const { chunk, matchCount } = data;
+  const stateCount = chunk.stateIds.length;
+  const plural = stateCount !== 1 ? "s" : "";
+  const matchPlural = matchCount !== 1 ? "es" : "";
+  return /* @__PURE__ */ jsxs3("div", { "data-chunk-id": chunk.id, style: { width: 200 }, children: [
+    /* @__PURE__ */ jsx3(
+      Handle2,
+      {
+        type: "target",
+        position: Position2.Top,
+        className: "!w-2.5 !h-2.5 !border-2 !border-bg-primary !bg-indigo-400"
+      }
+    ),
+    /* @__PURE__ */ jsxs3(
+      "div",
+      {
+        className: `
+          rounded-lg border-2 px-3 py-2.5 shadow-md
+          transition-all duration-150
+          ${selected ? "border-indigo-400 bg-indigo-500/15 ring-2 ring-indigo-400/40 shadow-indigo-500/20 shadow-lg" : chunk.containsInitialState ? "border-indigo-400/70 bg-bg-secondary/80 hover:border-indigo-300 hover:shadow-lg" : "border-indigo-500/40 bg-bg-secondary/60 hover:border-indigo-400 hover:shadow-lg"}
+        `,
+        children: [
+          /* @__PURE__ */ jsxs3("div", { className: "flex items-center gap-1.5 mb-1", children: [
+            chunk.containsInitialState && /* @__PURE__ */ jsx3(
+              Play2,
+              {
+                className: "size-3 text-yellow-400 fill-current shrink-0",
+                "aria-label": "Contains initial state"
+              }
+            ),
+            chunk.kind === "scc" ? /* @__PURE__ */ jsx3(
+              RefreshCw,
+              {
+                className: "size-3 text-indigo-300 shrink-0",
+                "aria-label": "Strongly-connected component"
+              }
+            ) : /* @__PURE__ */ jsx3(
+              ArrowRight,
+              {
+                className: "size-3 text-indigo-300 shrink-0",
+                "aria-label": "Linear chain"
+              }
+            ),
+            /* @__PURE__ */ jsx3("span", { className: "text-xs font-medium text-text-primary truncate flex-1", children: chunk.name })
+          ] }),
+          /* @__PURE__ */ jsxs3("div", { className: "text-[10px] text-text-muted", children: [
+            stateCount,
+            " state",
+            plural,
+            matchCount !== void 0 && matchCount > 0 && /* @__PURE__ */ jsxs3("span", { className: "text-brand-primary ml-1", children: [
+              "\xB7 ",
+              matchCount,
+              " match",
+              matchPlural
+            ] })
+          ] })
+        ]
+      }
+    ),
+    /* @__PURE__ */ jsx3(
+      Handle2,
+      {
+        type: "source",
+        position: Position2.Bottom,
+        className: "!w-2.5 !h-2.5 !border-2 !border-bg-primary !bg-indigo-400"
+      }
+    )
+  ] });
+}
+var ChunkOverviewNode = memo3(ChunkOverviewNodeInner);
+
+// src/components/state-machine/ChunkPortNode.tsx
+import { memo as memo4 } from "react";
+import { Handle as Handle3, Position as Position3 } from "@xyflow/react";
+import { ArrowLeft, ArrowRight as ArrowRight2 } from "lucide-react";
+import { jsx as jsx4, jsxs as jsxs4 } from "react/jsx-runtime";
+function ChunkPortNodeInner({ data }) {
+  const { direction, adjacentChunkId, adjacentChunkName, onNavigate } = data;
+  const isInput = direction === "input";
+  const label = isInput ? `\u2190 ${adjacentChunkName}` : `${adjacentChunkName} \u2192`;
+  return /* @__PURE__ */ jsxs4(
+    "div",
+    {
+      style: { width: 160 },
+      onClick: (e) => {
+        if (!onNavigate) return;
+        e.stopPropagation();
+        onNavigate(adjacentChunkId);
+      },
+      role: "button",
+      tabIndex: 0,
+      onKeyDown: (e) => {
+        if (!onNavigate) return;
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          e.stopPropagation();
+          onNavigate(adjacentChunkId);
+        }
+      },
+      title: isInput ? `Incoming from ${adjacentChunkName} - click to navigate` : `Outgoing to ${adjacentChunkName} - click to navigate`,
+      className: "cursor-pointer",
+      children: [
+        isInput && /* @__PURE__ */ jsx4(
+          Handle3,
+          {
+            type: "source",
+            position: Position3.Bottom,
+            className: "!w-2 !h-2 !border !border-bg-primary !bg-indigo-400/60"
+          }
+        ),
+        !isInput && /* @__PURE__ */ jsx4(
+          Handle3,
+          {
+            type: "target",
+            position: Position3.Top,
+            className: "!w-2 !h-2 !border !border-bg-primary !bg-indigo-400/60"
+          }
+        ),
+        /* @__PURE__ */ jsxs4(
+          "div",
+          {
+            className: `
+          rounded-md border-2 border-dashed px-2 py-1.5
+          bg-bg-secondary/40 border-indigo-400/50
+          text-indigo-300/80 hover:bg-indigo-500/10 hover:text-indigo-200
+          hover:border-indigo-300 transition-colors
+          flex items-center gap-1.5
+        `,
+            children: [
+              isInput ? /* @__PURE__ */ jsx4(ArrowLeft, { className: "size-3 shrink-0" }) : null,
+              /* @__PURE__ */ jsx4("span", { className: "text-[10px] font-medium truncate flex-1", children: label }),
+              !isInput ? /* @__PURE__ */ jsx4(ArrowRight2, { className: "size-3 shrink-0" }) : null
+            ]
+          }
+        )
+      ]
+    }
+  );
+}
+var ChunkPortNode = memo4(ChunkPortNodeInner);
+
+// src/components/state-machine/ChunkedGraphView.tsx
+import { jsx as jsx5, jsxs as jsxs5 } from "react/jsx-runtime";
+var CHUNK_MAX_NODES = 150;
+var FIT_VIEW_OPTIONS = { padding: 0.2, minZoom: 0.3 };
+var OVERVIEW_LAYOUT_OPTIONS = {
+  direction: "TB",
+  nodeWidth: 200,
+  nodeHeight: 80,
+  nodeSep: 60,
+  rankSep: 100
+};
+var overviewNodeTypes = { chunkOverview: ChunkOverviewNode };
+var overviewEdgeTypes = {};
+var drilledNodeTypes = {
+  stateNode: StateMachineStateNode,
+  chunkPort: ChunkPortNode
+};
+var drilledEdgeTypes = { transitionEdge: StateMachineTransitionEdge };
+function OverviewCanvasInner({
+  chunkGraph,
+  dagreLib,
+  onDrillIn
+}) {
+  const reactFlowInstance = useReactFlow();
+  const baseNodes = useMemo2(
+    () => chunkGraph.chunks.map((chunk) => ({
+      id: chunk.id,
+      type: "chunkOverview",
+      position: { x: 0, y: 0 },
+      data: { chunk }
+    })),
+    [chunkGraph.chunks]
+  );
+  const baseEdges = useMemo2(
+    () => chunkGraph.edges.map((e) => {
+      const thickness = Math.log(Math.max(e.transitionCount, 1)) + 1;
+      return {
+        id: `chunk-edge-${e.from}-${e.to}`,
+        source: e.from,
+        target: e.to,
+        markerEnd: { type: MarkerType.ArrowClosed, width: 15, height: 15 },
+        label: String(e.transitionCount),
+        labelBgPadding: [4, 2],
+        labelBgBorderRadius: 4,
+        labelBgStyle: {
+          fill: "var(--bg-secondary, #1a1a1a)",
+          stroke: "var(--border-secondary, #333)",
+          strokeWidth: 1
+        },
+        labelStyle: {
+          fontSize: 10,
+          fill: "var(--text-muted, #999)",
+          fontWeight: 500
+        },
+        style: {
+          strokeWidth: thickness,
+          stroke: "var(--border-secondary, #555)"
+        }
+      };
+    }),
+    [chunkGraph.edges]
+  );
+  const layouted = useMemo2(() => {
+    if (baseNodes.length === 0) return { nodes: [], edges: [] };
+    return getLayoutedElements(
+      dagreLib,
+      baseNodes,
+      baseEdges,
+      OVERVIEW_LAYOUT_OPTIONS
+    );
+  }, [dagreLib, baseNodes, baseEdges]);
+  const [nodes, setNodes, onNodesChange] = useNodesState(layouted.nodes);
+  const [edges, setEdges, onEdgesChange] = useEdgesState(layouted.edges);
+  useEffect(() => {
+    setNodes(layouted.nodes);
+    setEdges(layouted.edges);
+  }, [layouted, setNodes, setEdges]);
+  const clearOverviewSelection = useCallback(() => {
+    setNodes(
+      (prev) => prev.some((n) => n.selected) ? prev.map((n) => n.selected ? { ...n, selected: false } : n) : prev
+    );
+  }, [setNodes]);
+  const onSelectionChange = useCallback(
+    ({ nodes: selectedNodes }) => {
+      const first = selectedNodes[0];
+      if (!first) return;
+      const d = first.data;
+      if (!d?.chunk) return;
+      onDrillIn(d.chunk.id);
+      clearOverviewSelection();
+    },
+    [onDrillIn, clearOverviewSelection]
+  );
+  const fitView = useCallback(() => {
+    reactFlowInstance.fitView({ ...FIT_VIEW_OPTIONS, duration: 300 });
+  }, [reactFlowInstance]);
+  useEffect(() => {
+    const id = setTimeout(fitView, 50);
+    return () => clearTimeout(id);
+  }, []);
+  return /* @__PURE__ */ jsxs5(
+    ReactFlow,
+    {
+      nodes,
+      edges,
+      onNodesChange,
+      onEdgesChange,
+      onSelectionChange,
+      nodeTypes: overviewNodeTypes,
+      edgeTypes: overviewEdgeTypes,
+      fitView: true,
+      fitViewOptions: FIT_VIEW_OPTIONS,
+      minZoom: 0.1,
+      maxZoom: 3,
+      deleteKeyCode: null,
+      selectNodesOnDrag: false,
+      children: [
+        /* @__PURE__ */ jsx5(Background, { gap: 20, size: 1, variant: BackgroundVariant.Dots }),
+        /* @__PURE__ */ jsx5(Controls, { showInteractive: false }),
+        /* @__PURE__ */ jsx5(
+          MiniMap,
+          {
+            nodeColor: (n) => {
+              const d = n.data;
+              if (d?.chunk?.containsInitialState) return "#FFD700";
+              return "#818cf8";
+            },
+            maskColor: "rgba(0,0,0,0.15)",
+            pannable: true,
+            zoomable: true
+          }
+        ),
+        /* @__PURE__ */ jsx5(Panel, { position: "bottom-left", children: /* @__PURE__ */ jsxs5("div", { className: "text-[10px] text-text-muted/70 bg-bg-primary/80 backdrop-blur-xs px-2.5 py-1.5 rounded border border-border-secondary/50 flex items-center gap-2", children: [
+          /* @__PURE__ */ jsx5(Layers2, { className: "size-3" }),
+          /* @__PURE__ */ jsxs5("span", { children: [
+            chunkGraph.chunks.length,
+            " chunks"
+          ] }),
+          /* @__PURE__ */ jsx5("span", { className: "text-text-muted/30", children: "|" }),
+          /* @__PURE__ */ jsxs5("span", { children: [
+            chunkGraph.edges.length,
+            " cross-chunk edges"
+          ] }),
+          /* @__PURE__ */ jsx5("span", { className: "text-text-muted/30", children: "|" }),
+          /* @__PURE__ */ jsx5("span", { className: "text-indigo-300/80", children: "Click a chunk to drill in" })
+        ] }) })
+      ]
+    }
+  );
+}
+function OverviewCanvas(props) {
+  return /* @__PURE__ */ jsx5(ReactFlowProvider, { children: /* @__PURE__ */ jsx5(OverviewCanvasInner, { ...props }) });
+}
+function DrilledCanvasInner({
+  chunk,
+  chunkGraph,
+  states,
+  transitions,
+  dagreLib,
+  selectedStateId,
+  selectedTransitionId,
+  effectiveInitialStateId,
+  elementThumbnails,
+  highlightedTransitionIds,
+  transitionCounts,
+  onSelectState,
+  onSelectTransition,
+  resolveTransitionSelectionId,
+  onNavigateToChunk,
+  isDragging,
+  dropTargetStateId,
+  onStartElementDrag
+}) {
+  const reactFlowInstance = useReactFlow();
+  const chunkStateIds = useMemo2(
+    () => new Set(chunk.stateIds),
+    [chunk.stateIds]
+  );
+  const chunkStates = useMemo2(
+    () => states.filter((s) => chunkStateIds.has(s.state_id)),
+    [states, chunkStateIds]
+  );
+  const { internalTransitions, inboundByAdjChunk, outboundByAdjChunk } = useMemo2(() => {
+    const internal = [];
+    const inbound = /* @__PURE__ */ new Map();
+    const outbound = /* @__PURE__ */ new Map();
+    for (const t of transitions) {
+      const fromsInChunk = t.from_states.filter((s) => chunkStateIds.has(s));
+      const tosInChunk = t.activate_states.filter(
+        (s) => chunkStateIds.has(s)
+      );
+      const fromsOutChunk = t.from_states.filter(
+        (s) => !chunkStateIds.has(s) && chunkGraph.stateIndex.has(s)
+      );
+      const tosOutChunk = t.activate_states.filter(
+        (s) => !chunkStateIds.has(s) && chunkGraph.stateIndex.has(s)
+      );
+      if (fromsOutChunk.length === 0 && tosOutChunk.length === 0) {
+        if (fromsInChunk.length > 0 && tosInChunk.length > 0) {
+          internal.push(t);
+        }
+        continue;
+      }
+      if (fromsOutChunk.length > 0 && tosInChunk.length > 0) {
+        for (const extFrom of fromsOutChunk) {
+          const extChunkId = chunkGraph.stateIndex.get(extFrom);
+          if (!extChunkId || extChunkId === chunk.id) continue;
+          const entry = inbound.get(extChunkId) ?? {
+            states: /* @__PURE__ */ new Set(),
+            transitionIds: /* @__PURE__ */ new Set()
+          };
+          for (const dst of tosInChunk) entry.states.add(dst);
+          entry.transitionIds.add(t.transition_id);
+          inbound.set(extChunkId, entry);
+        }
+      }
+      if (fromsInChunk.length > 0 && tosOutChunk.length > 0) {
+        for (const extTo of tosOutChunk) {
+          const extChunkId = chunkGraph.stateIndex.get(extTo);
+          if (!extChunkId || extChunkId === chunk.id) continue;
+          const entry = outbound.get(extChunkId) ?? {
+            states: /* @__PURE__ */ new Set(),
+            transitionIds: /* @__PURE__ */ new Set()
+          };
+          for (const src of fromsInChunk) entry.states.add(src);
+          entry.transitionIds.add(t.transition_id);
+          outbound.set(extChunkId, entry);
+        }
+      }
+    }
+    return {
+      internalTransitions: internal,
+      inboundByAdjChunk: inbound,
+      outboundByAdjChunk: outbound
+    };
+  }, [transitions, chunkStateIds, chunkGraph, chunk.id]);
+  const chunkNameById = useMemo2(() => {
+    const m = /* @__PURE__ */ new Map();
+    for (const c of chunkGraph.chunks) m.set(c.id, c.name);
+    return m;
+  }, [chunkGraph.chunks]);
+  const stateNodes = useMemo2(
+    () => chunkStates.map((state) => ({
+      id: state.state_id,
+      type: "stateNode",
+      position: { x: 0, y: 0 },
+      data: {
+        stateId: state.state_id,
+        name: state.name,
+        elementCount: state.element_ids.length,
+        confidence: state.confidence,
+        elementIds: state.element_ids,
+        description: state.description ?? null,
+        isBlocking: state.extra_metadata?.blocking === true,
+        isSelected: state.state_id === selectedStateId,
+        isInitial: state.state_id === effectiveInitialStateId,
+        outgoingCount: transitionCounts.outgoing.get(state.state_id) ?? 0,
+        incomingCount: transitionCounts.incoming.get(state.state_id) ?? 0,
+        isDropTarget: isDragging && dropTargetStateId === state.state_id,
+        onStartElementDrag,
+        elementThumbnails
+      }
+    })),
+    [
+      chunkStates,
+      selectedStateId,
+      effectiveInitialStateId,
+      transitionCounts,
+      isDragging,
+      dropTargetStateId,
+      onStartElementDrag,
+      elementThumbnails
+    ]
+  );
+  const getSelectionId = useCallback(
+    (t) => {
+      if (resolveTransitionSelectionId) return resolveTransitionSelectionId(t);
+      return t.transition_id;
+    },
+    [resolveTransitionSelectionId]
+  );
+  const selectedTransitionSemanticId = useMemo2(() => {
+    if (!selectedTransitionId) return null;
+    const t = transitions.find(
+      (tr) => getSelectionId(tr) === selectedTransitionId
+    );
+    return t?.transition_id ?? null;
+  }, [selectedTransitionId, transitions, getSelectionId]);
+  const stateEdges = useMemo2(() => {
+    const list = [];
+    for (const t of internalTransitions) {
+      const isSelected = t.transition_id === selectedTransitionSemanticId;
+      for (const from of t.from_states) {
+        if (!chunkStateIds.has(from)) continue;
+        for (const to of t.activate_states) {
+          if (!chunkStateIds.has(to)) continue;
+          list.push({
+            id: `${t.transition_id}-${from}-${to}`,
+            source: from,
+            target: to,
+            type: "transitionEdge",
+            selected: isSelected,
+            markerEnd: { type: MarkerType.ArrowClosed, width: 15, height: 15 },
+            data: {
+              transitionId: t.transition_id,
+              name: t.name,
+              pathCost: t.path_cost,
+              actionCount: t.actions.length,
+              actionTypes: t.actions.map((a) => a.type),
+              isHighlighted: highlightedTransitionIds.has(t.transition_id),
+              staysVisible: t.stays_visible,
+              firstActionTarget: t.actions[0]?.target ?? t.actions[0]?.url ?? void 0
+            }
+          });
+        }
+      }
+    }
+    return list;
+  }, [
+    internalTransitions,
+    chunkStateIds,
+    selectedTransitionSemanticId,
+    highlightedTransitionIds
+  ]);
+  const portNodes = useMemo2(() => {
+    const list = [];
+    for (const [adjChunkId] of inboundByAdjChunk) {
+      list.push({
+        id: `port-in-${adjChunkId}`,
+        type: "chunkPort",
+        position: { x: 0, y: 0 },
+        data: {
+          direction: "input",
+          adjacentChunkId: adjChunkId,
+          adjacentChunkName: chunkNameById.get(adjChunkId) ?? adjChunkId,
+          onNavigate: onNavigateToChunk
+        }
+      });
+    }
+    for (const [adjChunkId] of outboundByAdjChunk) {
+      list.push({
+        id: `port-out-${adjChunkId}`,
+        type: "chunkPort",
+        position: { x: 0, y: 0 },
+        data: {
+          direction: "output",
+          adjacentChunkId: adjChunkId,
+          adjacentChunkName: chunkNameById.get(adjChunkId) ?? adjChunkId,
+          onNavigate: onNavigateToChunk
+        }
+      });
+    }
+    return list;
+  }, [inboundByAdjChunk, outboundByAdjChunk, chunkNameById, onNavigateToChunk]);
+  const portEdges = useMemo2(() => {
+    const list = [];
+    for (const [adjChunkId, info] of inboundByAdjChunk) {
+      const portId = `port-in-${adjChunkId}`;
+      for (const stateId of info.states) {
+        list.push({
+          id: `port-in-edge-${adjChunkId}-${stateId}`,
+          source: portId,
+          target: stateId,
+          markerEnd: { type: MarkerType.ArrowClosed, width: 12, height: 12 },
+          style: {
+            stroke: "var(--indigo-400, #818cf8)",
+            strokeDasharray: "4 3",
+            strokeWidth: 1.5,
+            opacity: 0.6
+          }
+        });
+      }
+    }
+    for (const [adjChunkId, info] of outboundByAdjChunk) {
+      const portId = `port-out-${adjChunkId}`;
+      for (const stateId of info.states) {
+        list.push({
+          id: `port-out-edge-${stateId}-${adjChunkId}`,
+          source: stateId,
+          target: portId,
+          markerEnd: { type: MarkerType.ArrowClosed, width: 12, height: 12 },
+          style: {
+            stroke: "var(--indigo-400, #818cf8)",
+            strokeDasharray: "4 3",
+            strokeWidth: 1.5,
+            opacity: 0.6
+          }
+        });
+      }
+    }
+    return list;
+  }, [inboundByAdjChunk, outboundByAdjChunk]);
+  const layouted = useMemo2(() => {
+    const allNodes = [...portNodes, ...stateNodes];
+    const allEdges = [...stateEdges, ...portEdges];
+    if (allNodes.length === 0) return { nodes: [], edges: [] };
+    const result = getLayoutedElements(
+      dagreLib,
+      allNodes,
+      allEdges,
+      STATE_MACHINE_LAYOUT_OPTIONS
+    );
+    let minY = Infinity;
+    let maxY = -Infinity;
+    for (const n of result.nodes) {
+      if (n.type === "stateNode") {
+        if (n.position.y < minY) minY = n.position.y;
+        if (n.position.y > maxY) maxY = n.position.y;
+      }
+    }
+    if (!isFinite(minY) || !isFinite(maxY)) {
+      return result;
+    }
+    const PORT_MARGIN = 100;
+    const portTopY = minY - PORT_MARGIN;
+    const portBottomY = maxY + PORT_MARGIN + STATE_MACHINE_LAYOUT_OPTIONS.nodeHeight;
+    return {
+      ...result,
+      nodes: result.nodes.map((n) => {
+        if (n.type !== "chunkPort") return n;
+        const d = n.data;
+        return {
+          ...n,
+          position: {
+            x: n.position.x,
+            y: d.direction === "input" ? portTopY : portBottomY
+          }
+        };
+      })
+    };
+  }, [dagreLib, stateNodes, stateEdges, portNodes, portEdges]);
+  const [nodes, setNodes, onNodesChange] = useNodesState(layouted.nodes);
+  const [edges, setEdges, onEdgesChange] = useEdgesState(layouted.edges);
+  useEffect(() => {
+    setNodes(layouted.nodes);
+    setEdges(layouted.edges);
+  }, [layouted, setNodes, setEdges]);
+  const onSelectionChange = useCallback(
+    ({ nodes: selectedNodes, edges: selectedEdges }) => {
+      const firstNode = selectedNodes[0];
+      const firstEdge = selectedEdges[0];
+      if (firstNode) {
+        if (firstNode.type === "chunkPort") {
+          onSelectState(null);
+          onSelectTransition(null);
+          return;
+        }
+        const nd = firstNode.data;
+        onSelectState(nd.stateId);
+        onSelectTransition(null);
+      } else if (firstEdge) {
+        const ed = firstEdge.data;
+        if (!ed?.transitionId) {
+          onSelectState(null);
+          onSelectTransition(null);
+          return;
+        }
+        const trans = transitions.find(
+          (t) => t.transition_id === ed.transitionId
+        );
+        onSelectTransition(trans ? getSelectionId(trans) : null);
+        onSelectState(null);
+      } else {
+        onSelectState(null);
+        onSelectTransition(null);
+      }
+    },
+    [onSelectState, onSelectTransition, transitions, getSelectionId]
+  );
+  const didFitRef = useRef(false);
+  useEffect(() => {
+    if (didFitRef.current) return;
+    if (nodes.length === 0) return;
+    didFitRef.current = true;
+    const id = setTimeout(() => {
+      reactFlowInstance.fitView({ ...FIT_VIEW_OPTIONS, duration: 300 });
+    }, 50);
+    return () => clearTimeout(id);
+  }, [nodes.length, reactFlowInstance]);
+  return /* @__PURE__ */ jsxs5(
+    ReactFlow,
+    {
+      nodes,
+      edges,
+      onNodesChange,
+      onEdgesChange,
+      onSelectionChange,
+      nodeTypes: drilledNodeTypes,
+      edgeTypes: drilledEdgeTypes,
+      fitView: true,
+      fitViewOptions: FIT_VIEW_OPTIONS,
+      minZoom: 0.05,
+      maxZoom: 3,
+      onlyRenderVisibleElements: true,
+      deleteKeyCode: null,
+      selectNodesOnDrag: false,
+      children: [
+        /* @__PURE__ */ jsx5(Background, { gap: 20, size: 1, variant: BackgroundVariant.Dots }),
+        /* @__PURE__ */ jsx5(Controls, { showInteractive: false }),
+        /* @__PURE__ */ jsx5(
+          MiniMap,
+          {
+            nodeColor: (n) => {
+              if (n.type === "chunkPort") return "#6366f1";
+              const d = n.data;
+              if (d?.isInitial) return "#FFD700";
+              return d?.isBlocking ? "#f59e0b" : "var(--brand-primary)";
+            },
+            maskColor: "rgba(0,0,0,0.15)",
+            pannable: true,
+            zoomable: true
+          }
+        )
+      ]
+    }
+  );
+}
+function DrilledCanvas(props) {
+  return /* @__PURE__ */ jsx5(ReactFlowProvider, { children: /* @__PURE__ */ jsx5(DrilledCanvasInner, { ...props }) });
+}
+function GiantChunkPanel({
+  chunk,
+  states,
+  selectedStateId,
+  onSelectState
+}) {
+  const chunkStates = useMemo2(() => {
+    const order = new Map(chunk.stateIds.map((id, i) => [id, i]));
+    return states.filter((s) => order.has(s.state_id)).sort(
+      (a, b) => (order.get(a.state_id) ?? 0) - (order.get(b.state_id) ?? 0)
+    );
+  }, [chunk.stateIds, states]);
+  return /* @__PURE__ */ jsxs5("div", { className: "h-full w-full flex flex-col p-4 gap-3", children: [
+    /* @__PURE__ */ jsxs5("div", { className: "flex items-start gap-3 bg-amber-950/20 border border-amber-600/40 rounded px-3 py-2.5", children: [
+      /* @__PURE__ */ jsx5(Layers2, { className: "size-4 text-amber-400 shrink-0 mt-0.5" }),
+      /* @__PURE__ */ jsxs5("div", { className: "text-xs text-amber-200/90", children: [
+        /* @__PURE__ */ jsxs5("p", { className: "font-medium", children: [
+          "Chunk too large to render (",
+          chunkStates.length,
+          " states)."
+        ] }),
+        /* @__PURE__ */ jsx5("p", { className: "text-amber-200/70 mt-1", children: "This strongly-connected component has too many interconnected cycles to lay out cleanly. Browse states from the list below or switch to the State View tab." })
+      ] })
+    ] }),
+    /* @__PURE__ */ jsx5("div", { className: "flex-1 min-h-0 overflow-y-auto max-h-[80vh] border border-border-secondary rounded bg-bg-secondary/40", children: /* @__PURE__ */ jsx5("ul", { className: "divide-y divide-border-secondary/60", children: chunkStates.map((s) => {
+      const isSel = s.state_id === selectedStateId;
+      return /* @__PURE__ */ jsx5("li", { children: /* @__PURE__ */ jsxs5(
+        "button",
+        {
+          type: "button",
+          onClick: () => onSelectState(isSel ? null : s.state_id),
+          className: `
+                    w-full text-left px-3 py-2 text-xs flex items-center gap-2
+                    transition-colors
+                    ${isSel ? "bg-brand-primary/20 text-text-primary" : "hover:bg-bg-tertiary text-text-secondary"}
+                  `,
+          children: [
+            /* @__PURE__ */ jsx5(Layers2, { className: "size-3 shrink-0 text-brand-primary/70" }),
+            /* @__PURE__ */ jsx5("span", { className: "truncate flex-1 font-medium", children: s.name }),
+            /* @__PURE__ */ jsxs5("span", { className: "text-[10px] text-text-muted shrink-0", children: [
+              s.element_ids.length,
+              " el"
+            ] })
+          ]
+        }
+      ) }, s.state_id);
+    }) }) })
+  ] });
+}
+function ChunkedGraphViewInner(props) {
+  const {
+    dagre: dagreLib,
+    states,
+    transitions,
+    selectedStateId,
+    selectedTransitionId,
+    onSelectState,
+    onSelectTransition,
+    initialStateId,
+    emptyMessage = "No states in this config.",
+    highlightedPath,
+    elementThumbnails,
+    onStartElementDrag,
+    onDragOver,
+    onDrop,
+    isDragging,
+    dropTargetStateId,
+    resolveTransitionSelectionId
+  } = props;
+  const effectiveInitialStateId = useMemo2(() => {
+    if (initialStateId) return initialStateId;
+    const markedInitial = states.find(
+      (s) => s.extra_metadata?.initial === true
+    );
+    if (markedInitial) return markedInitial.state_id;
+    return states[0]?.state_id ?? null;
+  }, [states, initialStateId]);
+  const chunkGraph = useMemo2(
+    () => chunkStateMachine(states, transitions, {
+      initialStateId: effectiveInitialStateId
+    }),
+    [states, transitions, effectiveInitialStateId]
+  );
+  const chunkById = useMemo2(() => {
+    const m = /* @__PURE__ */ new Map();
+    for (const c of chunkGraph.chunks) m.set(c.id, c);
+    return m;
+  }, [chunkGraph.chunks]);
+  const transitionCounts = useMemo2(() => {
+    const outgoing = /* @__PURE__ */ new Map();
+    const incoming = /* @__PURE__ */ new Map();
+    for (const t of transitions) {
+      for (const from of t.from_states)
+        outgoing.set(from, (outgoing.get(from) ?? 0) + 1);
+      for (const to of t.activate_states)
+        incoming.set(to, (incoming.get(to) ?? 0) + 1);
+    }
+    return { outgoing, incoming };
+  }, [transitions]);
+  const highlightedTransitionIds = useMemo2(
+    () => new Set(highlightedPath?.map((s) => s.transition_id) ?? []),
+    [highlightedPath]
+  );
+  const [viewMode, setViewMode] = useState({ kind: "overview" });
+  const currentChunkId = viewMode.kind === "drilled" ? viewMode.chunkId : null;
+  useEffect(() => {
+    if (!selectedStateId) return;
+    const targetChunkId = chunkGraph.stateIndex.get(selectedStateId);
+    if (!targetChunkId) return;
+    if (targetChunkId === currentChunkId) return;
+    setViewMode({ kind: "drilled", chunkId: targetChunkId });
+  }, [selectedStateId, chunkGraph.stateIndex, currentChunkId]);
+  useEffect(() => {
+    if (viewMode.kind !== "drilled") return;
+    const handler = (e) => {
+      const tag = e.target?.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
+      if (e.key === "Escape") {
+        setViewMode({ kind: "overview" });
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [viewMode.kind]);
+  const goOverview = useCallback(() => {
+    setViewMode({ kind: "overview" });
+  }, []);
+  const drillInto = useCallback((chunkId) => {
+    setViewMode({ kind: "drilled", chunkId });
+  }, []);
+  if (states.length === 0) {
+    return /* @__PURE__ */ jsx5("div", { className: "flex items-center justify-center h-full text-text-muted", children: /* @__PURE__ */ jsx5("p", { children: emptyMessage }) });
+  }
+  if (viewMode.kind === "drilled") {
+    const chunk = chunkById.get(viewMode.chunkId);
+    if (!chunk) {
+      return /* @__PURE__ */ jsx5(ChunkedGraphViewFallbackMissingChunk, { onBack: goOverview });
+    }
+    const isGiant = chunk.stateIds.length > CHUNK_MAX_NODES;
+    return /* @__PURE__ */ jsxs5(
+      "div",
+      {
+        className: "h-full w-full flex flex-col",
+        onDragOver,
+        onDrop,
+        children: [
+          /* @__PURE__ */ jsx5(DrilledBreadcrumb, { chunkName: chunk.name, onBack: goOverview }),
+          /* @__PURE__ */ jsx5("div", { className: "flex-1 min-h-0", children: isGiant ? /* @__PURE__ */ jsx5(
+            GiantChunkPanel,
+            {
+              chunk,
+              states,
+              selectedStateId,
+              onSelectState
+            }
+          ) : /* @__PURE__ */ jsx5(
+            DrilledCanvas,
+            {
+              chunk,
+              chunkGraph,
+              states,
+              transitions,
+              dagreLib,
+              selectedStateId,
+              selectedTransitionId,
+              effectiveInitialStateId,
+              elementThumbnails,
+              highlightedTransitionIds,
+              transitionCounts,
+              onSelectState,
+              onSelectTransition,
+              resolveTransitionSelectionId,
+              onNavigateToChunk: drillInto,
+              isDragging,
+              dropTargetStateId,
+              onStartElementDrag
+            }
+          ) })
+        ]
+      }
+    );
+  }
+  return /* @__PURE__ */ jsx5("div", { className: "h-full w-full", onDragOver, onDrop, children: /* @__PURE__ */ jsx5(
+    OverviewCanvas,
+    {
+      chunkGraph,
+      dagreLib,
+      onDrillIn: drillInto
+    }
+  ) });
+}
+function DrilledBreadcrumb({
+  chunkName,
+  onBack
+}) {
+  return /* @__PURE__ */ jsxs5("div", { className: "flex items-center gap-2 px-3 py-2 border-b border-border-secondary bg-bg-secondary/40 shrink-0", children: [
+    /* @__PURE__ */ jsxs5(
+      "button",
+      {
+        type: "button",
+        onClick: onBack,
+        className: "flex items-center gap-1 px-2 py-1 text-xs text-text-secondary hover:text-text-primary hover:bg-bg-tertiary rounded transition-colors",
+        title: "Back to overview (Esc)",
+        children: [
+          /* @__PURE__ */ jsx5(ArrowLeft2, { className: "size-3.5" }),
+          "Back"
+        ]
+      }
+    ),
+    /* @__PURE__ */ jsxs5("div", { className: "text-xs text-text-muted flex items-center gap-1.5", children: [
+      /* @__PURE__ */ jsx5(
+        "button",
+        {
+          type: "button",
+          onClick: onBack,
+          className: "hover:text-text-primary transition-colors",
+          children: "All states"
+        }
+      ),
+      /* @__PURE__ */ jsx5("span", { className: "text-text-muted/60", children: "/" }),
+      /* @__PURE__ */ jsx5("span", { className: "text-text-primary font-medium truncate max-w-[240px]", children: chunkName })
+    ] })
+  ] });
+}
+function ChunkedGraphViewFallbackMissingChunk({
+  onBack
+}) {
+  return /* @__PURE__ */ jsxs5("div", { className: "h-full w-full flex flex-col items-center justify-center gap-3 text-center text-text-muted", children: [
+    /* @__PURE__ */ jsx5("p", { className: "text-sm", children: "That chunk no longer exists." }),
+    /* @__PURE__ */ jsx5(
+      "button",
+      {
+        type: "button",
+        onClick: onBack,
+        className: "px-3 py-1.5 text-xs bg-bg-secondary border border-border-secondary rounded hover:bg-bg-tertiary",
+        children: "Back to overview"
+      }
+    )
+  ] });
+}
+function ChunkedGraphView(props) {
+  return /* @__PURE__ */ jsx5(ChunkedGraphViewInner, { ...props });
+}
+
 // src/components/state-machine/StateMachineGraphView.tsx
-import { Fragment as Fragment2, jsx as jsx3, jsxs as jsxs3 } from "react/jsx-runtime";
+import { Fragment as Fragment2, jsx as jsx6, jsxs as jsxs6 } from "react/jsx-runtime";
 var nodeTypes = { stateNode: StateMachineStateNode };
 var edgeTypes = { transitionEdge: StateMachineTransitionEdge };
-var FIT_VIEW_OPTIONS = { padding: 0.2, minZoom: 0.3 };
-var FIT_VIEW_OPTIONS_ANIMATED = { ...FIT_VIEW_OPTIONS, duration: 300 };
-var GRAPH_MAX_NODES = 150;
+var FIT_VIEW_OPTIONS2 = { padding: 0.2, minZoom: 0.3 };
+var FIT_VIEW_OPTIONS_ANIMATED = { ...FIT_VIEW_OPTIONS2, duration: 300 };
+var CHUNKED_VIEW_THRESHOLD = 80;
+var GRAPH_MAX_NODES = 500;
 function StateMachineGraphViewInner({
   dagre: dagreLib,
   states,
@@ -415,14 +1355,14 @@ function StateMachineGraphViewInner({
   extraShortcutEntries,
   elementThumbnails
 }) {
-  const [showShortcuts, setShowShortcuts] = useState(false);
-  const reactFlowInstance = useReactFlow();
-  const prevStateCountRef = useRef(states.length);
-  const highlightedTransitionIds = useMemo2(
+  const [showShortcuts, setShowShortcuts] = useState2(false);
+  const reactFlowInstance = useReactFlow2();
+  const prevStateCountRef = useRef2(states.length);
+  const highlightedTransitionIds = useMemo3(
     () => new Set(highlightedPath?.map((s) => s.transition_id) ?? []),
     [highlightedPath]
   );
-  const effectiveInitialStateId = useMemo2(() => {
+  const effectiveInitialStateId = useMemo3(() => {
     if (initialStateId) return initialStateId;
     const markedInitial = states.find(
       (s) => s.extra_metadata?.initial === true
@@ -430,7 +1370,7 @@ function StateMachineGraphViewInner({
     if (markedInitial) return markedInitial.state_id;
     return states[0]?.state_id ?? null;
   }, [states, initialStateId]);
-  const transitionCounts = useMemo2(() => {
+  const transitionCounts = useMemo3(() => {
     const outgoing = /* @__PURE__ */ new Map();
     const incoming = /* @__PURE__ */ new Map();
     for (const t of transitions) {
@@ -439,7 +1379,7 @@ function StateMachineGraphViewInner({
     }
     return { outgoing, incoming };
   }, [transitions]);
-  const initialNodes = useMemo2(
+  const initialNodes = useMemo3(
     () => states.map((state) => ({
       id: state.state_id,
       type: "stateNode",
@@ -463,19 +1403,19 @@ function StateMachineGraphViewInner({
     })),
     [states, selectedStateId, effectiveInitialStateId, transitionCounts, isDragging, dropTargetStateId, onStartElementDrag, elementThumbnails]
   );
-  const getSelectionId = useCallback(
+  const getSelectionId = useCallback2(
     (trans) => {
       if (resolveTransitionSelectionId) return resolveTransitionSelectionId(trans);
       return trans.transition_id;
     },
     [resolveTransitionSelectionId]
   );
-  const selectedTransitionSemanticId = useMemo2(() => {
+  const selectedTransitionSemanticId = useMemo3(() => {
     if (!selectedTransitionId) return null;
     const trans = transitions.find((t) => getSelectionId(t) === selectedTransitionId);
     return trans?.transition_id ?? null;
   }, [selectedTransitionId, transitions, getSelectionId]);
-  const initialEdges = useMemo2(() => {
+  const initialEdges = useMemo3(() => {
     const edges2 = [];
     for (const trans of transitions) {
       const isSelected = trans.transition_id === selectedTransitionSemanticId;
@@ -487,7 +1427,7 @@ function StateMachineGraphViewInner({
             target: toState,
             type: "transitionEdge",
             selected: isSelected,
-            markerEnd: { type: MarkerType.ArrowClosed, width: 15, height: 15 },
+            markerEnd: { type: MarkerType2.ArrowClosed, width: 15, height: 15 },
             data: {
               transitionId: trans.transition_id,
               name: trans.name,
@@ -504,23 +1444,23 @@ function StateMachineGraphViewInner({
     }
     return edges2;
   }, [transitions, highlightedTransitionIds, selectedTransitionSemanticId]);
-  const layouted = useMemo2(() => {
+  const layouted = useMemo3(() => {
     if (initialNodes.length === 0) return { nodes: [], edges: [] };
-    return getLayoutedElements(dagreLib, initialNodes, initialEdges, STATE_MACHINE_LAYOUT_OPTIONS);
+    return getLayoutedElements2(dagreLib, initialNodes, initialEdges, STATE_MACHINE_LAYOUT_OPTIONS2);
   }, [dagreLib, initialNodes, initialEdges]);
-  const [nodes, setNodes, onNodesChange] = useNodesState(layouted.nodes);
-  const [edges, setEdges, onEdgesChange] = useEdgesState(layouted.edges);
-  useEffect(() => {
+  const [nodes, setNodes, onNodesChange] = useNodesState2(layouted.nodes);
+  const [edges, setEdges, onEdgesChange] = useEdgesState2(layouted.edges);
+  useEffect2(() => {
     setNodes(layouted.nodes);
     setEdges(layouted.edges);
   }, [layouted, setNodes, setEdges]);
-  useEffect(() => {
+  useEffect2(() => {
     if (states.length > prevStateCountRef.current) {
       setTimeout(() => reactFlowInstance.fitView(FIT_VIEW_OPTIONS_ANIMATED), 100);
     }
     prevStateCountRef.current = states.length;
   }, [states.length, reactFlowInstance]);
-  const onSelectionChange = useCallback(
+  const onSelectionChange = useCallback2(
     ({ nodes: selectedNodes, edges: selectedEdges }) => {
       const firstNode = selectedNodes[0];
       const firstEdge = selectedEdges[0];
@@ -540,13 +1480,13 @@ function StateMachineGraphViewInner({
     },
     [onSelectState, onSelectTransition, transitions, getSelectionId]
   );
-  const handleRelayout = useCallback(() => {
-    const result = getLayoutedElements(dagreLib, nodes, edges, STATE_MACHINE_LAYOUT_OPTIONS);
+  const handleRelayout = useCallback2(() => {
+    const result = getLayoutedElements2(dagreLib, nodes, edges, STATE_MACHINE_LAYOUT_OPTIONS2);
     setNodes(result.nodes);
     setEdges(result.edges);
     setTimeout(() => reactFlowInstance.fitView(FIT_VIEW_OPTIONS_ANIMATED), 50);
   }, [dagreLib, nodes, edges, setNodes, setEdges, reactFlowInstance]);
-  useEffect(() => {
+  useEffect2(() => {
     const handleKeyDown = (e) => {
       const tag = e.target.tagName;
       if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
@@ -620,7 +1560,7 @@ function StateMachineGraphViewInner({
     onDeleteTransition,
     getSelectionId
   ]);
-  const graphStats = useMemo2(
+  const graphStats = useMemo3(
     () => ({
       stateCount: states.length,
       transitionCount: transitions.length,
@@ -629,29 +1569,29 @@ function StateMachineGraphViewInner({
     [states, transitions, effectiveInitialStateId]
   );
   if (states.length === 0) {
-    return /* @__PURE__ */ jsx3("div", { className: "flex items-center justify-center h-full text-text-muted", children: /* @__PURE__ */ jsx3("p", { children: emptyMessage }) });
+    return /* @__PURE__ */ jsx6("div", { className: "flex items-center justify-center h-full text-text-muted", children: /* @__PURE__ */ jsx6("p", { children: emptyMessage }) });
   }
   if (states.length > GRAPH_MAX_NODES) {
-    return /* @__PURE__ */ jsxs3("div", { className: "flex flex-col items-center justify-center h-full gap-3 text-center px-8 text-text-muted", children: [
-      /* @__PURE__ */ jsx3(LayoutGrid, { className: "size-10 opacity-40" }),
-      /* @__PURE__ */ jsxs3("p", { className: "text-sm font-medium text-text-primary", children: [
+    return /* @__PURE__ */ jsxs6("div", { className: "flex flex-col items-center justify-center h-full gap-3 text-center px-8 text-text-muted", children: [
+      /* @__PURE__ */ jsx6(LayoutGrid, { className: "size-10 opacity-40" }),
+      /* @__PURE__ */ jsxs6("p", { className: "text-sm font-medium text-text-primary", children: [
         "Graph too large to render (",
         states.length,
         " states, ",
         transitions.length,
         " transitions)."
       ] }),
-      /* @__PURE__ */ jsxs3("p", { className: "text-xs max-w-md", children: [
+      /* @__PURE__ */ jsxs6("p", { className: "text-xs max-w-md", children: [
         "Graphs above ",
         GRAPH_MAX_NODES,
         " nodes overwhelm the browser's layout engine. Use the ",
-        /* @__PURE__ */ jsx3("span", { className: "text-brand-primary", children: "State View" }),
+        /* @__PURE__ */ jsx6("span", { className: "text-brand-primary", children: "State View" }),
         " tab to browse all states with search, filter, and detail panels."
       ] })
     ] });
   }
-  return /* @__PURE__ */ jsx3("div", { className: "h-full w-full", onDragOver, onDrop, children: /* @__PURE__ */ jsxs3(
-    ReactFlow,
+  return /* @__PURE__ */ jsx6("div", { className: "h-full w-full", onDragOver, onDrop, children: /* @__PURE__ */ jsxs6(
+    ReactFlow2,
     {
       nodes,
       edges,
@@ -661,17 +1601,17 @@ function StateMachineGraphViewInner({
       nodeTypes,
       edgeTypes,
       fitView: true,
-      fitViewOptions: FIT_VIEW_OPTIONS,
+      fitViewOptions: FIT_VIEW_OPTIONS2,
       minZoom: 0.05,
       maxZoom: 3,
       onlyRenderVisibleElements: true,
       deleteKeyCode: null,
       selectNodesOnDrag: false,
       children: [
-        /* @__PURE__ */ jsx3(Background, { gap: 20, size: 1, variant: BackgroundVariant.Dots }),
-        /* @__PURE__ */ jsx3(Controls, { showInteractive: false }),
-        /* @__PURE__ */ jsx3(
-          MiniMap,
+        /* @__PURE__ */ jsx6(Background2, { gap: 20, size: 1, variant: BackgroundVariant2.Dots }),
+        /* @__PURE__ */ jsx6(Controls2, { showInteractive: false }),
+        /* @__PURE__ */ jsx6(
+          MiniMap2,
           {
             nodeColor: (node) => {
               const d = node.data;
@@ -683,80 +1623,80 @@ function StateMachineGraphViewInner({
             zoomable: true
           }
         ),
-        /* @__PURE__ */ jsx3(Panel, { position: "top-right", children: /* @__PURE__ */ jsxs3("div", { className: "flex items-center gap-1.5", children: [
-          /* @__PURE__ */ jsxs3(
+        /* @__PURE__ */ jsx6(Panel2, { position: "top-right", children: /* @__PURE__ */ jsxs6("div", { className: "flex items-center gap-1.5", children: [
+          /* @__PURE__ */ jsxs6(
             "button",
             {
               onClick: () => reactFlowInstance.fitView(FIT_VIEW_OPTIONS_ANIMATED),
               className: "flex items-center gap-1.5 h-7 px-2 text-xs text-text-secondary hover:text-text-primary hover:bg-bg-tertiary rounded",
               title: "Fit to view (F)",
               children: [
-                /* @__PURE__ */ jsx3(Maximize, { className: "size-3.5" }),
+                /* @__PURE__ */ jsx6(Maximize, { className: "size-3.5" }),
                 "Fit"
               ]
             }
           ),
-          /* @__PURE__ */ jsx3(
+          /* @__PURE__ */ jsx6(
             "button",
             {
               onClick: () => setShowShortcuts((p) => !p),
               className: "flex items-center justify-center h-7 w-7 text-xs text-text-secondary hover:text-text-primary hover:bg-bg-tertiary rounded",
               title: "Keyboard shortcuts (?)",
-              children: /* @__PURE__ */ jsx3(Keyboard, { className: "size-3.5" })
+              children: /* @__PURE__ */ jsx6(Keyboard, { className: "size-3.5" })
             }
           ),
-          /* @__PURE__ */ jsxs3(
+          /* @__PURE__ */ jsxs6(
             "button",
             {
               onClick: handleRelayout,
               className: "flex items-center gap-1.5 h-7 px-2 text-xs text-text-secondary hover:text-text-primary border border-border-secondary hover:border-text-muted rounded",
               title: "Re-layout (L)",
               children: [
-                /* @__PURE__ */ jsx3(LayoutGrid, { className: "size-3.5" }),
+                /* @__PURE__ */ jsx6(LayoutGrid, { className: "size-3.5" }),
                 "Re-layout"
               ]
             }
           )
         ] }) }),
-        /* @__PURE__ */ jsx3(Panel, { position: "bottom-left", children: /* @__PURE__ */ jsxs3("div", { className: "text-[10px] text-text-muted/70 bg-bg-primary/80 backdrop-blur-xs px-2.5 py-1.5 rounded border border-border-secondary/50 flex items-center gap-2", children: [
-          /* @__PURE__ */ jsxs3("span", { children: [
+        /* @__PURE__ */ jsx6(Panel2, { position: "bottom-left", children: /* @__PURE__ */ jsxs6("div", { className: "text-[10px] text-text-muted/70 bg-bg-primary/80 backdrop-blur-xs px-2.5 py-1.5 rounded border border-border-secondary/50 flex items-center gap-2", children: [
+          /* @__PURE__ */ jsxs6("span", { children: [
             graphStats.stateCount,
             " states"
           ] }),
-          /* @__PURE__ */ jsx3("span", { className: "text-text-muted/30", children: "|" }),
-          /* @__PURE__ */ jsxs3("span", { children: [
+          /* @__PURE__ */ jsx6("span", { className: "text-text-muted/30", children: "|" }),
+          /* @__PURE__ */ jsxs6("span", { children: [
             graphStats.transitionCount,
             " transitions"
           ] }),
-          graphStats.initialStateName !== "None" && /* @__PURE__ */ jsxs3(Fragment2, { children: [
-            /* @__PURE__ */ jsx3("span", { className: "text-text-muted/30", children: "|" }),
-            /* @__PURE__ */ jsxs3("span", { className: "text-yellow-500", children: [
-              /* @__PURE__ */ jsx3(Play2, { className: "size-2 inline mr-0.5 fill-current" }),
+          graphStats.initialStateName !== "None" && /* @__PURE__ */ jsxs6(Fragment2, { children: [
+            /* @__PURE__ */ jsx6("span", { className: "text-text-muted/30", children: "|" }),
+            /* @__PURE__ */ jsxs6("span", { className: "text-yellow-500", children: [
+              /* @__PURE__ */ jsx6(Play3, { className: "size-2 inline mr-0.5 fill-current" }),
               graphStats.initialStateName
             ] })
           ] })
         ] }) }),
-        showShortcuts && /* @__PURE__ */ jsx3(Panel, { position: "bottom-right", children: /* @__PURE__ */ jsxs3("div", { className: "bg-bg-primary/95 border border-border-secondary rounded-lg p-4 text-xs shadow-lg backdrop-blur-xs min-w-[200px]", children: [
-          /* @__PURE__ */ jsx3("h4", { className: "font-semibold text-text-primary mb-2.5", children: "Keyboard Shortcuts" }),
-          /* @__PURE__ */ jsxs3("div", { className: "space-y-1.5 text-text-muted", children: [
+        showShortcuts && /* @__PURE__ */ jsx6(Panel2, { position: "bottom-right", children: /* @__PURE__ */ jsxs6("div", { className: "bg-bg-primary/95 border border-border-secondary rounded-lg p-4 text-xs shadow-lg backdrop-blur-xs min-w-[200px]", children: [
+          /* @__PURE__ */ jsx6("h4", { className: "font-semibold text-text-primary mb-2.5", children: "Keyboard Shortcuts" }),
+          /* @__PURE__ */ jsxs6("div", { className: "space-y-1.5 text-text-muted", children: [
             [
               ["Deselect all", "Esc"],
               ["Toggle shortcuts", "?"],
               ["Fit to view", "F"],
               ["Re-layout", "L"],
               ["Zoom in/out", "+ / -"]
-            ].map(([label, key]) => /* @__PURE__ */ jsxs3("div", { className: "flex items-center justify-between gap-4", children: [
-              /* @__PURE__ */ jsx3("span", { children: label }),
-              /* @__PURE__ */ jsx3("kbd", { className: "px-1.5 py-0.5 bg-bg-secondary rounded text-[10px] font-mono", children: key })
+            ].map(([label, key]) => /* @__PURE__ */ jsxs6("div", { className: "flex items-center justify-between gap-4", children: [
+              /* @__PURE__ */ jsx6("span", { children: label }),
+              /* @__PURE__ */ jsx6("kbd", { className: "px-1.5 py-0.5 bg-bg-secondary rounded text-[10px] font-mono", children: key })
             ] }, label)),
-            /* @__PURE__ */ jsx3("div", { className: "border-t border-border-secondary pt-1.5 mt-1.5", children: [
+            /* @__PURE__ */ jsx6("div", { className: "border-t border-border-secondary pt-1.5 mt-1.5", children: [
               ["Cycle states", "Tab"],
               ["Jump to initial", "I"],
               ["Delete transition", "Del"],
               ...extraShortcutEntries ?? []
-            ].map(([label, key]) => /* @__PURE__ */ jsxs3("div", { className: "flex items-center justify-between gap-4", children: [
-              /* @__PURE__ */ jsx3("span", { children: label }),
-              /* @__PURE__ */ jsx3("kbd", { className: "px-1.5 py-0.5 bg-bg-secondary rounded text-[10px] font-mono", children: key })
+            ].map(([label, key]) => /* @__PURE__ */ jsxs6("div", { className: "flex items-center justify-between gap-4", children: [
+              /* @__PURE__ */ jsx6("span", { children: label }),
+              /* @__PURE__ */ jsx6("kbd", { className: "px-1.5 py-0.5 bg-bg-secondary rounded text-[10px] font-mono", children: key })
             ] }, label)) })
           ] })
         ] }) })
@@ -765,12 +1705,15 @@ function StateMachineGraphViewInner({
   ) });
 }
 function StateMachineGraphView(props) {
-  return /* @__PURE__ */ jsx3(ReactFlowProvider, { children: /* @__PURE__ */ jsx3(StateMachineGraphViewInner, { ...props }) });
+  if (props.states.length > CHUNKED_VIEW_THRESHOLD) {
+    return /* @__PURE__ */ jsx6(ChunkedGraphView, { ...props });
+  }
+  return /* @__PURE__ */ jsx6(ReactFlowProvider2, { children: /* @__PURE__ */ jsx6(StateMachineGraphViewInner, { ...props }) });
 }
 
 // src/components/state-machine/TransitionEditor.tsx
-import { useState as useState2, useEffect as useEffect2, useCallback as useCallback2 } from "react";
-import { jsx as jsx4, jsxs as jsxs4 } from "react/jsx-runtime";
+import { useState as useState3, useEffect as useEffect3, useCallback as useCallback3 } from "react";
+import { jsx as jsx7, jsxs as jsxs7 } from "react/jsx-runtime";
 function makeActionUid() {
   return typeof crypto !== "undefined" && typeof crypto.randomUUID === "function" ? crypto.randomUUID() : `act-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
 }
@@ -810,15 +1753,15 @@ function TransitionEditor({
   onClose
 }) {
   const isEditing = !!transition;
-  const [name, setName] = useState2("");
-  const [fromStates, setFromStates] = useState2([]);
-  const [activateStates, setActivateStates] = useState2([]);
-  const [exitStates, setExitStates] = useState2([]);
-  const [actions, setActions] = useState2([]);
-  const [pathCost, setPathCost] = useState2(1);
-  const [staysVisible, setStaysVisible] = useState2(false);
-  const [isSaving, setIsSaving] = useState2(false);
-  useEffect2(() => {
+  const [name, setName] = useState3("");
+  const [fromStates, setFromStates] = useState3([]);
+  const [activateStates, setActivateStates] = useState3([]);
+  const [exitStates, setExitStates] = useState3([]);
+  const [actions, setActions] = useState3([]);
+  const [pathCost, setPathCost] = useState3(1);
+  const [staysVisible, setStaysVisible] = useState3(false);
+  const [isSaving, setIsSaving] = useState3(false);
+  useEffect3(() => {
     if (transition) {
       setName(transition.name);
       setFromStates([...transition.from_states]);
@@ -837,7 +1780,7 @@ function TransitionEditor({
       setStaysVisible(false);
     }
   }, [transition]);
-  const toggleState = useCallback2(
+  const toggleState = useCallback3(
     (arr, setter, stateId) => {
       if (arr.includes(stateId)) {
         setter(arr.filter((s) => s !== stateId));
@@ -847,13 +1790,13 @@ function TransitionEditor({
     },
     []
   );
-  const addAction = useCallback2(() => {
+  const addAction = useCallback3(() => {
     setActions((prev) => [...prev, toEditableAction({ type: "click" })]);
   }, []);
-  const removeAction = useCallback2((index) => {
+  const removeAction = useCallback3((index) => {
     setActions((prev) => prev.filter((_, i) => i !== index));
   }, []);
-  const updateAction = useCallback2(
+  const updateAction = useCallback3(
     (index, updates) => {
       setActions(
         (prev) => prev.map((a, i) => i === index ? { ...a, ...updates } : a)
@@ -861,7 +1804,7 @@ function TransitionEditor({
     },
     []
   );
-  const handleSave = useCallback2(async () => {
+  const handleSave = useCallback3(async () => {
     if (!name.trim()) return;
     setIsSaving(true);
     try {
@@ -895,7 +1838,7 @@ function TransitionEditor({
     onSave,
     onUpdate
   ]);
-  const handleDelete = useCallback2(async () => {
+  const handleDelete = useCallback3(async () => {
     if (!transition) return;
     setIsSaving(true);
     try {
@@ -904,10 +1847,10 @@ function TransitionEditor({
       setIsSaving(false);
     }
   }, [transition, onDelete]);
-  return /* @__PURE__ */ jsxs4("div", { className: "flex flex-col gap-4 p-4", children: [
-    /* @__PURE__ */ jsxs4("div", { className: "flex items-center justify-between", children: [
-      /* @__PURE__ */ jsx4("h3", { className: "text-sm font-semibold text-text-primary", children: isEditing ? "Edit Transition" : "New Transition" }),
-      /* @__PURE__ */ jsx4(
+  return /* @__PURE__ */ jsxs7("div", { className: "flex flex-col gap-4 p-4", children: [
+    /* @__PURE__ */ jsxs7("div", { className: "flex items-center justify-between", children: [
+      /* @__PURE__ */ jsx7("h3", { className: "text-sm font-semibold text-text-primary", children: isEditing ? "Edit Transition" : "New Transition" }),
+      /* @__PURE__ */ jsx7(
         "button",
         {
           onClick: onClose,
@@ -916,9 +1859,9 @@ function TransitionEditor({
         }
       )
     ] }),
-    /* @__PURE__ */ jsxs4("div", { children: [
-      /* @__PURE__ */ jsx4("label", { className: "block text-xs text-text-secondary mb-1", children: "Name" }),
-      /* @__PURE__ */ jsx4(
+    /* @__PURE__ */ jsxs7("div", { children: [
+      /* @__PURE__ */ jsx7("label", { className: "block text-xs text-text-secondary mb-1", children: "Name" }),
+      /* @__PURE__ */ jsx7(
         "input",
         {
           type: "text",
@@ -929,7 +1872,7 @@ function TransitionEditor({
         }
       )
     ] }),
-    /* @__PURE__ */ jsx4(
+    /* @__PURE__ */ jsx7(
       StateToggleGroup,
       {
         label: "From States",
@@ -939,7 +1882,7 @@ function TransitionEditor({
         onToggle: (id) => toggleState(fromStates, setFromStates, id)
       }
     ),
-    /* @__PURE__ */ jsx4(
+    /* @__PURE__ */ jsx7(
       StateToggleGroup,
       {
         label: "Activate States",
@@ -949,7 +1892,7 @@ function TransitionEditor({
         onToggle: (id) => toggleState(activateStates, setActivateStates, id)
       }
     ),
-    /* @__PURE__ */ jsx4(
+    /* @__PURE__ */ jsx7(
       StateToggleGroup,
       {
         label: "Exit States",
@@ -959,10 +1902,10 @@ function TransitionEditor({
         onToggle: (id) => toggleState(exitStates, setExitStates, id)
       }
     ),
-    /* @__PURE__ */ jsxs4("div", { children: [
-      /* @__PURE__ */ jsxs4("div", { className: "flex items-center justify-between mb-1", children: [
-        /* @__PURE__ */ jsx4("label", { className: "text-xs text-text-secondary", children: "Actions" }),
-        /* @__PURE__ */ jsx4(
+    /* @__PURE__ */ jsxs7("div", { children: [
+      /* @__PURE__ */ jsxs7("div", { className: "flex items-center justify-between mb-1", children: [
+        /* @__PURE__ */ jsx7("label", { className: "text-xs text-text-secondary", children: "Actions" }),
+        /* @__PURE__ */ jsx7(
           "button",
           {
             onClick: addAction,
@@ -971,7 +1914,7 @@ function TransitionEditor({
           }
         )
       ] }),
-      /* @__PURE__ */ jsx4("div", { className: "flex flex-col gap-2", children: actions.map((action, index) => /* @__PURE__ */ jsx4(
+      /* @__PURE__ */ jsx7("div", { className: "flex flex-col gap-2", children: actions.map((action, index) => /* @__PURE__ */ jsx7(
         ActionField,
         {
           action,
@@ -983,10 +1926,10 @@ function TransitionEditor({
         action._uid
       )) })
     ] }),
-    /* @__PURE__ */ jsxs4("div", { className: "flex gap-4", children: [
-      /* @__PURE__ */ jsxs4("div", { className: "flex-1", children: [
-        /* @__PURE__ */ jsx4("label", { className: "block text-xs text-text-secondary mb-1", children: "Path Cost" }),
-        /* @__PURE__ */ jsx4(
+    /* @__PURE__ */ jsxs7("div", { className: "flex gap-4", children: [
+      /* @__PURE__ */ jsxs7("div", { className: "flex-1", children: [
+        /* @__PURE__ */ jsx7("label", { className: "block text-xs text-text-secondary mb-1", children: "Path Cost" }),
+        /* @__PURE__ */ jsx7(
           "input",
           {
             type: "number",
@@ -998,8 +1941,8 @@ function TransitionEditor({
           }
         )
       ] }),
-      /* @__PURE__ */ jsx4("div", { className: "flex items-end pb-1", children: /* @__PURE__ */ jsxs4("label", { className: "flex items-center gap-1.5 text-xs text-text-secondary cursor-pointer", children: [
-        /* @__PURE__ */ jsx4(
+      /* @__PURE__ */ jsx7("div", { className: "flex items-end pb-1", children: /* @__PURE__ */ jsxs7("label", { className: "flex items-center gap-1.5 text-xs text-text-secondary cursor-pointer", children: [
+        /* @__PURE__ */ jsx7(
           "input",
           {
             type: "checkbox",
@@ -1011,8 +1954,8 @@ function TransitionEditor({
         "Stays Visible"
       ] }) })
     ] }),
-    /* @__PURE__ */ jsxs4("div", { className: "flex gap-2 pt-2 border-t border-border-secondary", children: [
-      /* @__PURE__ */ jsx4(
+    /* @__PURE__ */ jsxs7("div", { className: "flex gap-2 pt-2 border-t border-border-secondary", children: [
+      /* @__PURE__ */ jsx7(
         "button",
         {
           onClick: handleSave,
@@ -1021,7 +1964,7 @@ function TransitionEditor({
           children: isSaving ? "Saving..." : isEditing ? "Update" : "Create"
         }
       ),
-      isEditing && /* @__PURE__ */ jsx4(
+      isEditing && /* @__PURE__ */ jsx7(
         "button",
         {
           onClick: handleDelete,
@@ -1046,12 +1989,12 @@ function StateToggleGroup({
     red: "bg-red-500/20 text-red-300 border-red-500/50"
   };
   const inactiveClass = "bg-bg-tertiary text-text-secondary border-border-secondary hover:border-text-muted";
-  return /* @__PURE__ */ jsxs4("div", { children: [
-    /* @__PURE__ */ jsx4("label", { className: "block text-xs text-text-secondary mb-1", children: label }),
-    /* @__PURE__ */ jsxs4("div", { className: "flex flex-wrap gap-1", children: [
+  return /* @__PURE__ */ jsxs7("div", { children: [
+    /* @__PURE__ */ jsx7("label", { className: "block text-xs text-text-secondary mb-1", children: label }),
+    /* @__PURE__ */ jsxs7("div", { className: "flex flex-wrap gap-1", children: [
       states.map((s) => {
         const isActive = selected.includes(s.state_id);
-        return /* @__PURE__ */ jsx4(
+        return /* @__PURE__ */ jsx7(
           "button",
           {
             onClick: () => onToggle(s.state_id),
@@ -1061,7 +2004,7 @@ function StateToggleGroup({
           s.state_id
         );
       }),
-      states.length === 0 && /* @__PURE__ */ jsx4("span", { className: "text-xs text-text-muted italic", children: "No states" })
+      states.length === 0 && /* @__PURE__ */ jsx7("span", { className: "text-xs text-text-muted italic", children: "No states" })
     ] })
   ] });
 }
@@ -1072,19 +2015,19 @@ function ActionField({
   onRemove,
   canRemove
 }) {
-  return /* @__PURE__ */ jsxs4("div", { className: "p-2 bg-bg-tertiary border border-border-secondary rounded", children: [
-    /* @__PURE__ */ jsxs4("div", { className: "flex items-center gap-2 mb-1.5", children: [
-      /* @__PURE__ */ jsx4(
+  return /* @__PURE__ */ jsxs7("div", { className: "p-2 bg-bg-tertiary border border-border-secondary rounded", children: [
+    /* @__PURE__ */ jsxs7("div", { className: "flex items-center gap-2 mb-1.5", children: [
+      /* @__PURE__ */ jsx7(
         "select",
         {
           value: action.type,
           onChange: (e) => onUpdate(index, { type: e.target.value }),
           className: "flex-1 px-2 py-1 text-xs bg-bg-secondary border border-border-secondary rounded text-text-primary [&>option]:text-black [&>option]:bg-white",
           style: { colorScheme: "dark" },
-          children: ACTION_TYPES.map((t) => /* @__PURE__ */ jsx4("option", { value: t.value, children: t.label }, t.value))
+          children: ACTION_TYPES.map((t) => /* @__PURE__ */ jsx7("option", { value: t.value, children: t.label }, t.value))
         }
       ),
-      canRemove && /* @__PURE__ */ jsx4(
+      canRemove && /* @__PURE__ */ jsx7(
         "button",
         {
           onClick: () => onRemove(index),
@@ -1093,7 +2036,7 @@ function ActionField({
         }
       )
     ] }),
-    (action.type === "click" || action.type === "doubleClick" || action.type === "rightClick" || action.type === "hover" || action.type === "focus" || action.type === "blur" || action.type === "check" || action.type === "uncheck" || action.type === "toggle" || action.type === "submit" || action.type === "reset" || action.type === "clear") && /* @__PURE__ */ jsx4(
+    (action.type === "click" || action.type === "doubleClick" || action.type === "rightClick" || action.type === "hover" || action.type === "focus" || action.type === "blur" || action.type === "check" || action.type === "uncheck" || action.type === "toggle" || action.type === "submit" || action.type === "reset" || action.type === "clear") && /* @__PURE__ */ jsx7(
       "input",
       {
         type: "text",
@@ -1103,8 +2046,8 @@ function ActionField({
         className: "w-full px-2 py-1 text-xs bg-bg-secondary border border-border-secondary rounded text-text-primary placeholder:text-text-muted"
       }
     ),
-    action.type === "type" && /* @__PURE__ */ jsxs4("div", { className: "flex flex-col gap-1.5", children: [
-      /* @__PURE__ */ jsx4(
+    action.type === "type" && /* @__PURE__ */ jsxs7("div", { className: "flex flex-col gap-1.5", children: [
+      /* @__PURE__ */ jsx7(
         "input",
         {
           type: "text",
@@ -1114,7 +2057,7 @@ function ActionField({
           className: "w-full px-2 py-1 text-xs bg-bg-secondary border border-border-secondary rounded text-text-primary placeholder:text-text-muted"
         }
       ),
-      /* @__PURE__ */ jsx4(
+      /* @__PURE__ */ jsx7(
         "input",
         {
           type: "text",
@@ -1124,8 +2067,8 @@ function ActionField({
           className: "w-full px-2 py-1 text-xs bg-bg-secondary border border-border-secondary rounded text-text-primary placeholder:text-text-muted"
         }
       ),
-      /* @__PURE__ */ jsxs4("label", { className: "flex items-center gap-1 text-xs text-text-secondary", children: [
-        /* @__PURE__ */ jsx4(
+      /* @__PURE__ */ jsxs7("label", { className: "flex items-center gap-1 text-xs text-text-secondary", children: [
+        /* @__PURE__ */ jsx7(
           "input",
           {
             type: "checkbox",
@@ -1137,7 +2080,7 @@ function ActionField({
         "Clear first"
       ] })
     ] }),
-    action.type === "navigate" && /* @__PURE__ */ jsx4(
+    action.type === "navigate" && /* @__PURE__ */ jsx7(
       "input",
       {
         type: "text",
@@ -1147,7 +2090,7 @@ function ActionField({
         className: "w-full px-2 py-1 text-xs bg-bg-secondary border border-border-secondary rounded text-text-primary placeholder:text-text-muted"
       }
     ),
-    action.type === "wait" && /* @__PURE__ */ jsx4(
+    action.type === "wait" && /* @__PURE__ */ jsx7(
       "input",
       {
         type: "number",
@@ -1158,8 +2101,8 @@ function ActionField({
         className: "w-full px-2 py-1 text-xs bg-bg-secondary border border-border-secondary rounded text-text-primary placeholder:text-text-muted"
       }
     ),
-    (action.type === "select" || action.type === "setValue") && /* @__PURE__ */ jsxs4("div", { className: "flex flex-col gap-1.5", children: [
-      /* @__PURE__ */ jsx4(
+    (action.type === "select" || action.type === "setValue") && /* @__PURE__ */ jsxs7("div", { className: "flex flex-col gap-1.5", children: [
+      /* @__PURE__ */ jsx7(
         "input",
         {
           type: "text",
@@ -1169,7 +2112,7 @@ function ActionField({
           className: "w-full px-2 py-1 text-xs bg-bg-secondary border border-border-secondary rounded text-text-primary placeholder:text-text-muted"
         }
       ),
-      /* @__PURE__ */ jsx4(
+      /* @__PURE__ */ jsx7(
         "input",
         {
           type: "text",
@@ -1180,8 +2123,8 @@ function ActionField({
         }
       )
     ] }),
-    action.type === "scroll" && /* @__PURE__ */ jsxs4("div", { className: "flex gap-2", children: [
-      /* @__PURE__ */ jsxs4(
+    action.type === "scroll" && /* @__PURE__ */ jsxs7("div", { className: "flex gap-2", children: [
+      /* @__PURE__ */ jsxs7(
         "select",
         {
           value: action.scroll_direction ?? "down",
@@ -1191,14 +2134,14 @@ function ActionField({
           className: "flex-1 px-2 py-1 text-xs bg-bg-secondary border border-border-secondary rounded text-text-primary [&>option]:text-black [&>option]:bg-white",
           style: { colorScheme: "dark" },
           children: [
-            /* @__PURE__ */ jsx4("option", { value: "up", children: "Up" }),
-            /* @__PURE__ */ jsx4("option", { value: "down", children: "Down" }),
-            /* @__PURE__ */ jsx4("option", { value: "left", children: "Left" }),
-            /* @__PURE__ */ jsx4("option", { value: "right", children: "Right" })
+            /* @__PURE__ */ jsx7("option", { value: "up", children: "Up" }),
+            /* @__PURE__ */ jsx7("option", { value: "down", children: "Down" }),
+            /* @__PURE__ */ jsx7("option", { value: "left", children: "Left" }),
+            /* @__PURE__ */ jsx7("option", { value: "right", children: "Right" })
           ]
         }
       ),
-      /* @__PURE__ */ jsx4(
+      /* @__PURE__ */ jsx7(
         "input",
         {
           type: "number",
@@ -1212,8 +2155,8 @@ function ActionField({
         }
       )
     ] }),
-    action.type === "drag" && /* @__PURE__ */ jsxs4("div", { className: "flex flex-col gap-1.5", children: [
-      /* @__PURE__ */ jsx4(
+    action.type === "drag" && /* @__PURE__ */ jsxs7("div", { className: "flex flex-col gap-1.5", children: [
+      /* @__PURE__ */ jsx7(
         "input",
         {
           type: "text",
@@ -1223,7 +2166,7 @@ function ActionField({
           className: "w-full px-2 py-1 text-xs bg-bg-secondary border border-border-secondary rounded text-text-primary placeholder:text-text-muted"
         }
       ),
-      /* @__PURE__ */ jsx4(
+      /* @__PURE__ */ jsx7(
         "input",
         {
           type: "text",
@@ -1238,7 +2181,7 @@ function ActionField({
 }
 
 // src/components/state-machine/TransitionsPanel.tsx
-import { useState as useState3, useMemo as useMemo3, useCallback as useCallback3, useRef as useRef2, useEffect as useEffect3 } from "react";
+import { useState as useState4, useMemo as useMemo4, useCallback as useCallback4, useRef as useRef3, useEffect as useEffect4 } from "react";
 import {
   GitBranch,
   MousePointer as MousePointer3,
@@ -1246,14 +2189,14 @@ import {
   ListFilter as ListFilter2,
   Clock as Clock2,
   Globe as Globe3,
-  Play as Play3,
+  Play as Play4,
   Pause,
   SkipForward,
   SkipBack,
   RotateCcw,
   ChevronRight,
   Eye as Eye2,
-  ArrowRight,
+  ArrowRight as ArrowRight3,
   Search,
   Zap
 } from "lucide-react";
@@ -1263,7 +2206,7 @@ import {
   getActionColorConfig,
   computeActionDuration
 } from "@qontinui/workflow-utils";
-import { jsx as jsx5, jsxs as jsxs5 } from "react/jsx-runtime";
+import { jsx as jsx8, jsxs as jsxs8 } from "react/jsx-runtime";
 var ACTION_ICONS2 = {
   click: MousePointer3,
   type: TypeIcon3,
@@ -1299,21 +2242,21 @@ function TransitionsPanel({
   permittedTriggers,
   blockedTriggers
 }) {
-  const [filterFromState, setFilterFromState] = useState3(null);
-  const [filterToState, setFilterToState] = useState3(null);
-  const [searchFilter, setSearchFilter] = useState3("");
-  const [permittedOnly, setPermittedOnly] = useState3(false);
-  const [animation, setAnimation] = useState3({
+  const [filterFromState, setFilterFromState] = useState4(null);
+  const [filterToState, setFilterToState] = useState4(null);
+  const [searchFilter, setSearchFilter] = useState4("");
+  const [permittedOnly, setPermittedOnly] = useState4(false);
+  const [animation, setAnimation] = useState4({
     isPlaying: false,
     currentActionIndex: -1,
     progress: 0,
     speed: 1
   });
-  const permittedIds = useMemo3(
+  const permittedIds = useMemo4(
     () => new Set((permittedTriggers ?? []).map((p) => p.transition_id)),
     [permittedTriggers]
   );
-  const blockedReasonById = useMemo3(() => {
+  const blockedReasonById = useMemo4(() => {
     const map = /* @__PURE__ */ new Map();
     for (const b of blockedTriggers ?? []) {
       map.set(b.transition_id, b.reason);
@@ -1321,13 +2264,13 @@ function TransitionsPanel({
     return map;
   }, [blockedTriggers]);
   const hasIntrospectionData = (permittedTriggers?.length ?? 0) > 0 || (blockedTriggers?.length ?? 0) > 0 || (activeStateIds?.length ?? 0) > 0;
-  const animationRef = useRef2(null);
-  const startTimeRef = useRef2(0);
-  const selectedTransition = useMemo3(
+  const animationRef = useRef3(null);
+  const startTimeRef = useRef3(0);
+  const selectedTransition = useMemo4(
     () => transitions.find((t) => t.transition_id === selectedTransitionId),
     [transitions, selectedTransitionId]
   );
-  const filteredTransitions = useMemo3(() => {
+  const filteredTransitions = useMemo4(() => {
     return transitions.filter((t) => {
       if (filterFromState && !t.from_states.includes(filterFromState))
         return false;
@@ -1351,21 +2294,21 @@ function TransitionsPanel({
     hasIntrospectionData,
     permittedIds
   ]);
-  const stateNameMap = useMemo3(() => {
+  const stateNameMap = useMemo4(() => {
     const map = /* @__PURE__ */ new Map();
     for (const s of states) {
       map.set(s.state_id, s.name);
     }
     return map;
   }, [states]);
-  const stopAnimation = useCallback3(() => {
+  const stopAnimation = useCallback4(() => {
     if (animationRef.current) {
       cancelAnimationFrame(animationRef.current);
       animationRef.current = null;
     }
     setAnimation((prev) => ({ ...prev, isPlaying: false }));
   }, []);
-  const animate = useCallback3(() => {
+  const animate = useCallback4(() => {
     if (!selectedTransition || selectedTransition.actions.length === 0) return;
     const tick = (timestamp) => {
       setAnimation((prev) => {
@@ -1392,7 +2335,7 @@ function TransitionsPanel({
     startTimeRef.current = performance.now();
     animationRef.current = requestAnimationFrame(tick);
   }, [selectedTransition]);
-  const playAnimation = useCallback3(() => {
+  const playAnimation = useCallback4(() => {
     setAnimation((prev) => {
       const startIndex = prev.currentActionIndex < 0 ? 0 : prev.currentActionIndex;
       const idx = prev.progress >= 1 && startIndex >= (selectedTransition?.actions.length ?? 0) - 1 ? 0 : startIndex;
@@ -1400,10 +2343,10 @@ function TransitionsPanel({
     });
     setTimeout(animate, 0);
   }, [animate, selectedTransition]);
-  const pauseAnimation = useCallback3(() => {
+  const pauseAnimation = useCallback4(() => {
     stopAnimation();
   }, [stopAnimation]);
-  const resetAnimation = useCallback3(() => {
+  const resetAnimation = useCallback4(() => {
     stopAnimation();
     setAnimation((prev) => ({
       ...prev,
@@ -1411,7 +2354,7 @@ function TransitionsPanel({
       progress: 0
     }));
   }, [stopAnimation]);
-  const stepForward = useCallback3(() => {
+  const stepForward = useCallback4(() => {
     stopAnimation();
     setAnimation((prev) => {
       const next = prev.currentActionIndex + 1;
@@ -1420,7 +2363,7 @@ function TransitionsPanel({
       return { ...prev, currentActionIndex: next, progress: 1 };
     });
   }, [stopAnimation, selectedTransition]);
-  const stepBackward = useCallback3(() => {
+  const stepBackward = useCallback4(() => {
     stopAnimation();
     setAnimation((prev) => {
       const next = prev.currentActionIndex - 1;
@@ -1428,23 +2371,23 @@ function TransitionsPanel({
       return { ...prev, currentActionIndex: next, progress: 1 };
     });
   }, [stopAnimation]);
-  useEffect3(() => {
+  useEffect4(() => {
     return () => {
       if (animationRef.current) {
         cancelAnimationFrame(animationRef.current);
       }
     };
   }, []);
-  useEffect3(() => {
+  useEffect4(() => {
     resetAnimation();
   }, [selectedTransitionId, resetAnimation]);
-  const handleSelectTransition = useCallback3(
+  const handleSelectTransition = useCallback4(
     (tid) => {
       onSelectTransition(tid === selectedTransitionId ? null : tid);
     },
     [selectedTransitionId, onSelectTransition]
   );
-  const overallProgress = useMemo3(() => {
+  const overallProgress = useMemo4(() => {
     if (!selectedTransition || selectedTransition.actions.length === 0)
       return 0;
     if (animation.currentActionIndex < 0) return 0;
@@ -1452,17 +2395,17 @@ function TransitionsPanel({
     const currentProgress = animation.progress;
     return (completedActions + currentProgress) / selectedTransition.actions.length;
   }, [selectedTransition, animation]);
-  return /* @__PURE__ */ jsxs5("div", { className: "flex h-full", children: [
-    /* @__PURE__ */ jsxs5("div", { className: "w-80 border-r border-border-secondary bg-bg-primary overflow-y-auto shrink-0", children: [
-      /* @__PURE__ */ jsxs5("div", { className: "p-3 border-b border-border-secondary", children: [
-        /* @__PURE__ */ jsxs5("div", { className: "flex items-center gap-2 mb-3", children: [
-          /* @__PURE__ */ jsx5(GitBranch, { className: "size-4 text-brand-primary" }),
-          /* @__PURE__ */ jsx5("h3", { className: "text-sm font-semibold text-text-primary", children: "Transitions" }),
-          /* @__PURE__ */ jsx5("span", { className: "text-xs text-text-muted ml-auto", children: filteredTransitions.length })
+  return /* @__PURE__ */ jsxs8("div", { className: "flex h-full", children: [
+    /* @__PURE__ */ jsxs8("div", { className: "w-80 border-r border-border-secondary bg-bg-primary overflow-y-auto shrink-0", children: [
+      /* @__PURE__ */ jsxs8("div", { className: "p-3 border-b border-border-secondary", children: [
+        /* @__PURE__ */ jsxs8("div", { className: "flex items-center gap-2 mb-3", children: [
+          /* @__PURE__ */ jsx8(GitBranch, { className: "size-4 text-brand-primary" }),
+          /* @__PURE__ */ jsx8("h3", { className: "text-sm font-semibold text-text-primary", children: "Transitions" }),
+          /* @__PURE__ */ jsx8("span", { className: "text-xs text-text-muted ml-auto", children: filteredTransitions.length })
         ] }),
-        /* @__PURE__ */ jsxs5("div", { className: "relative mb-2", children: [
-          /* @__PURE__ */ jsx5(Search, { className: "absolute left-2 top-1/2 -translate-y-1/2 size-3 text-text-muted" }),
-          /* @__PURE__ */ jsx5(
+        /* @__PURE__ */ jsxs8("div", { className: "relative mb-2", children: [
+          /* @__PURE__ */ jsx8(Search, { className: "absolute left-2 top-1/2 -translate-y-1/2 size-3 text-text-muted" }),
+          /* @__PURE__ */ jsx8(
             "input",
             {
               type: "text",
@@ -1474,8 +2417,8 @@ function TransitionsPanel({
             }
           )
         ] }),
-        /* @__PURE__ */ jsxs5("div", { className: "flex gap-2", children: [
-          /* @__PURE__ */ jsxs5(
+        /* @__PURE__ */ jsxs8("div", { className: "flex gap-2", children: [
+          /* @__PURE__ */ jsxs8(
             "select",
             {
               value: filterFromState ?? "",
@@ -1483,12 +2426,12 @@ function TransitionsPanel({
               className: "text-[10px] h-6 flex-1 px-1 bg-bg-tertiary border border-border-secondary rounded text-text-primary [&>option]:text-black [&>option]:bg-white",
               style: { colorScheme: "dark" },
               children: [
-                /* @__PURE__ */ jsx5("option", { value: "", children: "All from states" }),
-                states.map((s) => /* @__PURE__ */ jsx5("option", { value: s.state_id, children: s.name }, s.state_id))
+                /* @__PURE__ */ jsx8("option", { value: "", children: "All from states" }),
+                states.map((s) => /* @__PURE__ */ jsx8("option", { value: s.state_id, children: s.name }, s.state_id))
               ]
             }
           ),
-          /* @__PURE__ */ jsxs5(
+          /* @__PURE__ */ jsxs8(
             "select",
             {
               value: filterToState ?? "",
@@ -1496,19 +2439,19 @@ function TransitionsPanel({
               className: "text-[10px] h-6 flex-1 px-1 bg-bg-tertiary border border-border-secondary rounded text-text-primary [&>option]:text-black [&>option]:bg-white",
               style: { colorScheme: "dark" },
               children: [
-                /* @__PURE__ */ jsx5("option", { value: "", children: "All target states" }),
-                states.map((s) => /* @__PURE__ */ jsx5("option", { value: s.state_id, children: s.name }, s.state_id))
+                /* @__PURE__ */ jsx8("option", { value: "", children: "All target states" }),
+                states.map((s) => /* @__PURE__ */ jsx8("option", { value: s.state_id, children: s.name }, s.state_id))
               ]
             }
           )
         ] }),
-        /* @__PURE__ */ jsxs5(
+        /* @__PURE__ */ jsxs8(
           "label",
           {
             className: `flex items-center gap-2 mt-2 text-[10px] select-none ${hasIntrospectionData ? "text-text-secondary cursor-pointer" : "text-text-muted/50 cursor-not-allowed"}`,
             title: hasIntrospectionData ? "Show only transitions currently permitted from the active state set" : "No active-state introspection data available",
             children: [
-              /* @__PURE__ */ jsx5(
+              /* @__PURE__ */ jsx8(
                 "input",
                 {
                   type: "checkbox",
@@ -1518,8 +2461,8 @@ function TransitionsPanel({
                   className: "accent-brand-primary"
                 }
               ),
-              /* @__PURE__ */ jsx5("span", { children: "Permitted from active states" }),
-              hasIntrospectionData && /* @__PURE__ */ jsxs5("span", { className: "ml-auto text-[9px] text-text-muted", children: [
+              /* @__PURE__ */ jsx8("span", { children: "Permitted from active states" }),
+              hasIntrospectionData && /* @__PURE__ */ jsxs8("span", { className: "ml-auto text-[9px] text-text-muted", children: [
                 permittedIds.size,
                 " permitted / ",
                 blockedReasonById.size,
@@ -1530,12 +2473,12 @@ function TransitionsPanel({
           }
         )
       ] }),
-      /* @__PURE__ */ jsxs5("div", { className: "p-2 space-y-0.5", children: [
+      /* @__PURE__ */ jsxs8("div", { className: "p-2 space-y-0.5", children: [
         filteredTransitions.map((t) => {
           const isSelected = t.transition_id === selectedTransitionId;
           const isPermitted = permittedIds.has(t.transition_id);
           const blockedReason = blockedReasonById.get(t.transition_id);
-          return /* @__PURE__ */ jsxs5(
+          return /* @__PURE__ */ jsxs8(
             "button",
             {
               onClick: () => handleSelectTransition(t.transition_id),
@@ -1545,18 +2488,18 @@ function TransitionsPanel({
                   ${isSelected ? "bg-brand-primary/10 border border-brand-primary/30" : "hover:bg-bg-secondary border border-transparent"}
                 `,
               children: [
-                /* @__PURE__ */ jsxs5("div", { className: "flex items-center gap-1.5", children: [
-                  hasIntrospectionData && isPermitted && /* @__PURE__ */ jsx5(
+                /* @__PURE__ */ jsxs8("div", { className: "flex items-center gap-1.5", children: [
+                  hasIntrospectionData && isPermitted && /* @__PURE__ */ jsx8(
                     "span",
                     {
                       "aria-label": "Permitted",
                       className: "shrink-0 w-1.5 h-1.5 rounded-full bg-green-500"
                     }
                   ),
-                  /* @__PURE__ */ jsx5("span", { className: "flex items-center gap-0.5", children: [...new Set(t.actions.map((a) => a.type))].slice(0, 3).map((type) => {
+                  /* @__PURE__ */ jsx8("span", { className: "flex items-center gap-0.5", children: [...new Set(t.actions.map((a) => a.type))].slice(0, 3).map((type) => {
                     const Icon = ACTION_ICONS2[type];
                     const color = getActionColorConfig(type);
-                    return Icon ? /* @__PURE__ */ jsx5(
+                    return Icon ? /* @__PURE__ */ jsx8(
                       Icon,
                       {
                         className: `size-3 ${color.text}`
@@ -1564,16 +2507,16 @@ function TransitionsPanel({
                       type
                     ) : null;
                   }) }),
-                  /* @__PURE__ */ jsx5("span", { className: "font-medium text-text-primary truncate flex-1", children: t.name || "Unnamed" }),
-                  t.stays_visible && /* @__PURE__ */ jsx5(Eye2, { className: "size-3 text-green-500 shrink-0" }),
-                  t.actions.length > 0 && /* @__PURE__ */ jsx5("span", { className: "text-[9px] text-text-muted bg-bg-secondary px-1 rounded", children: t.actions.length })
+                  /* @__PURE__ */ jsx8("span", { className: "font-medium text-text-primary truncate flex-1", children: t.name || "Unnamed" }),
+                  t.stays_visible && /* @__PURE__ */ jsx8(Eye2, { className: "size-3 text-green-500 shrink-0" }),
+                  t.actions.length > 0 && /* @__PURE__ */ jsx8("span", { className: "text-[9px] text-text-muted bg-bg-secondary px-1 rounded", children: t.actions.length })
                 ] }),
-                /* @__PURE__ */ jsxs5("div", { className: "flex items-center gap-1 mt-0.5 ml-4 text-[10px] text-text-muted", children: [
-                  /* @__PURE__ */ jsx5("span", { className: "truncate", children: t.from_states.map((s) => stateNameMap.get(s) ?? s).join(", ") }),
-                  /* @__PURE__ */ jsx5(ArrowRight, { className: "size-2.5 shrink-0" }),
-                  /* @__PURE__ */ jsx5("span", { className: "truncate", children: t.activate_states.map((s) => stateNameMap.get(s) ?? s).join(", ") })
+                /* @__PURE__ */ jsxs8("div", { className: "flex items-center gap-1 mt-0.5 ml-4 text-[10px] text-text-muted", children: [
+                  /* @__PURE__ */ jsx8("span", { className: "truncate", children: t.from_states.map((s) => stateNameMap.get(s) ?? s).join(", ") }),
+                  /* @__PURE__ */ jsx8(ArrowRight3, { className: "size-2.5 shrink-0" }),
+                  /* @__PURE__ */ jsx8("span", { className: "truncate", children: t.activate_states.map((s) => stateNameMap.get(s) ?? s).join(", ") })
                 ] }),
-                blockedReason && /* @__PURE__ */ jsx5("div", { className: "mt-1 ml-4", children: /* @__PURE__ */ jsx5(
+                blockedReason && /* @__PURE__ */ jsx8("div", { className: "mt-1 ml-4", children: /* @__PURE__ */ jsx8(
                   "span",
                   {
                     title: blockedReason,
@@ -1586,44 +2529,44 @@ function TransitionsPanel({
             t.transition_id
           );
         }),
-        filteredTransitions.length === 0 && /* @__PURE__ */ jsx5("p", { className: "text-xs text-text-muted text-center py-4", children: "No transitions match filters." })
+        filteredTransitions.length === 0 && /* @__PURE__ */ jsx8("p", { className: "text-xs text-text-muted text-center py-4", children: "No transitions match filters." })
       ] })
     ] }),
-    /* @__PURE__ */ jsx5("div", { className: "flex-1 overflow-y-auto", children: selectedTransition ? /* @__PURE__ */ jsxs5("div", { className: "p-6 space-y-6", children: [
-      /* @__PURE__ */ jsxs5("div", { children: [
-        /* @__PURE__ */ jsxs5("div", { className: "flex items-center gap-2", children: [
-          /* @__PURE__ */ jsx5("h2", { className: "text-lg font-semibold text-text-primary", children: selectedTransition.name || "Unnamed Transition" }),
-          selectedTransition.stays_visible && /* @__PURE__ */ jsxs5("span", { className: "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] border bg-green-500/20 text-green-400 border-green-500/30", children: [
-            /* @__PURE__ */ jsx5(Eye2, { className: "size-2.5" }),
+    /* @__PURE__ */ jsx8("div", { className: "flex-1 overflow-y-auto", children: selectedTransition ? /* @__PURE__ */ jsxs8("div", { className: "p-6 space-y-6", children: [
+      /* @__PURE__ */ jsxs8("div", { children: [
+        /* @__PURE__ */ jsxs8("div", { className: "flex items-center gap-2", children: [
+          /* @__PURE__ */ jsx8("h2", { className: "text-lg font-semibold text-text-primary", children: selectedTransition.name || "Unnamed Transition" }),
+          selectedTransition.stays_visible && /* @__PURE__ */ jsxs8("span", { className: "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] border bg-green-500/20 text-green-400 border-green-500/30", children: [
+            /* @__PURE__ */ jsx8(Eye2, { className: "size-2.5" }),
             "Visible"
           ] })
         ] }),
-        /* @__PURE__ */ jsxs5("div", { className: "flex items-center gap-2 mt-2 text-xs text-text-muted flex-wrap", children: [
-          /* @__PURE__ */ jsxs5("span", { className: "inline-flex items-center rounded-full px-2 py-0.5 text-[10px] border bg-bg-secondary border-border-secondary text-text-muted", children: [
+        /* @__PURE__ */ jsxs8("div", { className: "flex items-center gap-2 mt-2 text-xs text-text-muted flex-wrap", children: [
+          /* @__PURE__ */ jsxs8("span", { className: "inline-flex items-center rounded-full px-2 py-0.5 text-[10px] border bg-bg-secondary border-border-secondary text-text-muted", children: [
             "From:",
             " ",
             selectedTransition.from_states.map((s) => stateNameMap.get(s) ?? s).join(", ")
           ] }),
-          /* @__PURE__ */ jsx5(ArrowRight, { className: "size-3" }),
-          /* @__PURE__ */ jsxs5("span", { className: "inline-flex items-center rounded-full px-2 py-0.5 text-[10px] border bg-bg-secondary border-border-secondary text-text-muted", children: [
+          /* @__PURE__ */ jsx8(ArrowRight3, { className: "size-3" }),
+          /* @__PURE__ */ jsxs8("span", { className: "inline-flex items-center rounded-full px-2 py-0.5 text-[10px] border bg-bg-secondary border-border-secondary text-text-muted", children: [
             "To:",
             " ",
             selectedTransition.activate_states.map((s) => stateNameMap.get(s) ?? s).join(", ")
           ] }),
-          selectedTransition.exit_states.length > 0 && /* @__PURE__ */ jsxs5("span", { className: "inline-flex items-center rounded-full px-2 py-0.5 text-[10px] border status-error text-red-400 border-red-500/30", children: [
+          selectedTransition.exit_states.length > 0 && /* @__PURE__ */ jsxs8("span", { className: "inline-flex items-center rounded-full px-2 py-0.5 text-[10px] border status-error text-red-400 border-red-500/30", children: [
             "Exit:",
             " ",
             selectedTransition.exit_states.map((s) => stateNameMap.get(s) ?? s).join(", ")
           ] })
         ] })
       ] }),
-      selectedTransition.actions.length > 0 && /* @__PURE__ */ jsxs5("div", { className: "rounded-lg border border-border-secondary bg-bg-secondary p-4", children: [
-        /* @__PURE__ */ jsxs5("div", { className: "flex items-center justify-between mb-3", children: [
-          /* @__PURE__ */ jsxs5("div", { className: "flex items-center gap-2", children: [
-            /* @__PURE__ */ jsx5(Zap, { className: "size-3.5 text-brand-primary" }),
-            /* @__PURE__ */ jsx5("span", { className: "text-xs font-medium text-text-primary", children: "Action Playback" })
+      selectedTransition.actions.length > 0 && /* @__PURE__ */ jsxs8("div", { className: "rounded-lg border border-border-secondary bg-bg-secondary p-4", children: [
+        /* @__PURE__ */ jsxs8("div", { className: "flex items-center justify-between mb-3", children: [
+          /* @__PURE__ */ jsxs8("div", { className: "flex items-center gap-2", children: [
+            /* @__PURE__ */ jsx8(Zap, { className: "size-3.5 text-brand-primary" }),
+            /* @__PURE__ */ jsx8("span", { className: "text-xs font-medium text-text-primary", children: "Action Playback" })
           ] }),
-          /* @__PURE__ */ jsx5("div", { className: "flex items-center gap-2", children: /* @__PURE__ */ jsxs5(
+          /* @__PURE__ */ jsx8("div", { className: "flex items-center gap-2", children: /* @__PURE__ */ jsxs8(
             "select",
             {
               value: animation.speed,
@@ -1634,68 +2577,68 @@ function TransitionsPanel({
               className: "text-[10px] h-5 w-16 px-1 bg-bg-tertiary border border-border-secondary rounded text-text-primary [&>option]:text-black [&>option]:bg-white",
               style: { colorScheme: "dark" },
               children: [
-                /* @__PURE__ */ jsx5("option", { value: "0.5", children: "0.5x" }),
-                /* @__PURE__ */ jsx5("option", { value: "1", children: "1x" }),
-                /* @__PURE__ */ jsx5("option", { value: "1.5", children: "1.5x" }),
-                /* @__PURE__ */ jsx5("option", { value: "2", children: "2x" }),
-                /* @__PURE__ */ jsx5("option", { value: "4", children: "4x" })
+                /* @__PURE__ */ jsx8("option", { value: "0.5", children: "0.5x" }),
+                /* @__PURE__ */ jsx8("option", { value: "1", children: "1x" }),
+                /* @__PURE__ */ jsx8("option", { value: "1.5", children: "1.5x" }),
+                /* @__PURE__ */ jsx8("option", { value: "2", children: "2x" }),
+                /* @__PURE__ */ jsx8("option", { value: "4", children: "4x" })
               ]
             }
           ) })
         ] }),
-        /* @__PURE__ */ jsx5("div", { className: "w-full h-1.5 bg-bg-primary rounded-full mb-3 overflow-hidden", children: /* @__PURE__ */ jsx5(
+        /* @__PURE__ */ jsx8("div", { className: "w-full h-1.5 bg-bg-primary rounded-full mb-3 overflow-hidden", children: /* @__PURE__ */ jsx8(
           "div",
           {
             className: "h-full bg-brand-primary rounded-full transition-all duration-100",
             style: { width: `${overallProgress * 100}%` }
           }
         ) }),
-        /* @__PURE__ */ jsxs5("div", { className: "flex items-center justify-center gap-2", children: [
-          /* @__PURE__ */ jsx5(
+        /* @__PURE__ */ jsxs8("div", { className: "flex items-center justify-center gap-2", children: [
+          /* @__PURE__ */ jsx8(
             "button",
             {
               onClick: resetAnimation,
               className: "h-7 w-7 p-0 inline-flex items-center justify-center rounded text-text-secondary hover:text-text-primary hover:bg-bg-tertiary",
               title: "Reset",
-              children: /* @__PURE__ */ jsx5(RotateCcw, { className: "size-3.5" })
+              children: /* @__PURE__ */ jsx8(RotateCcw, { className: "size-3.5" })
             }
           ),
-          /* @__PURE__ */ jsx5(
+          /* @__PURE__ */ jsx8(
             "button",
             {
               onClick: stepBackward,
               disabled: animation.currentActionIndex <= 0,
               className: "h-7 w-7 p-0 inline-flex items-center justify-center rounded text-text-secondary hover:text-text-primary hover:bg-bg-tertiary disabled:opacity-50 disabled:cursor-not-allowed",
               title: "Step back",
-              children: /* @__PURE__ */ jsx5(SkipBack, { className: "size-3.5" })
+              children: /* @__PURE__ */ jsx8(SkipBack, { className: "size-3.5" })
             }
           ),
-          /* @__PURE__ */ jsx5(
+          /* @__PURE__ */ jsx8(
             "button",
             {
               onClick: animation.isPlaying ? pauseAnimation : playAnimation,
               className: "h-9 w-9 p-0 inline-flex items-center justify-center rounded-full bg-brand-primary text-white hover:bg-brand-primary/90",
               title: animation.isPlaying ? "Pause" : "Play",
-              children: animation.isPlaying ? /* @__PURE__ */ jsx5(Pause, { className: "size-4" }) : /* @__PURE__ */ jsx5(Play3, { className: "size-4 ml-0.5" })
+              children: animation.isPlaying ? /* @__PURE__ */ jsx8(Pause, { className: "size-4" }) : /* @__PURE__ */ jsx8(Play4, { className: "size-4 ml-0.5" })
             }
           ),
-          /* @__PURE__ */ jsx5(
+          /* @__PURE__ */ jsx8(
             "button",
             {
               onClick: stepForward,
               disabled: animation.currentActionIndex >= selectedTransition.actions.length - 1,
               className: "h-7 w-7 p-0 inline-flex items-center justify-center rounded text-text-secondary hover:text-text-primary hover:bg-bg-tertiary disabled:opacity-50 disabled:cursor-not-allowed",
               title: "Step forward",
-              children: /* @__PURE__ */ jsx5(SkipForward, { className: "size-3.5" })
+              children: /* @__PURE__ */ jsx8(SkipForward, { className: "size-3.5" })
             }
           )
         ] }),
-        /* @__PURE__ */ jsx5("div", { className: "mt-3 flex items-center justify-center gap-1", children: selectedTransition.actions.map((action, idx) => {
+        /* @__PURE__ */ jsx8("div", { className: "mt-3 flex items-center justify-center gap-1", children: selectedTransition.actions.map((action, idx) => {
           const Icon = ACTION_ICONS2[action.type] ?? ChevronRight;
           const isPastAction = animation.currentActionIndex >= 0 && idx < animation.currentActionIndex;
           const isCurrentAction = idx === animation.currentActionIndex;
           const color = getActionColorConfig(action.type);
-          return /* @__PURE__ */ jsxs5(
+          return /* @__PURE__ */ jsxs8(
             "button",
             {
               onClick: () => {
@@ -1712,27 +2655,27 @@ function TransitionsPanel({
                         `,
               title: `${ACTION_LABELS[action.type] ?? action.type}: ${action.target || action.url || action.text || ""}`,
               children: [
-                /* @__PURE__ */ jsx5(Icon, { className: "size-2.5" }),
-                /* @__PURE__ */ jsx5("span", { children: idx + 1 })
+                /* @__PURE__ */ jsx8(Icon, { className: "size-2.5" }),
+                /* @__PURE__ */ jsx8("span", { children: idx + 1 })
               ]
             },
             `${idx}-${action.type}`
           );
         }) }),
-        /* @__PURE__ */ jsx5("div", { className: "mt-1.5 text-center text-[10px] text-text-muted", children: animation.currentActionIndex >= 0 ? `Action ${animation.currentActionIndex + 1} of ${selectedTransition.actions.length}` : "Ready to play" })
+        /* @__PURE__ */ jsx8("div", { className: "mt-1.5 text-center text-[10px] text-text-muted", children: animation.currentActionIndex >= 0 ? `Action ${animation.currentActionIndex + 1} of ${selectedTransition.actions.length}` : "Ready to play" })
       ] }),
-      /* @__PURE__ */ jsxs5("div", { children: [
-        /* @__PURE__ */ jsxs5("h3", { className: "text-sm font-medium text-text-primary mb-3", children: [
+      /* @__PURE__ */ jsxs8("div", { children: [
+        /* @__PURE__ */ jsxs8("h3", { className: "text-sm font-medium text-text-primary mb-3", children: [
           "Actions (",
           selectedTransition.actions.length,
           ")"
         ] }),
-        selectedTransition.actions.length === 0 ? /* @__PURE__ */ jsx5("p", { className: "text-xs text-text-muted", children: "No actions defined." }) : /* @__PURE__ */ jsx5("div", { className: "space-y-2", children: selectedTransition.actions.map((action, idx) => {
+        selectedTransition.actions.length === 0 ? /* @__PURE__ */ jsx8("p", { className: "text-xs text-text-muted", children: "No actions defined." }) : /* @__PURE__ */ jsx8("div", { className: "space-y-2", children: selectedTransition.actions.map((action, idx) => {
           const Icon = ACTION_ICONS2[action.type] ?? ChevronRight;
           const color = getActionColorConfig(action.type);
           const isCurrent = idx === animation.currentActionIndex;
           const isPast = animation.currentActionIndex >= 0 && idx < animation.currentActionIndex;
-          return /* @__PURE__ */ jsxs5(
+          return /* @__PURE__ */ jsxs8(
             "div",
             {
               className: `
@@ -1740,20 +2683,20 @@ function TransitionsPanel({
                           ${isCurrent ? `${color.border} ${color.bg} shadow-xs` : isPast ? "border-green-500/30 bg-green-500/5" : "border-border-secondary bg-bg-secondary"}
                         `,
               children: [
-                /* @__PURE__ */ jsxs5("div", { className: "flex items-center gap-2 shrink-0", children: [
-                  /* @__PURE__ */ jsx5("span", { className: "text-[10px] text-text-muted font-mono w-4 text-right", children: idx + 1 }),
-                  /* @__PURE__ */ jsx5(
+                /* @__PURE__ */ jsxs8("div", { className: "flex items-center gap-2 shrink-0", children: [
+                  /* @__PURE__ */ jsx8("span", { className: "text-[10px] text-text-muted font-mono w-4 text-right", children: idx + 1 }),
+                  /* @__PURE__ */ jsx8(
                     "div",
                     {
                       className: `p-1.5 rounded-md ${color.bg} ${color.text}`,
-                      children: /* @__PURE__ */ jsx5(Icon, { className: "size-3.5" })
+                      children: /* @__PURE__ */ jsx8(Icon, { className: "size-3.5" })
                     }
                   )
                 ] }),
-                /* @__PURE__ */ jsxs5("div", { className: "flex-1 min-w-0", children: [
-                  /* @__PURE__ */ jsxs5("div", { className: "text-xs font-medium text-text-primary flex items-center gap-1.5", children: [
-                    /* @__PURE__ */ jsx5("span", { children: ACTION_LABELS[action.type] ?? action.type }),
-                    isCurrent && animation.isPlaying && /* @__PURE__ */ jsx5(
+                /* @__PURE__ */ jsxs8("div", { className: "flex-1 min-w-0", children: [
+                  /* @__PURE__ */ jsxs8("div", { className: "text-xs font-medium text-text-primary flex items-center gap-1.5", children: [
+                    /* @__PURE__ */ jsx8("span", { children: ACTION_LABELS[action.type] ?? action.type }),
+                    isCurrent && animation.isPlaying && /* @__PURE__ */ jsx8(
                       "span",
                       {
                         className: `animate-pulse ${color.text} text-[10px]`,
@@ -1761,8 +2704,8 @@ function TransitionsPanel({
                       }
                     )
                   ] }),
-                  action.target && /* @__PURE__ */ jsx5("code", { className: "text-[10px] text-text-muted mt-0.5 block truncate bg-bg-primary/50 px-1 py-0.5 rounded", children: action.target }),
-                  action.text && /* @__PURE__ */ jsxs5("div", { className: "text-[10px] text-text-muted mt-0.5 font-mono bg-bg-primary/50 px-1 py-0.5 rounded", children: [
+                  action.target && /* @__PURE__ */ jsx8("code", { className: "text-[10px] text-text-muted mt-0.5 block truncate bg-bg-primary/50 px-1 py-0.5 rounded", children: action.target }),
+                  action.text && /* @__PURE__ */ jsxs8("div", { className: "text-[10px] text-text-muted mt-0.5 font-mono bg-bg-primary/50 px-1 py-0.5 rounded", children: [
                     "\u201C",
                     isCurrent && animation.isPlaying ? action.text.slice(
                       0,
@@ -1771,13 +2714,13 @@ function TransitionsPanel({
                       )
                     ) : action.text,
                     "\u201D",
-                    isCurrent && animation.isPlaying && /* @__PURE__ */ jsx5("span", { className: "animate-pulse text-brand-primary", children: "|" })
+                    isCurrent && animation.isPlaying && /* @__PURE__ */ jsx8("span", { className: "animate-pulse text-brand-primary", children: "|" })
                   ] }),
-                  action.url && /* @__PURE__ */ jsx5("code", { className: "text-[10px] text-cyan-400 mt-0.5 block truncate bg-bg-primary/50 px-1 py-0.5 rounded", children: action.url }),
-                  action.delay_ms != null && /* @__PURE__ */ jsxs5("span", { className: "text-[10px] text-text-muted mt-0.5 block", children: [
+                  action.url && /* @__PURE__ */ jsx8("code", { className: "text-[10px] text-cyan-400 mt-0.5 block truncate bg-bg-primary/50 px-1 py-0.5 rounded", children: action.url }),
+                  action.delay_ms != null && /* @__PURE__ */ jsxs8("span", { className: "text-[10px] text-text-muted mt-0.5 block", children: [
                     action.delay_ms,
                     "ms",
-                    isCurrent && animation.isPlaying && /* @__PURE__ */ jsxs5("span", { className: "ml-1 text-text-muted/70", children: [
+                    isCurrent && animation.isPlaying && /* @__PURE__ */ jsxs8("span", { className: "ml-1 text-text-muted/70", children: [
                       "(",
                       Math.round(
                         animation.progress * (action.delay_ms ?? 0)
@@ -1786,31 +2729,31 @@ function TransitionsPanel({
                     ] })
                   ] })
                 ] }),
-                isPast && /* @__PURE__ */ jsx5("div", { className: "text-green-500 shrink-0 mt-0.5", children: /* @__PURE__ */ jsx5(
+                isPast && /* @__PURE__ */ jsx8("div", { className: "text-green-500 shrink-0 mt-0.5", children: /* @__PURE__ */ jsx8(
                   "svg",
                   {
                     className: "size-4",
                     viewBox: "0 0 16 16",
                     fill: "currentColor",
-                    children: /* @__PURE__ */ jsx5("path", { d: "M13.78 4.22a.75.75 0 0 1 0 1.06l-7.25 7.25a.75.75 0 0 1-1.06 0L2.22 9.28a.751.751 0 0 1 .018-1.042.751.751 0 0 1 1.042-.018L6 10.94l6.72-6.72a.75.75 0 0 1 1.06 0Z" })
+                    children: /* @__PURE__ */ jsx8("path", { d: "M13.78 4.22a.75.75 0 0 1 0 1.06l-7.25 7.25a.75.75 0 0 1-1.06 0L2.22 9.28a.751.751 0 0 1 .018-1.042.751.751 0 0 1 1.042-.018L6 10.94l6.72-6.72a.75.75 0 0 1 1.06 0Z" })
                   }
                 ) }),
-                isCurrent && animation.isPlaying && /* @__PURE__ */ jsx5("div", { className: "shrink-0 mt-0.5", children: action.type === "click" ? /* @__PURE__ */ jsxs5("div", { className: "relative w-5 h-5 flex items-center justify-center", children: [
-                  /* @__PURE__ */ jsx5("div", { className: "absolute inset-0 rounded-full bg-blue-500/20 animate-ping" }),
-                  /* @__PURE__ */ jsx5("div", { className: "w-2 h-2 rounded-full bg-blue-400" })
-                ] }) : action.type === "navigate" ? /* @__PURE__ */ jsx5("div", { className: "relative w-5 h-5 flex items-center justify-center overflow-hidden", children: /* @__PURE__ */ jsx5(
-                  ArrowRight,
+                isCurrent && animation.isPlaying && /* @__PURE__ */ jsx8("div", { className: "shrink-0 mt-0.5", children: action.type === "click" ? /* @__PURE__ */ jsxs8("div", { className: "relative w-5 h-5 flex items-center justify-center", children: [
+                  /* @__PURE__ */ jsx8("div", { className: "absolute inset-0 rounded-full bg-blue-500/20 animate-ping" }),
+                  /* @__PURE__ */ jsx8("div", { className: "w-2 h-2 rounded-full bg-blue-400" })
+                ] }) : action.type === "navigate" ? /* @__PURE__ */ jsx8("div", { className: "relative w-5 h-5 flex items-center justify-center overflow-hidden", children: /* @__PURE__ */ jsx8(
+                  ArrowRight3,
                   {
                     className: "size-4 text-cyan-400 animate-bounce",
                     style: { animationDuration: "0.6s" }
                   }
-                ) }) : action.type === "type" ? /* @__PURE__ */ jsx5("div", { className: "relative w-5 h-5 flex items-center justify-center", children: /* @__PURE__ */ jsx5(
+                ) }) : action.type === "type" ? /* @__PURE__ */ jsx8("div", { className: "relative w-5 h-5 flex items-center justify-center", children: /* @__PURE__ */ jsx8(
                   "div",
                   {
                     className: "w-0.5 h-3.5 bg-amber-400 animate-pulse",
                     style: { animationDuration: "0.5s" }
                   }
-                ) }) : action.type === "select" ? /* @__PURE__ */ jsx5("div", { className: "relative w-5 h-5 flex items-center justify-center", children: /* @__PURE__ */ jsx5(
+                ) }) : action.type === "select" ? /* @__PURE__ */ jsx8("div", { className: "relative w-5 h-5 flex items-center justify-center", children: /* @__PURE__ */ jsx8(
                   ChevronRight,
                   {
                     className: "size-3.5 text-purple-400 animate-bounce",
@@ -1819,13 +2762,13 @@ function TransitionsPanel({
                       transform: "rotate(90deg)"
                     }
                   }
-                ) }) : action.type === "wait" ? /* @__PURE__ */ jsx5("div", { className: "relative w-5 h-5 flex items-center justify-center", children: /* @__PURE__ */ jsx5(
+                ) }) : action.type === "wait" ? /* @__PURE__ */ jsx8("div", { className: "relative w-5 h-5 flex items-center justify-center", children: /* @__PURE__ */ jsx8(
                   "div",
                   {
                     className: "w-4 h-4 rounded-full border-2 border-gray-400/40 border-t-gray-400 animate-spin",
                     style: { animationDuration: "1.5s" }
                   }
-                ) }) : /* @__PURE__ */ jsx5(
+                ) }) : /* @__PURE__ */ jsx8(
                   "div",
                   {
                     className: `w-4 h-4 rounded-full border-2 ${color.text} border-current border-t-transparent animate-spin`
@@ -1837,25 +2780,25 @@ function TransitionsPanel({
           );
         }) })
       ] }),
-      /* @__PURE__ */ jsxs5("div", { className: "text-xs text-text-muted space-y-1 pt-3 border-t border-border-secondary", children: [
-        /* @__PURE__ */ jsxs5("div", { children: [
+      /* @__PURE__ */ jsxs8("div", { className: "text-xs text-text-muted space-y-1 pt-3 border-t border-border-secondary", children: [
+        /* @__PURE__ */ jsxs8("div", { children: [
           "Path Cost: ",
           selectedTransition.path_cost
         ] }),
-        /* @__PURE__ */ jsxs5("div", { children: [
+        /* @__PURE__ */ jsxs8("div", { children: [
           "Stays Visible: ",
           selectedTransition.stays_visible ? "Yes" : "No"
         ] }),
-        /* @__PURE__ */ jsxs5("div", { children: [
+        /* @__PURE__ */ jsxs8("div", { children: [
           "ID:",
           " ",
-          /* @__PURE__ */ jsx5("code", { className: "bg-bg-secondary px-1 rounded", children: selectedTransition.transition_id })
+          /* @__PURE__ */ jsx8("code", { className: "bg-bg-secondary px-1 rounded", children: selectedTransition.transition_id })
         ] })
       ] })
-    ] }) : /* @__PURE__ */ jsx5("div", { className: "flex items-center justify-center h-full text-text-muted", children: /* @__PURE__ */ jsxs5("div", { className: "text-center", children: [
-      /* @__PURE__ */ jsx5(GitBranch, { className: "size-12 mx-auto mb-3 opacity-30" }),
-      /* @__PURE__ */ jsx5("p", { className: "text-sm", children: "Select a transition to view its details" }),
-      /* @__PURE__ */ jsxs5("p", { className: "text-xs mt-1 text-text-muted/70", children: [
+    ] }) : /* @__PURE__ */ jsx8("div", { className: "flex items-center justify-center h-full text-text-muted", children: /* @__PURE__ */ jsxs8("div", { className: "text-center", children: [
+      /* @__PURE__ */ jsx8(GitBranch, { className: "size-12 mx-auto mb-3 opacity-30" }),
+      /* @__PURE__ */ jsx8("p", { className: "text-sm", children: "Select a transition to view its details" }),
+      /* @__PURE__ */ jsxs8("p", { className: "text-xs mt-1 text-text-muted/70", children: [
         transitions.length,
         " transition",
         transitions.length !== 1 ? "s" : "",
@@ -1866,40 +2809,40 @@ function TransitionsPanel({
 }
 
 // src/components/state-machine/StateDetailPanel.tsx
-import { useState as useState4, useEffect as useEffect4, useCallback as useCallback4 } from "react";
+import { useState as useState5, useEffect as useEffect5, useCallback as useCallback5 } from "react";
 import {
   getElementTypeStyle,
   getElementLabel,
   getConfidenceColor
 } from "@qontinui/workflow-utils";
-import { Fragment as Fragment3, jsx as jsx6, jsxs as jsxs6 } from "react/jsx-runtime";
+import { Fragment as Fragment3, jsx as jsx9, jsxs as jsxs9 } from "react/jsx-runtime";
 function StateDetailPanel({
   state,
   onSave,
   onDelete,
   onClose
 }) {
-  const [name, setName] = useState4(state.name);
-  const [description, setDescription] = useState4(state.description ?? "");
-  const [elementIds, setElementIds] = useState4([...state.element_ids]);
-  const [acceptanceCriteria, setAcceptanceCriteria] = useState4([
+  const [name, setName] = useState5(state.name);
+  const [description, setDescription] = useState5(state.description ?? "");
+  const [elementIds, setElementIds] = useState5([...state.element_ids]);
+  const [acceptanceCriteria, setAcceptanceCriteria] = useState5([
     ...state.acceptance_criteria
   ]);
-  const [domainKnowledge, setDomainKnowledge] = useState4(
+  const [domainKnowledge, setDomainKnowledge] = useState5(
     state.domain_knowledge.map((dk) => ({ ...dk, tags: [...dk.tags] }))
   );
-  const [isSaving, setIsSaving] = useState4(false);
-  const [newElementId, setNewElementId] = useState4("");
-  const [newCriterion, setNewCriterion] = useState4("");
-  const [showNewDk, setShowNewDk] = useState4(false);
-  const [newDkTitle, setNewDkTitle] = useState4("");
-  const [newDkContent, setNewDkContent] = useState4("");
-  const [newDkTags, setNewDkTags] = useState4("");
-  const [editingCriterionIdx, setEditingCriterionIdx] = useState4(
+  const [isSaving, setIsSaving] = useState5(false);
+  const [newElementId, setNewElementId] = useState5("");
+  const [newCriterion, setNewCriterion] = useState5("");
+  const [showNewDk, setShowNewDk] = useState5(false);
+  const [newDkTitle, setNewDkTitle] = useState5("");
+  const [newDkContent, setNewDkContent] = useState5("");
+  const [newDkTags, setNewDkTags] = useState5("");
+  const [editingCriterionIdx, setEditingCriterionIdx] = useState5(
     null
   );
-  const [editingCriterionValue, setEditingCriterionValue] = useState4("");
-  useEffect4(() => {
+  const [editingCriterionValue, setEditingCriterionValue] = useState5("");
+  useEffect5(() => {
     setName(state.name);
     setDescription(state.description ?? "");
     setElementIds([...state.element_ids]);
@@ -1913,7 +2856,7 @@ function StateDetailPanel({
     setEditingCriterionIdx(null);
   }, [state]);
   const hasChanges = name !== state.name || description !== (state.description ?? "") || JSON.stringify(elementIds) !== JSON.stringify(state.element_ids) || JSON.stringify(acceptanceCriteria) !== JSON.stringify(state.acceptance_criteria) || JSON.stringify(domainKnowledge) !== JSON.stringify(state.domain_knowledge);
-  const handleSave = useCallback4(async () => {
+  const handleSave = useCallback5(async () => {
     if (!hasChanges) return;
     setIsSaving(true);
     try {
@@ -1941,7 +2884,7 @@ function StateDetailPanel({
     hasChanges,
     onSave
   ]);
-  const handleDelete = useCallback4(async () => {
+  const handleDelete = useCallback5(async () => {
     if (!onDelete) return;
     setIsSaving(true);
     try {
@@ -1950,26 +2893,26 @@ function StateDetailPanel({
       setIsSaving(false);
     }
   }, [state.id, onDelete]);
-  const handleAddElement = useCallback4(() => {
+  const handleAddElement = useCallback5(() => {
     const trimmed = newElementId.trim();
     if (!trimmed || elementIds.includes(trimmed)) return;
     setElementIds((prev) => [...prev, trimmed]);
     setNewElementId("");
   }, [newElementId, elementIds]);
-  const handleRemoveElement = useCallback4((eid) => {
+  const handleRemoveElement = useCallback5((eid) => {
     setElementIds((prev) => prev.filter((e) => e !== eid));
   }, []);
-  const handleAddCriterion = useCallback4(() => {
+  const handleAddCriterion = useCallback5(() => {
     const trimmed = newCriterion.trim();
     if (!trimmed) return;
     setAcceptanceCriteria((prev) => [...prev, trimmed]);
     setNewCriterion("");
   }, [newCriterion]);
-  const handleRemoveCriterion = useCallback4((idx) => {
+  const handleRemoveCriterion = useCallback5((idx) => {
     setAcceptanceCriteria((prev) => prev.filter((_, i) => i !== idx));
     setEditingCriterionIdx(null);
   }, []);
-  const handleSaveCriterionEdit = useCallback4(() => {
+  const handleSaveCriterionEdit = useCallback5(() => {
     if (editingCriterionIdx === null) return;
     const trimmed = editingCriterionValue.trim();
     if (!trimmed) {
@@ -1981,7 +2924,7 @@ function StateDetailPanel({
     );
     setEditingCriterionIdx(null);
   }, [editingCriterionIdx, editingCriterionValue, handleRemoveCriterion]);
-  const handleAddDk = useCallback4(() => {
+  const handleAddDk = useCallback5(() => {
     const title = newDkTitle.trim();
     const content = newDkContent.trim();
     if (!title || !content) return;
@@ -2003,15 +2946,15 @@ function StateDetailPanel({
     setNewDkTags("");
     setShowNewDk(false);
   }, [newDkTitle, newDkContent, newDkTags]);
-  const handleRemoveDk = useCallback4((dkId) => {
+  const handleRemoveDk = useCallback5((dkId) => {
     setDomainKnowledge((prev) => prev.filter((dk) => dk.id !== dkId));
   }, []);
   const confidenceColor = getConfidenceColor(state.confidence);
   const confidencePct = Math.round(state.confidence * 100);
-  return /* @__PURE__ */ jsxs6("div", { className: "flex flex-col gap-4 p-4", children: [
-    /* @__PURE__ */ jsxs6("div", { className: "flex items-center justify-between", children: [
-      /* @__PURE__ */ jsx6("h3", { className: "text-sm font-semibold text-text-primary", children: "State Details" }),
-      /* @__PURE__ */ jsx6(
+  return /* @__PURE__ */ jsxs9("div", { className: "flex flex-col gap-4 p-4", children: [
+    /* @__PURE__ */ jsxs9("div", { className: "flex items-center justify-between", children: [
+      /* @__PURE__ */ jsx9("h3", { className: "text-sm font-semibold text-text-primary", children: "State Details" }),
+      /* @__PURE__ */ jsx9(
         "button",
         {
           onClick: onClose,
@@ -2020,9 +2963,9 @@ function StateDetailPanel({
         }
       )
     ] }),
-    /* @__PURE__ */ jsxs6("div", { children: [
-      /* @__PURE__ */ jsx6("label", { className: "block text-xs text-text-secondary mb-1", children: "Name" }),
-      /* @__PURE__ */ jsx6(
+    /* @__PURE__ */ jsxs9("div", { children: [
+      /* @__PURE__ */ jsx9("label", { className: "block text-xs text-text-secondary mb-1", children: "Name" }),
+      /* @__PURE__ */ jsx9(
         "input",
         {
           type: "text",
@@ -2032,9 +2975,9 @@ function StateDetailPanel({
         }
       )
     ] }),
-    /* @__PURE__ */ jsxs6("div", { children: [
-      /* @__PURE__ */ jsx6("label", { className: "block text-xs text-text-secondary mb-1", children: "Description" }),
-      /* @__PURE__ */ jsx6(
+    /* @__PURE__ */ jsxs9("div", { children: [
+      /* @__PURE__ */ jsx9("label", { className: "block text-xs text-text-secondary mb-1", children: "Description" }),
+      /* @__PURE__ */ jsx9(
         "textarea",
         {
           value: description,
@@ -2045,44 +2988,44 @@ function StateDetailPanel({
         }
       )
     ] }),
-    /* @__PURE__ */ jsxs6("div", { className: "grid grid-cols-2 gap-3 text-xs", children: [
-      /* @__PURE__ */ jsxs6("div", { children: [
-        /* @__PURE__ */ jsx6("span", { className: "text-text-secondary", children: "State ID" }),
-        /* @__PURE__ */ jsx6("code", { className: "block mt-0.5 px-1.5 py-0.5 bg-bg-tertiary rounded text-text-primary font-mono text-[10px] break-all", children: state.state_id })
+    /* @__PURE__ */ jsxs9("div", { className: "grid grid-cols-2 gap-3 text-xs", children: [
+      /* @__PURE__ */ jsxs9("div", { children: [
+        /* @__PURE__ */ jsx9("span", { className: "text-text-secondary", children: "State ID" }),
+        /* @__PURE__ */ jsx9("code", { className: "block mt-0.5 px-1.5 py-0.5 bg-bg-tertiary rounded text-text-primary font-mono text-[10px] break-all", children: state.state_id })
       ] }),
-      /* @__PURE__ */ jsxs6("div", { children: [
-        /* @__PURE__ */ jsx6("span", { className: "text-text-secondary", children: "Confidence" }),
-        /* @__PURE__ */ jsxs6("span", { className: `block mt-0.5 font-medium ${confidenceColor}`, children: [
+      /* @__PURE__ */ jsxs9("div", { children: [
+        /* @__PURE__ */ jsx9("span", { className: "text-text-secondary", children: "Confidence" }),
+        /* @__PURE__ */ jsxs9("span", { className: `block mt-0.5 font-medium ${confidenceColor}`, children: [
           confidencePct,
           "%"
         ] })
       ] }),
-      /* @__PURE__ */ jsxs6("div", { children: [
-        /* @__PURE__ */ jsx6("span", { className: "text-text-secondary", children: "Elements" }),
-        /* @__PURE__ */ jsx6("span", { className: "block mt-0.5 text-text-primary font-medium", children: elementIds.length })
+      /* @__PURE__ */ jsxs9("div", { children: [
+        /* @__PURE__ */ jsx9("span", { className: "text-text-secondary", children: "Elements" }),
+        /* @__PURE__ */ jsx9("span", { className: "block mt-0.5 text-text-primary font-medium", children: elementIds.length })
       ] }),
-      /* @__PURE__ */ jsxs6("div", { children: [
-        /* @__PURE__ */ jsx6("span", { className: "text-text-secondary", children: "Renders" }),
-        /* @__PURE__ */ jsx6("span", { className: "block mt-0.5 text-text-primary font-medium", children: state.render_ids.length })
+      /* @__PURE__ */ jsxs9("div", { children: [
+        /* @__PURE__ */ jsx9("span", { className: "text-text-secondary", children: "Renders" }),
+        /* @__PURE__ */ jsx9("span", { className: "block mt-0.5 text-text-primary font-medium", children: state.render_ids.length })
       ] })
     ] }),
-    /* @__PURE__ */ jsxs6("div", { children: [
-      /* @__PURE__ */ jsxs6("label", { className: "block text-xs text-text-secondary mb-1.5", children: [
+    /* @__PURE__ */ jsxs9("div", { children: [
+      /* @__PURE__ */ jsxs9("label", { className: "block text-xs text-text-secondary mb-1.5", children: [
         "Elements (",
         elementIds.length,
         ")"
       ] }),
-      /* @__PURE__ */ jsx6("div", { className: "max-h-48 overflow-y-auto space-y-0.5", children: elementIds.map((eid) => {
+      /* @__PURE__ */ jsx9("div", { className: "max-h-48 overflow-y-auto space-y-0.5", children: elementIds.map((eid) => {
         const style = getElementTypeStyle(eid);
         const label = getElementLabel(eid);
-        return /* @__PURE__ */ jsxs6(
+        return /* @__PURE__ */ jsxs9(
           "div",
           {
             className: `group flex items-center gap-1 px-2 py-1 text-xs rounded border ${style.bg} ${style.text} ${style.border}`,
             title: eid,
             children: [
-              /* @__PURE__ */ jsx6("span", { className: "truncate flex-1", children: label }),
-              /* @__PURE__ */ jsx6(
+              /* @__PURE__ */ jsx9("span", { className: "truncate flex-1", children: label }),
+              /* @__PURE__ */ jsx9(
                 "button",
                 {
                   onClick: () => handleRemoveElement(eid),
@@ -2096,8 +3039,8 @@ function StateDetailPanel({
           eid
         );
       }) }),
-      /* @__PURE__ */ jsxs6("div", { className: "flex gap-1 mt-1.5", children: [
-        /* @__PURE__ */ jsx6(
+      /* @__PURE__ */ jsxs9("div", { className: "flex gap-1 mt-1.5", children: [
+        /* @__PURE__ */ jsx9(
           "input",
           {
             type: "text",
@@ -2110,7 +3053,7 @@ function StateDetailPanel({
             className: "flex-1 px-2 py-1 text-xs bg-bg-tertiary border border-border-secondary rounded text-text-primary placeholder:text-text-muted"
           }
         ),
-        /* @__PURE__ */ jsx6(
+        /* @__PURE__ */ jsx9(
           "button",
           {
             onClick: handleAddElement,
@@ -2121,13 +3064,13 @@ function StateDetailPanel({
         )
       ] })
     ] }),
-    /* @__PURE__ */ jsxs6("div", { children: [
-      /* @__PURE__ */ jsxs6("label", { className: "block text-xs text-text-secondary mb-1", children: [
+    /* @__PURE__ */ jsxs9("div", { children: [
+      /* @__PURE__ */ jsxs9("label", { className: "block text-xs text-text-secondary mb-1", children: [
         "Acceptance Criteria (",
         acceptanceCriteria.length,
         ")"
       ] }),
-      acceptanceCriteria.length > 0 && /* @__PURE__ */ jsx6("ul", { className: "space-y-0.5 mb-1.5", children: acceptanceCriteria.map((c, i) => /* @__PURE__ */ jsx6("li", { className: "group flex items-start gap-1.5 text-xs", children: editingCriterionIdx === i ? /* @__PURE__ */ jsx6(
+      acceptanceCriteria.length > 0 && /* @__PURE__ */ jsx9("ul", { className: "space-y-0.5 mb-1.5", children: acceptanceCriteria.map((c, i) => /* @__PURE__ */ jsx9("li", { className: "group flex items-start gap-1.5 text-xs", children: editingCriterionIdx === i ? /* @__PURE__ */ jsx9(
         "input",
         {
           type: "text",
@@ -2141,8 +3084,8 @@ function StateDetailPanel({
           autoFocus: true,
           className: "flex-1 px-1.5 py-0.5 text-xs bg-bg-tertiary border border-border-secondary rounded text-text-primary"
         }
-      ) : /* @__PURE__ */ jsxs6(Fragment3, { children: [
-        /* @__PURE__ */ jsx6(
+      ) : /* @__PURE__ */ jsxs9(Fragment3, { children: [
+        /* @__PURE__ */ jsx9(
           "span",
           {
             className: "flex-1 text-text-primary cursor-pointer hover:text-brand-primary",
@@ -2154,7 +3097,7 @@ function StateDetailPanel({
             children: c
           }
         ),
-        /* @__PURE__ */ jsx6(
+        /* @__PURE__ */ jsx9(
           "button",
           {
             onClick: () => handleRemoveCriterion(i),
@@ -2164,8 +3107,8 @@ function StateDetailPanel({
           }
         )
       ] }) }, `${i}-${c}`)) }),
-      /* @__PURE__ */ jsxs6("div", { className: "flex gap-1", children: [
-        /* @__PURE__ */ jsx6(
+      /* @__PURE__ */ jsxs9("div", { className: "flex gap-1", children: [
+        /* @__PURE__ */ jsx9(
           "input",
           {
             type: "text",
@@ -2178,7 +3121,7 @@ function StateDetailPanel({
             className: "flex-1 px-2 py-1 text-xs bg-bg-tertiary border border-border-secondary rounded text-text-primary placeholder:text-text-muted"
           }
         ),
-        /* @__PURE__ */ jsx6(
+        /* @__PURE__ */ jsx9(
           "button",
           {
             onClick: handleAddCriterion,
@@ -2189,14 +3132,14 @@ function StateDetailPanel({
         )
       ] })
     ] }),
-    /* @__PURE__ */ jsxs6("div", { children: [
-      /* @__PURE__ */ jsxs6("div", { className: "flex items-center justify-between mb-1", children: [
-        /* @__PURE__ */ jsxs6("label", { className: "text-xs text-text-secondary", children: [
+    /* @__PURE__ */ jsxs9("div", { children: [
+      /* @__PURE__ */ jsxs9("div", { className: "flex items-center justify-between mb-1", children: [
+        /* @__PURE__ */ jsxs9("label", { className: "text-xs text-text-secondary", children: [
           "Domain Knowledge (",
           domainKnowledge.length,
           ")"
         ] }),
-        /* @__PURE__ */ jsx6(
+        /* @__PURE__ */ jsx9(
           "button",
           {
             onClick: () => setShowNewDk(true),
@@ -2205,14 +3148,14 @@ function StateDetailPanel({
           }
         )
       ] }),
-      domainKnowledge.length > 0 && /* @__PURE__ */ jsx6("div", { className: "space-y-1.5", children: domainKnowledge.map((dk) => /* @__PURE__ */ jsxs6(
+      domainKnowledge.length > 0 && /* @__PURE__ */ jsx9("div", { className: "space-y-1.5", children: domainKnowledge.map((dk) => /* @__PURE__ */ jsxs9(
         "div",
         {
           className: "group p-2 bg-bg-tertiary border border-border-secondary rounded",
           children: [
-            /* @__PURE__ */ jsxs6("div", { className: "flex items-start justify-between gap-1", children: [
-              /* @__PURE__ */ jsx6("div", { className: "text-xs font-medium text-text-primary", children: dk.title }),
-              /* @__PURE__ */ jsx6(
+            /* @__PURE__ */ jsxs9("div", { className: "flex items-start justify-between gap-1", children: [
+              /* @__PURE__ */ jsx9("div", { className: "text-xs font-medium text-text-primary", children: dk.title }),
+              /* @__PURE__ */ jsx9(
                 "button",
                 {
                   onClick: () => handleRemoveDk(dk.id),
@@ -2222,8 +3165,8 @@ function StateDetailPanel({
                 }
               )
             ] }),
-            /* @__PURE__ */ jsx6("div", { className: "text-xs text-text-secondary mt-0.5 line-clamp-2", children: dk.content }),
-            dk.tags.length > 0 && /* @__PURE__ */ jsx6("div", { className: "flex flex-wrap gap-1 mt-1", children: dk.tags.map((tag) => /* @__PURE__ */ jsx6(
+            /* @__PURE__ */ jsx9("div", { className: "text-xs text-text-secondary mt-0.5 line-clamp-2", children: dk.content }),
+            dk.tags.length > 0 && /* @__PURE__ */ jsx9("div", { className: "flex flex-wrap gap-1 mt-1", children: dk.tags.map((tag) => /* @__PURE__ */ jsx9(
               "span",
               {
                 className: "px-1 py-0.5 text-[10px] bg-bg-secondary rounded text-text-secondary",
@@ -2235,8 +3178,8 @@ function StateDetailPanel({
         },
         dk.id
       )) }),
-      showNewDk && /* @__PURE__ */ jsxs6("div", { className: "mt-1.5 p-2 bg-bg-tertiary border border-border-secondary rounded space-y-1.5", children: [
-        /* @__PURE__ */ jsx6(
+      showNewDk && /* @__PURE__ */ jsxs9("div", { className: "mt-1.5 p-2 bg-bg-tertiary border border-border-secondary rounded space-y-1.5", children: [
+        /* @__PURE__ */ jsx9(
           "input",
           {
             type: "text",
@@ -2247,7 +3190,7 @@ function StateDetailPanel({
             className: "w-full px-2 py-1 text-xs bg-bg-secondary border border-border-secondary rounded text-text-primary placeholder:text-text-muted"
           }
         ),
-        /* @__PURE__ */ jsx6(
+        /* @__PURE__ */ jsx9(
           "textarea",
           {
             value: newDkContent,
@@ -2257,7 +3200,7 @@ function StateDetailPanel({
             className: "w-full px-2 py-1 text-xs bg-bg-secondary border border-border-secondary rounded text-text-primary placeholder:text-text-muted resize-y"
           }
         ),
-        /* @__PURE__ */ jsx6(
+        /* @__PURE__ */ jsx9(
           "input",
           {
             type: "text",
@@ -2267,8 +3210,8 @@ function StateDetailPanel({
             className: "w-full px-2 py-1 text-xs bg-bg-secondary border border-border-secondary rounded text-text-primary placeholder:text-text-muted"
           }
         ),
-        /* @__PURE__ */ jsxs6("div", { className: "flex gap-1.5", children: [
-          /* @__PURE__ */ jsx6(
+        /* @__PURE__ */ jsxs9("div", { className: "flex gap-1.5", children: [
+          /* @__PURE__ */ jsx9(
             "button",
             {
               onClick: handleAddDk,
@@ -2277,7 +3220,7 @@ function StateDetailPanel({
               children: "Add"
             }
           ),
-          /* @__PURE__ */ jsx6(
+          /* @__PURE__ */ jsx9(
             "button",
             {
               onClick: () => {
@@ -2293,8 +3236,8 @@ function StateDetailPanel({
         ] })
       ] })
     ] }),
-    /* @__PURE__ */ jsxs6("div", { className: "flex gap-2 pt-2 border-t border-border-secondary", children: [
-      hasChanges && /* @__PURE__ */ jsx6(
+    /* @__PURE__ */ jsxs9("div", { className: "flex gap-2 pt-2 border-t border-border-secondary", children: [
+      hasChanges && /* @__PURE__ */ jsx9(
         "button",
         {
           onClick: handleSave,
@@ -2303,7 +3246,7 @@ function StateDetailPanel({
           children: isSaving ? "Saving..." : "Save Changes"
         }
       ),
-      onDelete && /* @__PURE__ */ jsx6(
+      onDelete && /* @__PURE__ */ jsx9(
         "button",
         {
           onClick: handleDelete,
@@ -2317,17 +3260,17 @@ function StateDetailPanel({
 }
 
 // src/components/state-machine/StateViewPanel.tsx
-import { useState as useState8, useMemo as useMemo7, useEffect as useEffect7, useCallback as useCallback7 } from "react";
+import { useState as useState9, useMemo as useMemo8, useEffect as useEffect8, useCallback as useCallback8 } from "react";
 import {
   List as VirtualList,
   useListRef,
   useDynamicRowHeight
 } from "react-window";
 import {
-  Layers as Layers4,
+  Layers as Layers5,
   ChevronRight as ChevronRight3,
   ChevronDown,
-  Play as Play4,
+  Play as Play5,
   Lock as Lock2,
   Eye as Eye3,
   BookOpen,
@@ -2336,7 +3279,7 @@ import {
   List,
   ArrowUpRight as ArrowUpRight2,
   ArrowDownLeft as ArrowDownLeft2,
-  ArrowRight as ArrowRight2,
+  ArrowRight as ArrowRight4,
   CheckCircle,
   Image as Image2
 } from "lucide-react";
@@ -2354,7 +3297,7 @@ import {
   Globe as Globe4,
   Hash as Hash2,
   Box as Box2,
-  Layers as Layers2,
+  Layers as Layers3,
   Target
 } from "lucide-react";
 import {
@@ -2380,7 +3323,7 @@ var ACTION_ICONS3 = {
   click: MousePointer4,
   type: TypeIcon4,
   select: Target,
-  wait: Layers2,
+  wait: Layers3,
   navigate: Globe4
 };
 function getFingerprintHash(elementId) {
@@ -2423,22 +3366,22 @@ function resolveElementTag(elementId, fingerprintDetails, state) {
 }
 
 // src/components/state-machine/SpatialCanvas.tsx
-import { useState as useState5, useMemo as useMemo4, useRef as useRef3, useEffect as useEffect5, useCallback as useCallback5 } from "react";
+import { useState as useState6, useMemo as useMemo5, useRef as useRef4, useEffect as useEffect6, useCallback as useCallback6 } from "react";
 import { ZoomIn, ZoomOut, Maximize as Maximize2 } from "lucide-react";
 import { STATE_COLORS, computeSpatialLayout } from "@qontinui/workflow-utils";
-import { jsx as jsx7, jsxs as jsxs7 } from "react/jsx-runtime";
+import { jsx as jsx10, jsxs as jsxs10 } from "react/jsx-runtime";
 function SpatialCanvas({
   states,
   transitions,
   selectedStateId,
   onSelectState
 }) {
-  const canvasRef = useRef3(null);
-  const containerRef = useRef3(null);
-  const [canvasSize, setCanvasSize] = useState5({ width: 800, height: 600 });
-  const [zoom, setZoom] = useState5(1);
-  const [hoveredStateId, setHoveredStateId] = useState5(null);
-  const layout = useMemo4(
+  const canvasRef = useRef4(null);
+  const containerRef = useRef4(null);
+  const [canvasSize, setCanvasSize] = useState6({ width: 800, height: 600 });
+  const [zoom, setZoom] = useState6(1);
+  const [hoveredStateId, setHoveredStateId] = useState6(null);
+  const layout = useMemo5(
     () => computeSpatialLayout(
       states,
       transitions,
@@ -2447,7 +3390,7 @@ function SpatialCanvas({
     ),
     [states, transitions, canvasSize.width, canvasSize.height]
   );
-  const sharedElements = useMemo4(() => {
+  const sharedElements = useMemo5(() => {
     const elementStateMap = /* @__PURE__ */ new Map();
     for (const s of states) {
       for (const eid of s.element_ids) {
@@ -2457,7 +3400,7 @@ function SpatialCanvas({
     }
     return elementStateMap;
   }, [states]);
-  useEffect5(() => {
+  useEffect6(() => {
     const container = containerRef.current;
     if (!container) return;
     const observer = new ResizeObserver((entries) => {
@@ -2472,7 +3415,7 @@ function SpatialCanvas({
     observer.observe(container);
     return () => observer.disconnect();
   }, []);
-  useEffect5(() => {
+  useEffect6(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext("2d");
@@ -2613,7 +3556,7 @@ function SpatialCanvas({
     sharedElements,
     zoom
   ]);
-  const getStateAtPoint = useCallback5(
+  const getStateAtPoint = useCallback6(
     (clientX, clientY) => {
       const canvas = canvasRef.current;
       if (!canvas) return null;
@@ -2634,26 +3577,26 @@ function SpatialCanvas({
     },
     [states, layout, zoom]
   );
-  const handleMouseMove = useCallback5(
+  const handleMouseMove = useCallback6(
     (e) => {
       setHoveredStateId(getStateAtPoint(e.clientX, e.clientY));
     },
     [getStateAtPoint]
   );
-  const handleClick = useCallback5(
+  const handleClick = useCallback6(
     (e) => {
       const stateId = getStateAtPoint(e.clientX, e.clientY);
       onSelectState(stateId === selectedStateId ? null : stateId);
     },
     [getStateAtPoint, onSelectState, selectedStateId]
   );
-  return /* @__PURE__ */ jsxs7(
+  return /* @__PURE__ */ jsxs10(
     "div",
     {
       ref: containerRef,
       className: "relative w-full h-full bg-bg-secondary",
       children: [
-        /* @__PURE__ */ jsx7(
+        /* @__PURE__ */ jsx10(
           "canvas",
           {
             ref: canvasRef,
@@ -2667,53 +3610,53 @@ function SpatialCanvas({
             onMouseLeave: () => setHoveredStateId(null)
           }
         ),
-        /* @__PURE__ */ jsxs7("div", { className: "absolute top-3 right-3 flex items-center gap-1", children: [
-          /* @__PURE__ */ jsx7(
+        /* @__PURE__ */ jsxs10("div", { className: "absolute top-3 right-3 flex items-center gap-1", children: [
+          /* @__PURE__ */ jsx10(
             "button",
             {
               className: "h-7 w-7 p-0 inline-flex items-center justify-center rounded bg-bg-primary/80 backdrop-blur-xs text-text-secondary hover:text-text-primary",
               onClick: () => setZoom((z) => Math.min(3, z + 0.25)),
               title: "Zoom in",
-              children: /* @__PURE__ */ jsx7(ZoomIn, { className: "size-3.5" })
+              children: /* @__PURE__ */ jsx10(ZoomIn, { className: "size-3.5" })
             }
           ),
-          /* @__PURE__ */ jsx7(
+          /* @__PURE__ */ jsx10(
             "button",
             {
               className: "h-7 w-7 p-0 inline-flex items-center justify-center rounded bg-bg-primary/80 backdrop-blur-xs text-text-secondary hover:text-text-primary",
               onClick: () => setZoom((z) => Math.max(0.5, z - 0.25)),
               title: "Zoom out",
-              children: /* @__PURE__ */ jsx7(ZoomOut, { className: "size-3.5" })
+              children: /* @__PURE__ */ jsx10(ZoomOut, { className: "size-3.5" })
             }
           ),
-          /* @__PURE__ */ jsx7(
+          /* @__PURE__ */ jsx10(
             "button",
             {
               className: "h-7 w-7 p-0 inline-flex items-center justify-center rounded bg-bg-primary/80 backdrop-blur-xs text-text-secondary hover:text-text-primary",
               onClick: () => setZoom(1),
               title: "Reset zoom",
-              children: /* @__PURE__ */ jsx7(Maximize2, { className: "size-3.5" })
+              children: /* @__PURE__ */ jsx10(Maximize2, { className: "size-3.5" })
             }
           )
         ] }),
-        /* @__PURE__ */ jsx7("div", { className: "absolute bottom-3 left-3 text-[10px] text-text-muted bg-bg-primary/80 backdrop-blur-xs px-2.5 py-1.5 rounded border border-border-secondary/50", children: /* @__PURE__ */ jsxs7("div", { className: "flex items-center gap-3", children: [
-          /* @__PURE__ */ jsxs7("span", { children: [
+        /* @__PURE__ */ jsx10("div", { className: "absolute bottom-3 left-3 text-[10px] text-text-muted bg-bg-primary/80 backdrop-blur-xs px-2.5 py-1.5 rounded border border-border-secondary/50", children: /* @__PURE__ */ jsxs10("div", { className: "flex items-center gap-3", children: [
+          /* @__PURE__ */ jsxs10("span", { children: [
             states.length,
             " states"
           ] }),
-          /* @__PURE__ */ jsxs7("span", { children: [
+          /* @__PURE__ */ jsxs10("span", { children: [
             transitions.length,
             " transitions"
           ] }),
-          /* @__PURE__ */ jsxs7("span", { children: [
+          /* @__PURE__ */ jsxs10("span", { children: [
             "Zoom: ",
             Math.round(zoom * 100),
             "%"
           ] })
         ] }) }),
-        hoveredStateId && /* @__PURE__ */ jsxs7("div", { className: "absolute top-3 left-3 text-xs bg-bg-primary/95 backdrop-blur-xs px-3 py-2 rounded-lg border border-border-secondary shadow-md", children: [
-          /* @__PURE__ */ jsx7("div", { className: "font-medium text-text-primary", children: states.find((s) => s.state_id === hoveredStateId)?.name }),
-          /* @__PURE__ */ jsxs7("div", { className: "text-text-muted mt-0.5", children: [
+        hoveredStateId && /* @__PURE__ */ jsxs10("div", { className: "absolute top-3 left-3 text-xs bg-bg-primary/95 backdrop-blur-xs px-3 py-2 rounded-lg border border-border-secondary shadow-md", children: [
+          /* @__PURE__ */ jsx10("div", { className: "font-medium text-text-primary", children: states.find((s) => s.state_id === hoveredStateId)?.name }),
+          /* @__PURE__ */ jsxs10("div", { className: "text-text-muted mt-0.5", children: [
             states.find((s) => s.state_id === hoveredStateId)?.element_ids.length,
             " ",
             "elements"
@@ -2725,17 +3668,17 @@ function SpatialCanvas({
 }
 
 // src/components/state-machine/StateLayoutView.tsx
-import { useState as useState6, useMemo as useMemo5 } from "react";
+import { useState as useState7, useMemo as useMemo6 } from "react";
 import { Layout } from "lucide-react";
 import { getElementTypePrefix as getElementTypePrefix2, getElementLabel as getElementLabel3 } from "@qontinui/workflow-utils";
-import { jsx as jsx8, jsxs as jsxs8 } from "react/jsx-runtime";
+import { jsx as jsx11, jsxs as jsxs11 } from "react/jsx-runtime";
 function StateLayoutView({
   state,
   elementThumbnails,
   fingerprintDetails
 }) {
-  const [hoveredElement, setHoveredElement] = useState6(null);
-  const positionedElements = useMemo5(() => {
+  const [hoveredElement, setHoveredElement] = useState7(null);
+  const positionedElements = useMemo6(() => {
     const items = [];
     for (const eid of state.element_ids) {
       const pos = resolveElementPosition(eid, fingerprintDetails, state);
@@ -2750,28 +3693,28 @@ function StateLayoutView({
   }, [state, fingerprintDetails, elementThumbnails]);
   const elementsWithoutPosition = state.element_ids.length - positionedElements.length;
   if (positionedElements.length === 0) {
-    return /* @__PURE__ */ jsx8("div", { className: "flex items-center justify-center h-48 text-text-muted text-xs", children: "No position data available for this state's elements." });
+    return /* @__PURE__ */ jsx11("div", { className: "flex items-center justify-center h-48 text-text-muted text-xs", children: "No position data available for this state's elements." });
   }
-  return /* @__PURE__ */ jsxs8("div", { children: [
-    /* @__PURE__ */ jsxs8("h3", { className: "text-sm font-medium text-text-primary mb-3 flex items-center gap-2", children: [
-      /* @__PURE__ */ jsx8(Layout, { className: "size-3.5" }),
+  return /* @__PURE__ */ jsxs11("div", { children: [
+    /* @__PURE__ */ jsxs11("h3", { className: "text-sm font-medium text-text-primary mb-3 flex items-center gap-2", children: [
+      /* @__PURE__ */ jsx11(Layout, { className: "size-3.5" }),
       "State Layout"
     ] }),
-    /* @__PURE__ */ jsxs8(
+    /* @__PURE__ */ jsxs11(
       "div",
       {
         className: "relative bg-bg-tertiary border border-border-secondary rounded-lg",
         style: { aspectRatio: "16 / 10" },
         children: [
-          /* @__PURE__ */ jsxs8("div", { className: "absolute inset-0 pointer-events-none", children: [
-            /* @__PURE__ */ jsx8("div", { className: "absolute top-0 left-0 right-0 h-[10%] border-b border-dashed border-border-secondary/30" }),
-            /* @__PURE__ */ jsx8("div", { className: "absolute bottom-0 left-0 right-0 h-[10%] border-t border-dashed border-border-secondary/30" })
+          /* @__PURE__ */ jsxs11("div", { className: "absolute inset-0 pointer-events-none", children: [
+            /* @__PURE__ */ jsx11("div", { className: "absolute top-0 left-0 right-0 h-[10%] border-b border-dashed border-border-secondary/30" }),
+            /* @__PURE__ */ jsx11("div", { className: "absolute bottom-0 left-0 right-0 h-[10%] border-t border-dashed border-border-secondary/30" })
           ] }),
           positionedElements.map((el) => {
             const isHovered = hoveredElement === el.id;
             const colorClass = ELEMENT_COLORS[el.prefix] ?? "border-gray-400 bg-gray-500/10 text-gray-300";
             const thumbSrc = el.thumbnail ? el.thumbnail.startsWith("data:") ? el.thumbnail : `data:image/png;base64,${el.thumbnail}` : void 0;
-            return /* @__PURE__ */ jsxs8(
+            return /* @__PURE__ */ jsxs11(
               "div",
               {
                 className: "absolute group",
@@ -2783,7 +3726,7 @@ function StateLayoutView({
                 onMouseEnter: () => setHoveredElement(el.id),
                 onMouseLeave: () => setHoveredElement(null),
                 children: [
-                  /* @__PURE__ */ jsx8(
+                  /* @__PURE__ */ jsx11(
                     "div",
                     {
                       className: `
@@ -2792,19 +3735,19 @@ function StateLayoutView({
                   ${isHovered ? "ring-2 ring-brand-primary/50 shadow-lg z-20 scale-125" : "z-10"}
                 `,
                       style: { width: thumbSrc ? 32 : void 0, height: thumbSrc ? 32 : void 0 },
-                      children: thumbSrc ? /* @__PURE__ */ jsx8(
+                      children: thumbSrc ? /* @__PURE__ */ jsx11(
                         "img",
                         {
                           src: thumbSrc,
                           alt: el.label,
                           className: "w-full h-full object-contain"
                         }
-                      ) : /* @__PURE__ */ jsx8("div", { className: "px-1 py-0.5 text-[8px] whitespace-nowrap max-w-[80px] truncate", children: el.label })
+                      ) : /* @__PURE__ */ jsx11("div", { className: "px-1 py-0.5 text-[8px] whitespace-nowrap max-w-[80px] truncate", children: el.label })
                     }
                   ),
-                  isHovered && /* @__PURE__ */ jsxs8("div", { className: "absolute top-full left-1/2 -translate-x-1/2 mt-1 z-30 bg-bg-primary/95 backdrop-blur-xs border border-border-secondary rounded px-2 py-1 shadow-md whitespace-nowrap", children: [
-                    /* @__PURE__ */ jsx8("div", { className: "text-[10px] font-medium text-text-primary", children: el.label }),
-                    el.tag && /* @__PURE__ */ jsx8("div", { className: "text-[9px] text-text-muted", children: [el.tag.tagName && `<${el.tag.tagName}>`, el.tag.role && `role="${el.tag.role}"`, el.tag.zone].filter(Boolean).join(" ") })
+                  isHovered && /* @__PURE__ */ jsxs11("div", { className: "absolute top-full left-1/2 -translate-x-1/2 mt-1 z-30 bg-bg-primary/95 backdrop-blur-xs border border-border-secondary rounded px-2 py-1 shadow-md whitespace-nowrap", children: [
+                    /* @__PURE__ */ jsx11("div", { className: "text-[10px] font-medium text-text-primary", children: el.label }),
+                    el.tag && /* @__PURE__ */ jsx11("div", { className: "text-[9px] text-text-muted", children: [el.tag.tagName && `<${el.tag.tagName}>`, el.tag.role && `role="${el.tag.role}"`, el.tag.zone].filter(Boolean).join(" ") })
                   ] })
                 ]
               },
@@ -2814,7 +3757,7 @@ function StateLayoutView({
         ]
       }
     ),
-    elementsWithoutPosition > 0 && /* @__PURE__ */ jsxs8("p", { className: "text-[10px] text-text-muted mt-1.5", children: [
+    elementsWithoutPosition > 0 && /* @__PURE__ */ jsxs11("p", { className: "text-[10px] text-text-muted mt-1.5", children: [
       elementsWithoutPosition,
       " element",
       elementsWithoutPosition !== 1 ? "s" : "",
@@ -2824,9 +3767,9 @@ function StateLayoutView({
 }
 
 // src/components/state-machine/ScreenshotStateView.tsx
-import { useState as useState7, useMemo as useMemo6, useRef as useRef4, useEffect as useEffect6, useCallback as useCallback6 } from "react";
+import { useState as useState8, useMemo as useMemo7, useRef as useRef5, useEffect as useEffect7, useCallback as useCallback7 } from "react";
 import {
-  Layers as Layers3,
+  Layers as Layers4,
   ChevronLeft,
   ChevronRight as ChevronRight2,
   ZoomIn as ZoomIn2,
@@ -2836,7 +3779,7 @@ import {
   X
 } from "lucide-react";
 import { STATE_COLORS as STATE_COLORS2 } from "@qontinui/workflow-utils";
-import { jsx as jsx9, jsxs as jsxs9 } from "react/jsx-runtime";
+import { jsx as jsx12, jsxs as jsxs12 } from "react/jsx-runtime";
 function ScreenshotStateView({
   captureScreenshots,
   onLoadScreenshotImage,
@@ -2845,21 +3788,21 @@ function ScreenshotStateView({
   fingerprintDetails,
   elementThumbnails
 }) {
-  const canvasRef = useRef4(null);
-  const containerRef = useRef4(null);
-  const imageCache = useRef4(/* @__PURE__ */ new Map());
-  const thumbnailLoadingRef = useRef4(/* @__PURE__ */ new Set());
-  const [currentIndex, setCurrentIndex] = useState7(0);
-  const [userZoom, setUserZoom] = useState7(null);
-  const [autoFitZoom, setAutoFitZoom] = useState7(1);
+  const canvasRef = useRef5(null);
+  const containerRef = useRef5(null);
+  const imageCache = useRef5(/* @__PURE__ */ new Map());
+  const thumbnailLoadingRef = useRef5(/* @__PURE__ */ new Set());
+  const [currentIndex, setCurrentIndex] = useState8(0);
+  const [userZoom, setUserZoom] = useState8(null);
+  const [autoFitZoom, setAutoFitZoom] = useState8(1);
   const zoom = userZoom ?? autoFitZoom;
-  const [hoveredElement, setHoveredElement] = useState7(null);
-  const [canvasSize, setCanvasSize] = useState7({ width: 800, height: 600 });
-  const [isLoading, setIsLoading] = useState7(false);
-  const [selectedElementHash, setSelectedElementHash] = useState7(null);
-  const [thumbnailCache, setThumbnailCache] = useState7(/* @__PURE__ */ new Map());
+  const [hoveredElement, setHoveredElement] = useState8(null);
+  const [canvasSize, setCanvasSize] = useState8({ width: 800, height: 600 });
+  const [isLoading, setIsLoading] = useState8(false);
+  const [selectedElementHash, setSelectedElementHash] = useState8(null);
+  const [thumbnailCache, setThumbnailCache] = useState8(/* @__PURE__ */ new Map());
   const capture = captureScreenshots[currentIndex];
-  const elementBounds = useMemo6(() => {
+  const elementBounds = useMemo7(() => {
     if (!capture) return {};
     try {
       return JSON.parse(capture.elementBoundsJson);
@@ -2867,7 +3810,7 @@ function ScreenshotStateView({
       return {};
     }
   }, [capture]);
-  const selectedStateHashes = useMemo6(() => {
+  const selectedStateHashes = useMemo7(() => {
     const hashes = /* @__PURE__ */ new Set();
     for (const state of states) {
       if (selectedStateIds.has(state.state_id)) {
@@ -2878,11 +3821,11 @@ function ScreenshotStateView({
     }
     return hashes;
   }, [selectedStateIds, states]);
-  const selectedStates = useMemo6(
+  const selectedStates = useMemo7(
     () => states.filter((s) => selectedStateIds.has(s.state_id)),
     [states, selectedStateIds]
   );
-  const hashToElement = useMemo6(() => {
+  const hashToElement = useMemo7(() => {
     const map = /* @__PURE__ */ new Map();
     for (const state of states) {
       for (const eid of state.element_ids) {
@@ -2894,7 +3837,7 @@ function ScreenshotStateView({
     }
     return map;
   }, [states]);
-  const matchingScreenshotIndices = useMemo6(() => {
+  const matchingScreenshotIndices = useMemo7(() => {
     if (selectedStateIds.size === 0) return captureScreenshots.map((_, i) => i);
     const indices = [];
     for (let i = 0; i < captureScreenshots.length; i++) {
@@ -2908,7 +3851,7 @@ function ScreenshotStateView({
     }
     return indices;
   }, [captureScreenshots, selectedStateIds, selectedStateHashes]);
-  useEffect6(() => {
+  useEffect7(() => {
     if (selectedStateIds.size === 0) return;
     let bestIdx = -1;
     let bestOverlap = 0;
@@ -2925,7 +3868,7 @@ function ScreenshotStateView({
     }
     if (bestIdx >= 0) setCurrentIndex(bestIdx);
   }, [selectedStateIds, selectedStateHashes, captureScreenshots]);
-  useEffect6(() => {
+  useEffect7(() => {
     const container = containerRef.current;
     if (!container) return;
     const observer = new ResizeObserver((entries) => {
@@ -2940,7 +3883,7 @@ function ScreenshotStateView({
     observer.observe(container);
     return () => observer.disconnect();
   }, []);
-  useEffect6(() => {
+  useEffect7(() => {
     for (const cap of captureScreenshots) {
       if (thumbnailLoadingRef.current.has(cap.id)) continue;
       thumbnailLoadingRef.current.add(cap.id);
@@ -2954,7 +3897,7 @@ function ScreenshotStateView({
       });
     }
   }, [captureScreenshots, onLoadScreenshotImage]);
-  useEffect6(() => {
+  useEffect7(() => {
     if (!capture) return;
     const cached = imageCache.current.get(capture.id);
     if (cached) {
@@ -2987,7 +3930,7 @@ function ScreenshotStateView({
       cancelled = true;
     };
   }, [capture, onLoadScreenshotImage, canvasSize.width, canvasSize.height]);
-  useEffect6(() => {
+  useEffect7(() => {
     const canvas = canvasRef.current;
     if (!canvas || !capture) return;
     const ctx = canvas.getContext("2d");
@@ -3052,7 +3995,7 @@ function ScreenshotStateView({
       }
     }
   }, [canvasSize, capture, zoom, elementBounds, hoveredElement, selectedStateIds, selectedStateHashes, selectedElementHash, fingerprintDetails, hashToElement]);
-  const getElementAtPoint = useCallback6(
+  const getElementAtPoint = useCallback7(
     (clientX, clientY) => {
       const canvas = canvasRef.current;
       if (!canvas || !capture) return null;
@@ -3085,13 +4028,13 @@ function ScreenshotStateView({
     },
     [capture, zoom, canvasSize, elementBounds, selectedStateIds, selectedStateHashes]
   );
-  const handleMouseMove = useCallback6(
+  const handleMouseMove = useCallback7(
     (e) => {
       setHoveredElement(getElementAtPoint(e.clientX, e.clientY));
     },
     [getElementAtPoint]
   );
-  const handleCanvasClick = useCallback6(
+  const handleCanvasClick = useCallback7(
     (e) => {
       const hash = getElementAtPoint(e.clientX, e.clientY);
       if (!hash) {
@@ -3104,7 +4047,7 @@ function ScreenshotStateView({
   );
   const handlePrev = () => setCurrentIndex((i) => Math.max(0, i - 1));
   const handleNext = () => setCurrentIndex((i) => Math.min(captureScreenshots.length - 1, i + 1));
-  useEffect6(() => {
+  useEffect7(() => {
     const handler = (e) => {
       if (e.key === "ArrowLeft") handlePrev();
       if (e.key === "ArrowRight") handleNext();
@@ -3114,117 +4057,117 @@ function ScreenshotStateView({
     return () => window.removeEventListener("keydown", handler);
   }, [captureScreenshots.length]);
   if (captureScreenshots.length === 0) {
-    return /* @__PURE__ */ jsx9("div", { className: "flex items-center justify-center h-full text-text-muted", children: /* @__PURE__ */ jsxs9("div", { className: "text-center", children: [
-      /* @__PURE__ */ jsx9(Image, { className: "size-12 mx-auto mb-3 opacity-30" }),
-      /* @__PURE__ */ jsx9("p", { className: "text-sm", children: "No capture screenshots available" }),
-      /* @__PURE__ */ jsx9("p", { className: "text-xs mt-1 text-text-muted/70", children: "Run a state discovery to capture screenshots" })
+    return /* @__PURE__ */ jsx12("div", { className: "flex items-center justify-center h-full text-text-muted", children: /* @__PURE__ */ jsxs12("div", { className: "text-center", children: [
+      /* @__PURE__ */ jsx12(Image, { className: "size-12 mx-auto mb-3 opacity-30" }),
+      /* @__PURE__ */ jsx12("p", { className: "text-sm", children: "No capture screenshots available" }),
+      /* @__PURE__ */ jsx12("p", { className: "text-xs mt-1 text-text-muted/70", children: "Run a state discovery to capture screenshots" })
     ] }) });
   }
   const selectedFp = selectedElementHash ? fingerprintDetails?.[selectedElementHash] ?? null : null;
-  return /* @__PURE__ */ jsxs9("div", { className: "flex h-full", children: [
-    /* @__PURE__ */ jsx9("div", { className: "w-56 border-r border-border-secondary bg-bg-primary overflow-y-auto shrink-0", children: selectedStates.length > 0 ? /* @__PURE__ */ jsx9("div", { className: "flex flex-col", children: selectedStates.map((state, stateIdx) => {
+  return /* @__PURE__ */ jsxs12("div", { className: "flex h-full", children: [
+    /* @__PURE__ */ jsx12("div", { className: "w-56 border-r border-border-secondary bg-bg-primary overflow-y-auto shrink-0", children: selectedStates.length > 0 ? /* @__PURE__ */ jsx12("div", { className: "flex flex-col", children: selectedStates.map((state, stateIdx) => {
       const colorIdx = states.indexOf(state);
       const color = STATE_COLORS2[colorIdx % STATE_COLORS2.length];
-      return /* @__PURE__ */ jsxs9("div", { className: stateIdx > 0 ? "border-t border-border-secondary" : "", children: [
-        /* @__PURE__ */ jsxs9("div", { className: "p-2 border-b border-border-secondary flex items-center gap-2", children: [
-          /* @__PURE__ */ jsx9("div", { className: "w-2 h-2 rounded-full shrink-0", style: { backgroundColor: color.border } }),
-          /* @__PURE__ */ jsx9("h4", { className: "text-[10px] font-semibold text-text-primary uppercase tracking-wider truncate", children: state.name }),
-          /* @__PURE__ */ jsx9("span", { className: "text-[9px] text-text-muted ml-auto shrink-0", children: state.element_ids.length })
+      return /* @__PURE__ */ jsxs12("div", { className: stateIdx > 0 ? "border-t border-border-secondary" : "", children: [
+        /* @__PURE__ */ jsxs12("div", { className: "p-2 border-b border-border-secondary flex items-center gap-2", children: [
+          /* @__PURE__ */ jsx12("div", { className: "w-2 h-2 rounded-full shrink-0", style: { backgroundColor: color.border } }),
+          /* @__PURE__ */ jsx12("h4", { className: "text-[10px] font-semibold text-text-primary uppercase tracking-wider truncate", children: state.name }),
+          /* @__PURE__ */ jsx12("span", { className: "text-[9px] text-text-muted ml-auto shrink-0", children: state.element_ids.length })
         ] }),
-        /* @__PURE__ */ jsx9("div", { className: "p-1.5 space-y-0.5", children: state.element_ids.map((eid) => {
+        /* @__PURE__ */ jsx12("div", { className: "p-1.5 space-y-0.5", children: state.element_ids.map((eid) => {
           const hash = getFingerprintHash(eid);
           const label = resolveElementLabel(eid, fingerprintDetails, state);
           const thumb = elementThumbnails?.[hash] ?? elementThumbnails?.[eid];
           const isActive = hash === selectedElementHash;
-          return /* @__PURE__ */ jsxs9(
+          return /* @__PURE__ */ jsxs12(
             "button",
             {
               onClick: () => setSelectedElementHash(isActive ? null : hash),
               className: `w-full flex items-center gap-1.5 text-[10px] px-2 py-1 rounded text-left ${isActive ? "bg-brand-primary/10 text-brand-primary" : "hover:bg-bg-secondary text-text-primary"}`,
               children: [
-                thumb ? /* @__PURE__ */ jsx9(
+                thumb ? /* @__PURE__ */ jsx12(
                   "img",
                   {
                     src: thumb.startsWith("data:") ? thumb : `data:image/png;base64,${thumb}`,
                     alt: label,
                     className: "w-5 h-5 object-cover rounded shrink-0"
                   }
-                ) : /* @__PURE__ */ jsx9(Layers3, { className: "size-3 text-text-muted shrink-0" }),
-                /* @__PURE__ */ jsx9("span", { className: "truncate", children: label })
+                ) : /* @__PURE__ */ jsx12(Layers4, { className: "size-3 text-text-muted shrink-0" }),
+                /* @__PURE__ */ jsx12("span", { className: "truncate", children: label })
               ]
             },
             eid
           );
         }) })
       ] }, state.state_id);
-    }) }) : /* @__PURE__ */ jsx9("div", { className: "flex items-center justify-center h-full text-text-muted", children: /* @__PURE__ */ jsxs9("div", { className: "text-center px-4", children: [
-      /* @__PURE__ */ jsx9(Layers3, { className: "size-8 mx-auto mb-2 opacity-30" }),
-      /* @__PURE__ */ jsx9("p", { className: "text-xs", children: "Select a state to see its elements" })
+    }) }) : /* @__PURE__ */ jsx12("div", { className: "flex items-center justify-center h-full text-text-muted", children: /* @__PURE__ */ jsxs12("div", { className: "text-center px-4", children: [
+      /* @__PURE__ */ jsx12(Layers4, { className: "size-8 mx-auto mb-2 opacity-30" }),
+      /* @__PURE__ */ jsx12("p", { className: "text-xs", children: "Select a state to see its elements" })
     ] }) }) }),
-    /* @__PURE__ */ jsxs9("div", { className: "flex-1 flex flex-col overflow-hidden", children: [
-      /* @__PURE__ */ jsxs9("div", { className: "flex items-center gap-2 px-3 py-1.5 border-b border-border-secondary bg-bg-primary shrink-0", children: [
-        /* @__PURE__ */ jsx9(
+    /* @__PURE__ */ jsxs12("div", { className: "flex-1 flex flex-col overflow-hidden", children: [
+      /* @__PURE__ */ jsxs12("div", { className: "flex items-center gap-2 px-3 py-1.5 border-b border-border-secondary bg-bg-primary shrink-0", children: [
+        /* @__PURE__ */ jsx12(
           "button",
           {
             className: "h-6 w-6 p-0 inline-flex items-center justify-center rounded text-text-secondary hover:text-text-primary disabled:opacity-30",
             onClick: handlePrev,
             disabled: currentIndex === 0,
             title: "Previous capture",
-            children: /* @__PURE__ */ jsx9(ChevronLeft, { className: "size-4" })
+            children: /* @__PURE__ */ jsx12(ChevronLeft, { className: "size-4" })
           }
         ),
-        /* @__PURE__ */ jsxs9("span", { className: "text-[10px] text-text-primary min-w-[70px] text-center", children: [
+        /* @__PURE__ */ jsxs12("span", { className: "text-[10px] text-text-primary min-w-[70px] text-center", children: [
           currentIndex + 1,
           " / ",
           captureScreenshots.length
         ] }),
-        /* @__PURE__ */ jsx9(
+        /* @__PURE__ */ jsx12(
           "button",
           {
             className: "h-6 w-6 p-0 inline-flex items-center justify-center rounded text-text-secondary hover:text-text-primary disabled:opacity-30",
             onClick: handleNext,
             disabled: currentIndex === captureScreenshots.length - 1,
             title: "Next capture",
-            children: /* @__PURE__ */ jsx9(ChevronRight2, { className: "size-4" })
+            children: /* @__PURE__ */ jsx12(ChevronRight2, { className: "size-4" })
           }
         ),
-        /* @__PURE__ */ jsx9("div", { className: "flex-1" }),
-        /* @__PURE__ */ jsxs9("div", { className: "flex items-center gap-0.5", children: [
-          /* @__PURE__ */ jsx9(
+        /* @__PURE__ */ jsx12("div", { className: "flex-1" }),
+        /* @__PURE__ */ jsxs12("div", { className: "flex items-center gap-0.5", children: [
+          /* @__PURE__ */ jsx12(
             "button",
             {
               className: "h-6 w-6 p-0 inline-flex items-center justify-center rounded text-text-secondary hover:text-text-primary",
               onClick: () => setUserZoom(Math.max(0.1, zoom - 0.25)),
               title: "Zoom out",
-              children: /* @__PURE__ */ jsx9(ZoomOut2, { className: "size-3" })
+              children: /* @__PURE__ */ jsx12(ZoomOut2, { className: "size-3" })
             }
           ),
-          /* @__PURE__ */ jsxs9("span", { className: "text-[10px] text-text-muted w-8 text-center", children: [
+          /* @__PURE__ */ jsxs12("span", { className: "text-[10px] text-text-muted w-8 text-center", children: [
             Math.round(zoom * 100),
             "%"
           ] }),
-          /* @__PURE__ */ jsx9(
+          /* @__PURE__ */ jsx12(
             "button",
             {
               className: "h-6 w-6 p-0 inline-flex items-center justify-center rounded text-text-secondary hover:text-text-primary",
               onClick: () => setUserZoom(Math.min(3, zoom + 0.25)),
               title: "Zoom in",
-              children: /* @__PURE__ */ jsx9(ZoomIn2, { className: "size-3" })
+              children: /* @__PURE__ */ jsx12(ZoomIn2, { className: "size-3" })
             }
           ),
-          /* @__PURE__ */ jsx9(
+          /* @__PURE__ */ jsx12(
             "button",
             {
               className: "h-6 w-6 p-0 inline-flex items-center justify-center rounded text-text-secondary hover:text-text-primary",
               onClick: () => setUserZoom(null),
               title: "Fit to view",
-              children: /* @__PURE__ */ jsx9(Maximize3, { className: "size-3" })
+              children: /* @__PURE__ */ jsx12(Maximize3, { className: "size-3" })
             }
           )
         ] })
       ] }),
-      /* @__PURE__ */ jsxs9("div", { ref: containerRef, className: "relative flex-1 bg-bg-secondary overflow-hidden", children: [
-        /* @__PURE__ */ jsx9(
+      /* @__PURE__ */ jsxs12("div", { ref: containerRef, className: "relative flex-1 bg-bg-secondary overflow-hidden", children: [
+        /* @__PURE__ */ jsx12(
           "canvas",
           {
             ref: canvasRef,
@@ -3238,16 +4181,16 @@ function ScreenshotStateView({
             onClick: handleCanvasClick
           }
         ),
-        isLoading && /* @__PURE__ */ jsx9("div", { className: "absolute inset-0 flex items-center justify-center bg-bg-secondary/50", children: /* @__PURE__ */ jsx9("div", { className: "animate-spin size-6 border-2 border-brand-primary border-t-transparent rounded-full" }) }),
-        hoveredElement && hoveredElement !== selectedElementHash && /* @__PURE__ */ jsxs9("div", { className: "absolute top-3 left-3 text-xs bg-bg-primary/95 backdrop-blur-xs px-3 py-2 rounded-lg border border-border-secondary shadow-md max-w-[280px] pointer-events-none", children: [
-          /* @__PURE__ */ jsx9("div", { className: "font-medium text-text-primary truncate", children: (() => {
+        isLoading && /* @__PURE__ */ jsx12("div", { className: "absolute inset-0 flex items-center justify-center bg-bg-secondary/50", children: /* @__PURE__ */ jsx12("div", { className: "animate-spin size-6 border-2 border-brand-primary border-t-transparent rounded-full" }) }),
+        hoveredElement && hoveredElement !== selectedElementHash && /* @__PURE__ */ jsxs12("div", { className: "absolute top-3 left-3 text-xs bg-bg-primary/95 backdrop-blur-xs px-3 py-2 rounded-lg border border-border-secondary shadow-md max-w-[280px] pointer-events-none", children: [
+          /* @__PURE__ */ jsx12("div", { className: "font-medium text-text-primary truncate", children: (() => {
             const entry = hashToElement.get(hoveredElement);
             return entry ? resolveElementLabel(entry.elementId, fingerprintDetails, entry.state) : hoveredElement;
           })() }),
           (() => {
             const fp = fingerprintDetails?.[hoveredElement];
             if (!fp) return null;
-            return /* @__PURE__ */ jsxs9("div", { className: "text-text-muted mt-0.5", children: [
+            return /* @__PURE__ */ jsxs12("div", { className: "text-text-muted mt-0.5", children: [
               "<",
               fp.tagName,
               ">",
@@ -3255,20 +4198,20 @@ function ScreenshotStateView({
             ] });
           })()
         ] }),
-        selectedElementHash && /* @__PURE__ */ jsx9("div", { className: "absolute bottom-2 left-2 right-2 text-xs bg-bg-primary/95 backdrop-blur-xs px-3 py-2 rounded-lg border border-border-secondary shadow-md", children: /* @__PURE__ */ jsxs9("div", { className: "flex items-start gap-3", children: [
-          /* @__PURE__ */ jsxs9("div", { className: "flex-1 min-w-0", children: [
-            /* @__PURE__ */ jsx9("div", { className: "font-medium text-text-primary truncate", children: (() => {
+        selectedElementHash && /* @__PURE__ */ jsx12("div", { className: "absolute bottom-2 left-2 right-2 text-xs bg-bg-primary/95 backdrop-blur-xs px-3 py-2 rounded-lg border border-border-secondary shadow-md", children: /* @__PURE__ */ jsxs12("div", { className: "flex items-start gap-3", children: [
+          /* @__PURE__ */ jsxs12("div", { className: "flex-1 min-w-0", children: [
+            /* @__PURE__ */ jsx12("div", { className: "font-medium text-text-primary truncate", children: (() => {
               const entry = hashToElement.get(selectedElementHash);
               return entry ? resolveElementLabel(entry.elementId, fingerprintDetails, entry.state) : selectedElementHash;
             })() }),
-            selectedFp && /* @__PURE__ */ jsxs9("div", { className: "text-[10px] text-text-muted mt-0.5", children: [
+            selectedFp && /* @__PURE__ */ jsxs12("div", { className: "text-[10px] text-text-muted mt-0.5", children: [
               "<",
               selectedFp.tagName,
               ">",
               selectedFp.role ? ` role="${selectedFp.role}"` : "",
               selectedFp.positionZone ? ` \xB7 ${selectedFp.positionZone}` : ""
             ] }),
-            elementBounds[selectedElementHash] && /* @__PURE__ */ jsxs9("div", { className: "text-[10px] text-text-muted mt-0.5", children: [
+            elementBounds[selectedElementHash] && /* @__PURE__ */ jsxs12("div", { className: "text-[10px] text-text-muted mt-0.5", children: [
               Math.round(elementBounds[selectedElementHash].x),
               ", ",
               Math.round(elementBounds[selectedElementHash].y),
@@ -3278,7 +4221,7 @@ function ScreenshotStateView({
               Math.round(elementBounds[selectedElementHash].height)
             ] })
           ] }),
-          elementThumbnails?.[selectedElementHash] && /* @__PURE__ */ jsx9(
+          elementThumbnails?.[selectedElementHash] && /* @__PURE__ */ jsx12(
             "img",
             {
               src: elementThumbnails[selectedElementHash].startsWith("data:") ? elementThumbnails[selectedElementHash] : `data:image/png;base64,${elementThumbnails[selectedElementHash]}`,
@@ -3286,34 +4229,34 @@ function ScreenshotStateView({
               className: "w-12 h-12 object-cover rounded border border-border-secondary shrink-0"
             }
           ),
-          /* @__PURE__ */ jsx9(
+          /* @__PURE__ */ jsx12(
             "button",
             {
               onClick: () => setSelectedElementHash(null),
               className: "text-text-muted hover:text-text-primary shrink-0",
-              children: /* @__PURE__ */ jsx9(X, { className: "size-3.5" })
+              children: /* @__PURE__ */ jsx12(X, { className: "size-3.5" })
             }
           )
         ] }) }),
-        !selectedElementHash && /* @__PURE__ */ jsx9("div", { className: "absolute bottom-2 right-2 text-[9px] text-text-muted bg-bg-primary/80 backdrop-blur-xs px-2 py-1 rounded border border-border-secondary/50", children: selectedStateIds.size > 0 ? `${Object.keys(elementBounds).filter((h) => selectedStateHashes.has(h)).length} / ${Object.keys(elementBounds).length} elements` : `${Object.keys(elementBounds).length} elements` })
+        !selectedElementHash && /* @__PURE__ */ jsx12("div", { className: "absolute bottom-2 right-2 text-[9px] text-text-muted bg-bg-primary/80 backdrop-blur-xs px-2 py-1 rounded border border-border-secondary/50", children: selectedStateIds.size > 0 ? `${Object.keys(elementBounds).filter((h) => selectedStateHashes.has(h)).length} / ${Object.keys(elementBounds).length} elements` : `${Object.keys(elementBounds).length} elements` })
       ] })
     ] }),
-    /* @__PURE__ */ jsxs9("div", { className: "w-48 border-l border-border-secondary bg-bg-primary overflow-y-auto shrink-0", children: [
-      /* @__PURE__ */ jsx9("div", { className: "p-2 border-b border-border-secondary", children: /* @__PURE__ */ jsxs9("h4", { className: "text-[10px] font-semibold text-text-muted uppercase tracking-wider", children: [
+    /* @__PURE__ */ jsxs12("div", { className: "w-48 border-l border-border-secondary bg-bg-primary overflow-y-auto shrink-0", children: [
+      /* @__PURE__ */ jsx12("div", { className: "p-2 border-b border-border-secondary", children: /* @__PURE__ */ jsxs12("h4", { className: "text-[10px] font-semibold text-text-muted uppercase tracking-wider", children: [
         "Screenshots ",
         selectedStateIds.size > 0 && `(${matchingScreenshotIndices.length})`
       ] }) }),
-      /* @__PURE__ */ jsxs9("div", { className: "p-1.5 space-y-1.5", children: [
+      /* @__PURE__ */ jsxs12("div", { className: "p-1.5 space-y-1.5", children: [
         matchingScreenshotIndices.map((idx) => {
           const cap = captureScreenshots[idx];
           const isCurrent = idx === currentIndex;
-          return /* @__PURE__ */ jsxs9(
+          return /* @__PURE__ */ jsxs12(
             "button",
             {
               onClick: () => setCurrentIndex(idx),
               className: `w-full rounded border-2 transition-colors overflow-hidden ${isCurrent ? "border-blue-500" : "border-transparent hover:border-border-secondary"}`,
               children: [
-                thumbnailCache.has(cap.id) ? /* @__PURE__ */ jsx9(
+                thumbnailCache.has(cap.id) ? /* @__PURE__ */ jsx12(
                   "img",
                   {
                     src: thumbnailCache.get(cap.id),
@@ -3321,8 +4264,8 @@ function ScreenshotStateView({
                     className: "w-full h-auto object-cover",
                     style: { maxHeight: 100 }
                   }
-                ) : /* @__PURE__ */ jsx9("div", { className: "w-full h-16 bg-bg-tertiary flex items-center justify-center", children: /* @__PURE__ */ jsx9(Image, { className: "size-4 text-text-muted opacity-30" }) }),
-                /* @__PURE__ */ jsxs9("div", { className: "text-[9px] text-text-muted px-1 py-0.5 text-center truncate", children: [
+                ) : /* @__PURE__ */ jsx12("div", { className: "w-full h-16 bg-bg-tertiary flex items-center justify-center", children: /* @__PURE__ */ jsx12(Image, { className: "size-4 text-text-muted opacity-30" }) }),
+                /* @__PURE__ */ jsxs12("div", { className: "text-[9px] text-text-muted px-1 py-0.5 text-center truncate", children: [
                   "#",
                   cap.captureIndex + 1,
                   " \xB7 ",
@@ -3333,14 +4276,14 @@ function ScreenshotStateView({
             cap.id
           );
         }),
-        matchingScreenshotIndices.length === 0 && /* @__PURE__ */ jsx9("p", { className: "text-[10px] text-text-muted text-center py-4", children: "No screenshots match selected state(s)" })
+        matchingScreenshotIndices.length === 0 && /* @__PURE__ */ jsx12("p", { className: "text-[10px] text-text-muted text-center py-4", children: "No screenshots match selected state(s)" })
       ] })
     ] })
   ] });
 }
 
 // src/components/state-machine/StateViewPanel.tsx
-import { Fragment as Fragment4, jsx as jsx10, jsxs as jsxs10 } from "react/jsx-runtime";
+import { Fragment as Fragment4, jsx as jsx13, jsxs as jsxs13 } from "react/jsx-runtime";
 function StateRow({
   index,
   style,
@@ -3365,8 +4308,8 @@ function StateRow({
   const stateIncoming = transitionMap.incoming.get(state.state_id) ?? [];
   const isInitial = state.extra_metadata?.initial === true;
   const isBlocking = state.extra_metadata?.blocking === true;
-  return /* @__PURE__ */ jsxs10("div", { style, ...ariaAttributes, children: [
-    /* @__PURE__ */ jsxs10(
+  return /* @__PURE__ */ jsxs13("div", { style, ...ariaAttributes, children: [
+    /* @__PURE__ */ jsxs13(
       "button",
       {
         "data-ui-id": `state-item-${state.state_id}`,
@@ -3376,25 +4319,25 @@ function StateRow({
           ${isSelected ? "bg-brand-primary/10 border border-brand-primary/30" : "hover:bg-bg-secondary border border-transparent"}
         `,
         children: [
-          /* @__PURE__ */ jsxs10("div", { className: "flex items-center gap-2", children: [
-            /* @__PURE__ */ jsx10(
+          /* @__PURE__ */ jsxs13("div", { className: "flex items-center gap-2", children: [
+            /* @__PURE__ */ jsx13(
               "div",
               {
                 className: "w-2.5 h-2.5 rounded-full shrink-0",
                 style: { backgroundColor: color.border }
               }
             ),
-            isInitial && /* @__PURE__ */ jsx10(Play4, { className: "size-3 text-yellow-500 fill-yellow-500 shrink-0" }),
-            isBlocking && /* @__PURE__ */ jsx10(Lock2, { className: "size-3 text-amber-500 shrink-0" }),
-            /* @__PURE__ */ jsx10("span", { className: "font-medium text-text-primary truncate flex-1", children: state.name }),
-            isExpanded ? /* @__PURE__ */ jsx10(ChevronDown, { className: "size-3 text-text-muted transition-transform" }) : /* @__PURE__ */ jsx10(ChevronRight3, { className: "size-3 text-text-muted transition-transform" })
+            isInitial && /* @__PURE__ */ jsx13(Play5, { className: "size-3 text-yellow-500 fill-yellow-500 shrink-0" }),
+            isBlocking && /* @__PURE__ */ jsx13(Lock2, { className: "size-3 text-amber-500 shrink-0" }),
+            /* @__PURE__ */ jsx13("span", { className: "font-medium text-text-primary truncate flex-1", children: state.name }),
+            isExpanded ? /* @__PURE__ */ jsx13(ChevronDown, { className: "size-3 text-text-muted transition-transform" }) : /* @__PURE__ */ jsx13(ChevronRight3, { className: "size-3 text-text-muted transition-transform" })
           ] }),
-          /* @__PURE__ */ jsxs10("div", { className: "flex items-center gap-2 mt-1 ml-4.5 text-xs text-text-muted", children: [
-            /* @__PURE__ */ jsxs10("span", { children: [
+          /* @__PURE__ */ jsxs13("div", { className: "flex items-center gap-2 mt-1 ml-4.5 text-xs text-text-muted", children: [
+            /* @__PURE__ */ jsxs13("span", { children: [
               state.element_ids.length,
               " elements"
             ] }),
-            /* @__PURE__ */ jsxs10(
+            /* @__PURE__ */ jsxs13(
               "span",
               {
                 className: Math.round(state.confidence * 100) >= 80 ? "text-green-400" : Math.round(state.confidence * 100) >= 50 ? "text-amber-400" : "text-red-400",
@@ -3404,39 +4347,39 @@ function StateRow({
                 ]
               }
             ),
-            stateOutgoing.length > 0 && /* @__PURE__ */ jsxs10("span", { className: "text-brand-secondary flex items-center gap-0.5", children: [
-              /* @__PURE__ */ jsx10(ArrowUpRight2, { className: "size-2" }),
+            stateOutgoing.length > 0 && /* @__PURE__ */ jsxs13("span", { className: "text-brand-secondary flex items-center gap-0.5", children: [
+              /* @__PURE__ */ jsx13(ArrowUpRight2, { className: "size-2" }),
               stateOutgoing.length
             ] }),
-            stateIncoming.length > 0 && /* @__PURE__ */ jsxs10("span", { className: "text-brand-primary flex items-center gap-0.5", children: [
-              /* @__PURE__ */ jsx10(ArrowDownLeft2, { className: "size-2" }),
+            stateIncoming.length > 0 && /* @__PURE__ */ jsxs13("span", { className: "text-brand-primary flex items-center gap-0.5", children: [
+              /* @__PURE__ */ jsx13(ArrowDownLeft2, { className: "size-2" }),
               stateIncoming.length
             ] })
           ] })
         ]
       }
     ),
-    isExpanded && /* @__PURE__ */ jsxs10("div", { className: "ml-5 pl-2 border-l border-border-secondary mt-1 mb-2 space-y-0.5", children: [
+    isExpanded && /* @__PURE__ */ jsxs13("div", { className: "ml-5 pl-2 border-l border-border-secondary mt-1 mb-2 space-y-0.5", children: [
       state.element_ids.slice(0, 20).map((eid) => {
         const prefix = getElementTypePrefix3(eid);
         const label = resolveElementLabel(eid, fingerprintDetails, state);
-        const Icon = ELEMENT_ICONS[prefix] ?? Layers4;
+        const Icon = ELEMENT_ICONS[prefix] ?? Layers5;
         const stateCount = sharedElements.get(eid)?.length ?? 1;
-        return /* @__PURE__ */ jsxs10(
+        return /* @__PURE__ */ jsxs13(
           "div",
           {
             className: "text-[10px] text-text-muted flex items-center gap-1 py-0.5 px-1 rounded hover:bg-bg-secondary",
             title: `${eid}${stateCount > 1 ? ` (shared across ${stateCount} states)` : ""}`,
             children: [
-              /* @__PURE__ */ jsx10(Icon, { className: "size-2.5 shrink-0" }),
-              /* @__PURE__ */ jsx10("span", { className: "truncate flex-1", children: label }),
-              stateCount > 1 && /* @__PURE__ */ jsx10("span", { className: "text-[8px] text-brand-primary bg-brand-primary/10 px-1 rounded-full shrink-0", children: stateCount })
+              /* @__PURE__ */ jsx13(Icon, { className: "size-2.5 shrink-0" }),
+              /* @__PURE__ */ jsx13("span", { className: "truncate flex-1", children: label }),
+              stateCount > 1 && /* @__PURE__ */ jsx13("span", { className: "text-[8px] text-brand-primary bg-brand-primary/10 px-1 rounded-full shrink-0", children: stateCount })
             ]
           },
           eid
         );
       }),
-      state.element_ids.length > 20 && /* @__PURE__ */ jsxs10("div", { className: "text-[10px] text-text-muted py-0.5 px-1", children: [
+      state.element_ids.length > 20 && /* @__PURE__ */ jsxs13("div", { className: "text-[10px] text-text-muted py-0.5 px-1", children: [
         "+",
         state.element_ids.length - 20,
         " more"
@@ -3454,27 +4397,27 @@ function StateViewPanel({
   captureScreenshots,
   onLoadScreenshotImage
 }) {
-  const [expandedStates, setExpandedStates] = useState8(/* @__PURE__ */ new Set());
-  const [searchFilter, setSearchFilter] = useState8("");
-  const [viewMode, setViewMode] = useState8(
+  const [expandedStates, setExpandedStates] = useState9(/* @__PURE__ */ new Set());
+  const [searchFilter, setSearchFilter] = useState9("");
+  const [viewMode, setViewMode] = useState9(
     captureScreenshots && captureScreenshots.length > 0 ? "screenshot" : "list"
   );
-  const [hasAutoSwitched, setHasAutoSwitched] = useState8(
+  const [hasAutoSwitched, setHasAutoSwitched] = useState9(
     () => !!(captureScreenshots && captureScreenshots.length > 0)
   );
-  useEffect7(() => {
+  useEffect8(() => {
     if (!hasAutoSwitched && captureScreenshots && captureScreenshots.length > 0) {
       setViewMode("screenshot");
       setHasAutoSwitched(true);
     }
   }, [captureScreenshots, hasAutoSwitched]);
-  const [selectedStateIds, setSelectedStateIds] = useState8(/* @__PURE__ */ new Set());
+  const [selectedStateIds, setSelectedStateIds] = useState9(/* @__PURE__ */ new Set());
   const effectiveSelectedStateId = selectedStateId;
-  const selectedState = useMemo7(
+  const selectedState = useMemo8(
     () => states.find((s) => s.state_id === effectiveSelectedStateId),
     [states, effectiveSelectedStateId]
   );
-  const transitionMap = useMemo7(() => {
+  const transitionMap = useMemo8(() => {
     const outgoing = /* @__PURE__ */ new Map();
     const incoming = /* @__PURE__ */ new Map();
     for (const t of transitions) {
@@ -3489,7 +4432,7 @@ function StateViewPanel({
     }
     return { outgoing, incoming };
   }, [transitions]);
-  const elementGroups = useMemo7(() => {
+  const elementGroups = useMemo8(() => {
     if (!selectedState) return /* @__PURE__ */ new Map();
     const groups = /* @__PURE__ */ new Map();
     for (const eid of selectedState.element_ids) {
@@ -3499,7 +4442,7 @@ function StateViewPanel({
     }
     return groups;
   }, [selectedState]);
-  const sharedElements = useMemo7(() => {
+  const sharedElements = useMemo8(() => {
     const elementStateMap = /* @__PURE__ */ new Map();
     for (const s of states) {
       for (const eid of s.element_ids) {
@@ -3509,14 +4452,14 @@ function StateViewPanel({
     }
     return elementStateMap;
   }, [states]);
-  const filteredStates = useMemo7(() => {
+  const filteredStates = useMemo8(() => {
     if (!searchFilter) return states;
     const lower = searchFilter.toLowerCase();
     return states.filter(
       (s) => s.name.toLowerCase().includes(lower) || s.state_id.toLowerCase().includes(lower) || s.element_ids.some((eid) => eid.toLowerCase().includes(lower))
     );
   }, [states, searchFilter]);
-  const toggleExpanded = useCallback7((stateId) => {
+  const toggleExpanded = useCallback8((stateId) => {
     setExpandedStates((prev) => {
       const next = new Set(prev);
       if (next.has(stateId)) {
@@ -3529,7 +4472,7 @@ function StateViewPanel({
   }, []);
   const listRef = useListRef(null);
   const dynamicRowHeight = useDynamicRowHeight({ defaultRowHeight: 60 });
-  const handleRowClick = useCallback7(
+  const handleRowClick = useCallback8(
     (state, e) => {
       const isSelected = viewMode === "screenshot" ? selectedStateIds.has(state.state_id) : state.state_id === effectiveSelectedStateId;
       const isExpanded = expandedStates.has(state.state_id);
@@ -3555,7 +4498,7 @@ function StateViewPanel({
     },
     [viewMode, selectedStateIds, effectiveSelectedStateId, expandedStates, toggleExpanded, onSelectState]
   );
-  useEffect7(() => {
+  useEffect8(() => {
     if (!effectiveSelectedStateId) return;
     const idx = filteredStates.findIndex(
       (s) => s.state_id === effectiveSelectedStateId
@@ -3568,18 +4511,18 @@ function StateViewPanel({
       });
     }
   }, [effectiveSelectedStateId, filteredStates, listRef]);
-  return /* @__PURE__ */ jsxs10("div", { className: "flex flex-1 h-full min-w-0", children: [
-    /* @__PURE__ */ jsxs10("div", { className: "w-72 border-r border-border-secondary bg-bg-primary shrink-0 flex flex-col min-h-0", children: [
-      /* @__PURE__ */ jsxs10("div", { className: "p-3 border-b border-border-secondary", children: [
-        /* @__PURE__ */ jsxs10("div", { className: "flex items-center gap-2 mb-2", children: [
-          /* @__PURE__ */ jsx10(Layers4, { className: "size-4 text-brand-primary" }),
-          /* @__PURE__ */ jsx10("h3", { className: "text-sm font-semibold text-text-primary", children: "States" }),
-          /* @__PURE__ */ jsx10("span", { className: "text-xs text-text-muted ml-auto", children: states.length })
+  return /* @__PURE__ */ jsxs13("div", { className: "flex flex-1 h-full min-w-0", children: [
+    /* @__PURE__ */ jsxs13("div", { className: "w-72 border-r border-border-secondary bg-bg-primary shrink-0 flex flex-col min-h-0", children: [
+      /* @__PURE__ */ jsxs13("div", { className: "p-3 border-b border-border-secondary", children: [
+        /* @__PURE__ */ jsxs13("div", { className: "flex items-center gap-2 mb-2", children: [
+          /* @__PURE__ */ jsx13(Layers5, { className: "size-4 text-brand-primary" }),
+          /* @__PURE__ */ jsx13("h3", { className: "text-sm font-semibold text-text-primary", children: "States" }),
+          /* @__PURE__ */ jsx13("span", { className: "text-xs text-text-muted ml-auto", children: states.length })
         ] }),
-        /* @__PURE__ */ jsxs10("div", { className: "flex items-center gap-2 mb-2", children: [
-          /* @__PURE__ */ jsxs10("div", { className: "relative flex-1", children: [
-            /* @__PURE__ */ jsx10(Search2, { className: "absolute left-2 top-1/2 -translate-y-1/2 size-3 text-text-muted" }),
-            /* @__PURE__ */ jsx10(
+        /* @__PURE__ */ jsxs13("div", { className: "flex items-center gap-2 mb-2", children: [
+          /* @__PURE__ */ jsxs13("div", { className: "relative flex-1", children: [
+            /* @__PURE__ */ jsx13(Search2, { className: "absolute left-2 top-1/2 -translate-y-1/2 size-3 text-text-muted" }),
+            /* @__PURE__ */ jsx13(
               "input",
               {
                 type: "text",
@@ -3591,39 +4534,39 @@ function StateViewPanel({
               }
             )
           ] }),
-          /* @__PURE__ */ jsxs10("div", { className: "flex items-center border border-border-secondary rounded overflow-hidden", children: [
-            /* @__PURE__ */ jsx10(
+          /* @__PURE__ */ jsxs13("div", { className: "flex items-center border border-border-secondary rounded overflow-hidden", children: [
+            /* @__PURE__ */ jsx13(
               "button",
               {
                 onClick: () => setViewMode("list"),
                 className: `p-1 ${viewMode === "list" ? "bg-brand-primary/20 text-brand-primary" : "text-text-muted hover:text-text-primary"}`,
                 title: "List view",
-                children: /* @__PURE__ */ jsx10(List, { className: "size-3.5" })
+                children: /* @__PURE__ */ jsx13(List, { className: "size-3.5" })
               }
             ),
-            /* @__PURE__ */ jsx10(
+            /* @__PURE__ */ jsx13(
               "button",
               {
                 onClick: () => setViewMode("spatial"),
                 className: `p-1 ${viewMode === "spatial" ? "bg-brand-primary/20 text-brand-primary" : "text-text-muted hover:text-text-primary"}`,
                 title: "Spatial view",
-                children: /* @__PURE__ */ jsx10(BarChart3, { className: "size-3.5" })
+                children: /* @__PURE__ */ jsx13(BarChart3, { className: "size-3.5" })
               }
             ),
-            /* @__PURE__ */ jsx10(
+            /* @__PURE__ */ jsx13(
               "button",
               {
                 onClick: () => setViewMode("screenshot"),
                 className: `p-1 ${viewMode === "screenshot" ? "bg-brand-primary/20 text-brand-primary" : "text-text-muted hover:text-text-primary"}`,
                 title: "Screenshot view",
                 disabled: !captureScreenshots || captureScreenshots.length === 0,
-                children: /* @__PURE__ */ jsx10(Image2, { className: "size-3.5" })
+                children: /* @__PURE__ */ jsx13(Image2, { className: "size-3.5" })
               }
             )
           ] })
         ] })
       ] }),
-      /* @__PURE__ */ jsx10("div", { className: "flex-1 min-h-0 p-2", children: filteredStates.length === 0 ? /* @__PURE__ */ jsx10("p", { className: "text-xs text-text-muted text-center py-4", children: "No states match filter." }) : /* @__PURE__ */ jsx10(
+      /* @__PURE__ */ jsx13("div", { className: "flex-1 min-h-0 p-2", children: filteredStates.length === 0 ? /* @__PURE__ */ jsx13("p", { className: "text-xs text-text-muted text-center py-4", children: "No states match filter." }) : /* @__PURE__ */ jsx13(
         VirtualList,
         {
           listRef,
@@ -3647,7 +4590,7 @@ function StateViewPanel({
         }
       ) })
     ] }),
-    /* @__PURE__ */ jsx10("div", { className: "flex-1 overflow-hidden", children: viewMode === "screenshot" && captureScreenshots && onLoadScreenshotImage ? /* @__PURE__ */ jsx10(
+    /* @__PURE__ */ jsx13("div", { className: "flex-1 overflow-hidden", children: viewMode === "screenshot" && captureScreenshots && onLoadScreenshotImage ? /* @__PURE__ */ jsx13(
       ScreenshotStateView,
       {
         captureScreenshots,
@@ -3657,7 +4600,7 @@ function StateViewPanel({
         fingerprintDetails,
         elementThumbnails
       }
-    ) : viewMode === "spatial" ? /* @__PURE__ */ jsx10(
+    ) : viewMode === "spatial" ? /* @__PURE__ */ jsx13(
       SpatialCanvas,
       {
         states,
@@ -3665,30 +4608,30 @@ function StateViewPanel({
         selectedStateId: effectiveSelectedStateId,
         onSelectState
       }
-    ) : selectedState ? /* @__PURE__ */ jsxs10("div", { className: "p-6 space-y-6 overflow-y-auto h-full", children: [
-      /* @__PURE__ */ jsxs10("div", { children: [
-        /* @__PURE__ */ jsxs10("div", { className: "flex items-center gap-2", children: [
-          /* @__PURE__ */ jsx10("h2", { className: "text-lg font-semibold text-text-primary", children: selectedState.name }),
-          selectedState.extra_metadata?.initial === true && /* @__PURE__ */ jsxs10("span", { className: "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] border bg-yellow-500/20 text-yellow-400 border-yellow-500/30", children: [
-            /* @__PURE__ */ jsx10(Play4, { className: "size-2.5 fill-current" }),
+    ) : selectedState ? /* @__PURE__ */ jsxs13("div", { className: "p-6 space-y-6 overflow-y-auto h-full", children: [
+      /* @__PURE__ */ jsxs13("div", { children: [
+        /* @__PURE__ */ jsxs13("div", { className: "flex items-center gap-2", children: [
+          /* @__PURE__ */ jsx13("h2", { className: "text-lg font-semibold text-text-primary", children: selectedState.name }),
+          selectedState.extra_metadata?.initial === true && /* @__PURE__ */ jsxs13("span", { className: "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] border bg-yellow-500/20 text-yellow-400 border-yellow-500/30", children: [
+            /* @__PURE__ */ jsx13(Play5, { className: "size-2.5 fill-current" }),
             "Initial"
           ] }),
-          selectedState.extra_metadata?.blocking === true && /* @__PURE__ */ jsxs10("span", { className: "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] border bg-amber-500/20 text-amber-400 border-amber-500/30", children: [
-            /* @__PURE__ */ jsx10(Lock2, { className: "size-2.5" }),
+          selectedState.extra_metadata?.blocking === true && /* @__PURE__ */ jsxs13("span", { className: "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] border bg-amber-500/20 text-amber-400 border-amber-500/30", children: [
+            /* @__PURE__ */ jsx13(Lock2, { className: "size-2.5" }),
             "Blocking"
           ] })
         ] }),
-        selectedState.description && /* @__PURE__ */ jsx10("p", { className: "text-sm text-text-muted mt-1", children: selectedState.description }),
-        /* @__PURE__ */ jsxs10("div", { className: "flex items-center gap-3 mt-2 text-xs text-text-muted", children: [
-          /* @__PURE__ */ jsxs10("span", { className: "inline-flex items-center rounded-full px-2 py-0.5 text-[10px] border bg-bg-secondary border-border-secondary text-text-muted", children: [
+        selectedState.description && /* @__PURE__ */ jsx13("p", { className: "text-sm text-text-muted mt-1", children: selectedState.description }),
+        /* @__PURE__ */ jsxs13("div", { className: "flex items-center gap-3 mt-2 text-xs text-text-muted", children: [
+          /* @__PURE__ */ jsxs13("span", { className: "inline-flex items-center rounded-full px-2 py-0.5 text-[10px] border bg-bg-secondary border-border-secondary text-text-muted", children: [
             selectedState.element_ids.length,
             " elements"
           ] }),
-          /* @__PURE__ */ jsxs10("span", { className: "inline-flex items-center rounded-full px-2 py-0.5 text-[10px] border bg-bg-secondary border-border-secondary text-text-muted", children: [
+          /* @__PURE__ */ jsxs13("span", { className: "inline-flex items-center rounded-full px-2 py-0.5 text-[10px] border bg-bg-secondary border-border-secondary text-text-muted", children: [
             selectedState.render_ids.length,
             " renders"
           ] }),
-          /* @__PURE__ */ jsxs10(
+          /* @__PURE__ */ jsxs13(
             "span",
             {
               className: `inline-flex items-center rounded-full px-2 py-0.5 text-[10px] border ${Math.round(selectedState.confidence * 100) >= 80 ? "bg-green-500/10 border-green-500/30 text-green-400" : "bg-amber-500/10 border-amber-500/30 text-amber-400"}`,
@@ -3700,35 +4643,35 @@ function StateViewPanel({
           )
         ] })
       ] }),
-      /* @__PURE__ */ jsxs10("div", { children: [
-        /* @__PURE__ */ jsx10("h3", { className: "text-sm font-medium text-text-primary mb-3", children: "Elements by Type" }),
-        /* @__PURE__ */ jsx10("div", { className: "space-y-3", children: Array.from(elementGroups.entries()).map(
+      /* @__PURE__ */ jsxs13("div", { children: [
+        /* @__PURE__ */ jsx13("h3", { className: "text-sm font-medium text-text-primary mb-3", children: "Elements by Type" }),
+        /* @__PURE__ */ jsx13("div", { className: "space-y-3", children: Array.from(elementGroups.entries()).map(
           ([prefix, elements]) => {
-            const Icon = ELEMENT_ICONS[prefix] ?? Layers4;
+            const Icon = ELEMENT_ICONS[prefix] ?? Layers5;
             const colorClass = ELEMENT_COLORS[prefix] ?? "border-gray-400 bg-gray-500/10 text-gray-300";
-            return /* @__PURE__ */ jsxs10("div", { children: [
-              /* @__PURE__ */ jsxs10("div", { className: "flex items-center gap-2 mb-1.5", children: [
-                /* @__PURE__ */ jsx10(Icon, { className: "size-3.5" }),
-                /* @__PURE__ */ jsx10("span", { className: "text-xs font-medium text-text-primary capitalize", children: prefix }),
-                /* @__PURE__ */ jsxs10("span", { className: "text-xs text-text-muted", children: [
+            return /* @__PURE__ */ jsxs13("div", { children: [
+              /* @__PURE__ */ jsxs13("div", { className: "flex items-center gap-2 mb-1.5", children: [
+                /* @__PURE__ */ jsx13(Icon, { className: "size-3.5" }),
+                /* @__PURE__ */ jsx13("span", { className: "text-xs font-medium text-text-primary capitalize", children: prefix }),
+                /* @__PURE__ */ jsxs13("span", { className: "text-xs text-text-muted", children: [
                   "(",
                   elements.length,
                   ")"
                 ] })
               ] }),
-              /* @__PURE__ */ jsx10("div", { className: "flex flex-wrap gap-1.5", children: elements.map((eid) => {
+              /* @__PURE__ */ jsx13("div", { className: "flex flex-wrap gap-1.5", children: elements.map((eid) => {
                 const stateCount = sharedElements.get(eid)?.length ?? 1;
                 const rawLabel = getElementLabel4(eid);
                 const descriptiveLabel = resolveElementLabel(eid, fingerprintDetails, selectedState);
                 const thumb = elementThumbnails?.[eid] ?? elementThumbnails?.[rawLabel];
-                return /* @__PURE__ */ jsx10(
+                return /* @__PURE__ */ jsx13(
                   "div",
                   {
                     className: `rounded border ${colorClass} overflow-hidden ${thumb ? "flex flex-col items-center w-16" : "text-[11px] px-2 py-0.5 inline-flex items-center gap-1"}`,
                     title: `${eid}${stateCount > 1 ? ` (shared across ${stateCount} states)` : ""}`,
-                    children: thumb ? /* @__PURE__ */ jsxs10(Fragment4, { children: [
-                      /* @__PURE__ */ jsxs10("div", { className: "relative", children: [
-                        /* @__PURE__ */ jsx10(
+                    children: thumb ? /* @__PURE__ */ jsxs13(Fragment4, { children: [
+                      /* @__PURE__ */ jsxs13("div", { className: "relative", children: [
+                        /* @__PURE__ */ jsx13(
                           "img",
                           {
                             src: thumb.startsWith("data:") ? thumb : `data:image/png;base64,${thumb}`,
@@ -3736,15 +4679,15 @@ function StateViewPanel({
                             className: "w-12 h-12 object-cover"
                           }
                         ),
-                        stateCount > 1 && /* @__PURE__ */ jsxs10("span", { className: "absolute -top-1 -right-1 text-[7px] bg-brand-primary/90 text-white px-1 rounded-full leading-tight", children: [
+                        stateCount > 1 && /* @__PURE__ */ jsxs13("span", { className: "absolute -top-1 -right-1 text-[7px] bg-brand-primary/90 text-white px-1 rounded-full leading-tight", children: [
                           "x",
                           stateCount
                         ] })
                       ] }),
-                      /* @__PURE__ */ jsx10("span", { className: "text-[8px] text-center px-0.5 py-0.5 truncate w-full leading-tight", children: descriptiveLabel })
-                    ] }) : /* @__PURE__ */ jsxs10(Fragment4, { children: [
+                      /* @__PURE__ */ jsx13("span", { className: "text-[8px] text-center px-0.5 py-0.5 truncate w-full leading-tight", children: descriptiveLabel })
+                    ] }) : /* @__PURE__ */ jsxs13(Fragment4, { children: [
                       descriptiveLabel,
-                      stateCount > 1 && /* @__PURE__ */ jsxs10("span", { className: "text-[8px] opacity-70 bg-white/10 px-0.5 rounded", children: [
+                      stateCount > 1 && /* @__PURE__ */ jsxs13("span", { className: "text-[8px] opacity-70 bg-white/10 px-0.5 rounded", children: [
                         "x",
                         stateCount
                       ] })
@@ -3757,7 +4700,7 @@ function StateViewPanel({
           }
         ) })
       ] }),
-      /* @__PURE__ */ jsx10(
+      /* @__PURE__ */ jsx13(
         StateLayoutView,
         {
           state: selectedState,
@@ -3765,20 +4708,20 @@ function StateViewPanel({
           fingerprintDetails
         }
       ),
-      /* @__PURE__ */ jsxs10("div", { children: [
-        /* @__PURE__ */ jsx10("h3", { className: "text-sm font-medium text-text-primary mb-3", children: "Transitions" }),
-        /* @__PURE__ */ jsxs10("div", { className: "space-y-2", children: [
+      /* @__PURE__ */ jsxs13("div", { children: [
+        /* @__PURE__ */ jsx13("h3", { className: "text-sm font-medium text-text-primary mb-3", children: "Transitions" }),
+        /* @__PURE__ */ jsxs13("div", { className: "space-y-2", children: [
           (transitionMap.outgoing.get(selectedState.state_id) ?? []).map(
-            (t) => /* @__PURE__ */ jsxs10(
+            (t) => /* @__PURE__ */ jsxs13(
               "div",
               {
                 className: "flex items-center gap-2 text-xs p-2.5 rounded-lg bg-bg-secondary border border-border-secondary",
                 children: [
-                  /* @__PURE__ */ jsx10(ArrowRight2, { className: "size-3 text-brand-secondary shrink-0" }),
-                  /* @__PURE__ */ jsx10("span", { className: "font-medium text-text-primary", children: t.name }),
-                  t.actions.length > 0 && /* @__PURE__ */ jsx10("span", { className: "flex items-center gap-0.5 shrink-0", children: [...new Set(t.actions.map((a) => a.type))].slice(0, 3).map((actionType) => {
+                  /* @__PURE__ */ jsx13(ArrowRight4, { className: "size-3 text-brand-secondary shrink-0" }),
+                  /* @__PURE__ */ jsx13("span", { className: "font-medium text-text-primary", children: t.name }),
+                  t.actions.length > 0 && /* @__PURE__ */ jsx13("span", { className: "flex items-center gap-0.5 shrink-0", children: [...new Set(t.actions.map((a) => a.type))].slice(0, 3).map((actionType) => {
                     const ActionIcon = ACTION_ICONS3[actionType];
-                    return ActionIcon ? /* @__PURE__ */ jsx10(
+                    return ActionIcon ? /* @__PURE__ */ jsx13(
                       ActionIcon,
                       {
                         className: `size-2.5 ${getActionTypeColor(actionType)}`
@@ -3786,32 +4729,32 @@ function StateViewPanel({
                       actionType
                     ) : null;
                   }) }),
-                  /* @__PURE__ */ jsx10(ArrowRight2, { className: "size-2.5 text-text-muted" }),
-                  /* @__PURE__ */ jsx10("span", { className: "text-text-muted truncate", children: t.activate_states.map(
+                  /* @__PURE__ */ jsx13(ArrowRight4, { className: "size-2.5 text-text-muted" }),
+                  /* @__PURE__ */ jsx13("span", { className: "text-text-muted truncate", children: t.activate_states.map(
                     (sid) => states.find((s) => s.state_id === sid)?.name ?? sid
                   ).join(", ") }),
-                  t.actions.length > 0 && /* @__PURE__ */ jsxs10("span", { className: "text-text-muted ml-auto text-[10px] shrink-0", children: [
+                  t.actions.length > 0 && /* @__PURE__ */ jsxs13("span", { className: "text-text-muted ml-auto text-[10px] shrink-0", children: [
                     t.actions.length,
                     " action",
                     t.actions.length !== 1 ? "s" : ""
                   ] }),
-                  t.stays_visible && /* @__PURE__ */ jsx10(Eye3, { className: "size-3 text-green-400 shrink-0" })
+                  t.stays_visible && /* @__PURE__ */ jsx13(Eye3, { className: "size-3 text-green-400 shrink-0" })
                 ]
               },
               `out-${t.transition_id}`
             )
           ),
           (transitionMap.incoming.get(selectedState.state_id) ?? []).map(
-            (t) => /* @__PURE__ */ jsxs10(
+            (t) => /* @__PURE__ */ jsxs13(
               "div",
               {
                 className: "flex items-center gap-2 text-xs p-2.5 rounded-lg bg-bg-secondary border border-border-secondary",
                 children: [
-                  /* @__PURE__ */ jsx10(CheckCircle, { className: "size-3 text-brand-primary shrink-0" }),
-                  /* @__PURE__ */ jsx10("span", { className: "font-medium text-text-primary", children: t.name }),
-                  t.actions.length > 0 && /* @__PURE__ */ jsx10("span", { className: "flex items-center gap-0.5 shrink-0", children: [...new Set(t.actions.map((a) => a.type))].slice(0, 3).map((actionType) => {
+                  /* @__PURE__ */ jsx13(CheckCircle, { className: "size-3 text-brand-primary shrink-0" }),
+                  /* @__PURE__ */ jsx13("span", { className: "font-medium text-text-primary", children: t.name }),
+                  t.actions.length > 0 && /* @__PURE__ */ jsx13("span", { className: "flex items-center gap-0.5 shrink-0", children: [...new Set(t.actions.map((a) => a.type))].slice(0, 3).map((actionType) => {
                     const ActionIcon = ACTION_ICONS3[actionType];
-                    return ActionIcon ? /* @__PURE__ */ jsx10(
+                    return ActionIcon ? /* @__PURE__ */ jsx13(
                       ActionIcon,
                       {
                         className: `size-2.5 ${getActionTypeColor(actionType)}`
@@ -3819,7 +4762,7 @@ function StateViewPanel({
                       actionType
                     ) : null;
                   }) }),
-                  /* @__PURE__ */ jsxs10("span", { className: "text-text-muted truncate", children: [
+                  /* @__PURE__ */ jsxs13("span", { className: "text-text-muted truncate", children: [
                     "from",
                     " ",
                     t.from_states.map(
@@ -3831,36 +4774,36 @@ function StateViewPanel({
               `in-${t.transition_id}`
             )
           ),
-          (transitionMap.outgoing.get(selectedState.state_id) ?? []).length === 0 && (transitionMap.incoming.get(selectedState.state_id) ?? []).length === 0 && /* @__PURE__ */ jsx10("p", { className: "text-xs text-text-muted", children: "No transitions connected." })
+          (transitionMap.outgoing.get(selectedState.state_id) ?? []).length === 0 && (transitionMap.incoming.get(selectedState.state_id) ?? []).length === 0 && /* @__PURE__ */ jsx13("p", { className: "text-xs text-text-muted", children: "No transitions connected." })
         ] })
       ] }),
-      selectedState.acceptance_criteria.length > 0 && /* @__PURE__ */ jsxs10("div", { children: [
-        /* @__PURE__ */ jsx10("h3", { className: "text-sm font-medium text-text-primary mb-2", children: "Acceptance Criteria" }),
-        /* @__PURE__ */ jsx10("ul", { className: "space-y-1", children: selectedState.acceptance_criteria.map((criteria, i) => /* @__PURE__ */ jsxs10(
+      selectedState.acceptance_criteria.length > 0 && /* @__PURE__ */ jsxs13("div", { children: [
+        /* @__PURE__ */ jsx13("h3", { className: "text-sm font-medium text-text-primary mb-2", children: "Acceptance Criteria" }),
+        /* @__PURE__ */ jsx13("ul", { className: "space-y-1", children: selectedState.acceptance_criteria.map((criteria, i) => /* @__PURE__ */ jsxs13(
           "li",
           {
             className: "text-xs text-text-muted flex items-start gap-1.5",
             children: [
-              /* @__PURE__ */ jsx10(CheckCircle, { className: "size-3 text-green-500 mt-0.5 shrink-0" }),
+              /* @__PURE__ */ jsx13(CheckCircle, { className: "size-3 text-green-500 mt-0.5 shrink-0" }),
               criteria
             ]
           },
           `${i}-${criteria}`
         )) })
       ] }),
-      selectedState.domain_knowledge.length > 0 && /* @__PURE__ */ jsxs10("div", { children: [
-        /* @__PURE__ */ jsxs10("h3", { className: "text-sm font-medium text-text-primary mb-2", children: [
-          /* @__PURE__ */ jsx10(BookOpen, { className: "size-3.5 inline mr-1" }),
+      selectedState.domain_knowledge.length > 0 && /* @__PURE__ */ jsxs13("div", { children: [
+        /* @__PURE__ */ jsxs13("h3", { className: "text-sm font-medium text-text-primary mb-2", children: [
+          /* @__PURE__ */ jsx13(BookOpen, { className: "size-3.5 inline mr-1" }),
           "Domain Knowledge"
         ] }),
-        /* @__PURE__ */ jsx10("div", { className: "space-y-2", children: selectedState.domain_knowledge.map((dk) => /* @__PURE__ */ jsxs10(
+        /* @__PURE__ */ jsx13("div", { className: "space-y-2", children: selectedState.domain_knowledge.map((dk) => /* @__PURE__ */ jsxs13(
           "div",
           {
             className: "p-3 rounded-lg bg-bg-secondary border border-border-secondary",
             children: [
-              /* @__PURE__ */ jsx10("div", { className: "text-xs font-medium text-text-primary", children: dk.title }),
-              /* @__PURE__ */ jsx10("div", { className: "text-[10px] text-text-muted mt-1 line-clamp-3", children: dk.content }),
-              dk.tags.length > 0 && /* @__PURE__ */ jsx10("div", { className: "flex flex-wrap gap-1 mt-1.5", children: dk.tags.map((tag) => /* @__PURE__ */ jsx10(
+              /* @__PURE__ */ jsx13("div", { className: "text-xs font-medium text-text-primary", children: dk.title }),
+              /* @__PURE__ */ jsx13("div", { className: "text-[10px] text-text-muted mt-1 line-clamp-3", children: dk.content }),
+              dk.tags.length > 0 && /* @__PURE__ */ jsx13("div", { className: "flex flex-wrap gap-1 mt-1.5", children: dk.tags.map((tag) => /* @__PURE__ */ jsx13(
                 "span",
                 {
                   className: "text-[9px] px-1.5 py-0.5 rounded-full bg-brand-primary/10 text-brand-primary",
@@ -3873,27 +4816,27 @@ function StateViewPanel({
           dk.id
         )) })
       ] }),
-      /* @__PURE__ */ jsxs10("div", { className: "text-xs text-text-muted space-y-1 pt-3 border-t border-border-secondary", children: [
-        /* @__PURE__ */ jsxs10("div", { children: [
+      /* @__PURE__ */ jsxs13("div", { className: "text-xs text-text-muted space-y-1 pt-3 border-t border-border-secondary", children: [
+        /* @__PURE__ */ jsxs13("div", { children: [
           "State ID:",
           " ",
-          /* @__PURE__ */ jsx10("code", { className: "bg-bg-secondary px-1 rounded", children: selectedState.state_id })
+          /* @__PURE__ */ jsx13("code", { className: "bg-bg-secondary px-1 rounded", children: selectedState.state_id })
         ] }),
-        /* @__PURE__ */ jsxs10("div", { children: [
+        /* @__PURE__ */ jsxs13("div", { children: [
           "Created:",
           " ",
           new Date(selectedState.created_at).toLocaleDateString()
         ] }),
-        /* @__PURE__ */ jsxs10("div", { children: [
+        /* @__PURE__ */ jsxs13("div", { children: [
           "Updated:",
           " ",
           new Date(selectedState.updated_at).toLocaleDateString()
         ] })
       ] })
-    ] }) : /* @__PURE__ */ jsx10("div", { className: "flex items-center justify-center h-full text-text-muted", children: /* @__PURE__ */ jsxs10("div", { className: "text-center", children: [
-      /* @__PURE__ */ jsx10(Layers4, { className: "size-12 mx-auto mb-3 opacity-30" }),
-      /* @__PURE__ */ jsx10("p", { className: "text-sm", children: "Select a state to view its details" }),
-      /* @__PURE__ */ jsxs10("p", { className: "text-xs mt-1 text-text-muted/70", children: [
+    ] }) : /* @__PURE__ */ jsx13("div", { className: "flex items-center justify-center h-full text-text-muted", children: /* @__PURE__ */ jsxs13("div", { className: "text-center", children: [
+      /* @__PURE__ */ jsx13(Layers5, { className: "size-12 mx-auto mb-3 opacity-30" }),
+      /* @__PURE__ */ jsx13("p", { className: "text-sm", children: "Select a state to view its details" }),
+      /* @__PURE__ */ jsxs13("p", { className: "text-xs mt-1 text-text-muted/70", children: [
         states.length,
         " state",
         states.length !== 1 ? "s" : "",
@@ -3904,23 +4847,23 @@ function StateViewPanel({
 }
 
 // src/components/state-machine/PathfindingPanel.tsx
-import { useState as useState9, useCallback as useCallback8 } from "react";
+import { useState as useState10, useCallback as useCallback9 } from "react";
 import {
   findPath
 } from "@qontinui/workflow-utils";
-import { Fragment as Fragment5, jsx as jsx11, jsxs as jsxs11 } from "react/jsx-runtime";
+import { Fragment as Fragment5, jsx as jsx14, jsxs as jsxs14 } from "react/jsx-runtime";
 function PathfindingPanel({
   states,
   transitions,
   onPathFound,
   onFindPath
 }) {
-  const [fromStateId, setFromStateId] = useState9("");
-  const [targetStateId, setTargetStateId] = useState9("");
-  const [algorithm, setAlgorithm] = useState9("dijkstra");
-  const [result, setResult] = useState9(null);
-  const [isSearching, setIsSearching] = useState9(false);
-  const handleFind = useCallback8(async () => {
+  const [fromStateId, setFromStateId] = useState10("");
+  const [targetStateId, setTargetStateId] = useState10("");
+  const [algorithm, setAlgorithm] = useState10("dijkstra");
+  const [result, setResult] = useState10(null);
+  const [isSearching, setIsSearching] = useState10(false);
+  const handleFind = useCallback9(async () => {
     if (!fromStateId || !targetStateId) return;
     setIsSearching(true);
     try {
@@ -3947,17 +4890,17 @@ function PathfindingPanel({
     onFindPath,
     onPathFound
   ]);
-  const clearResult = useCallback8(() => {
+  const clearResult = useCallback9(() => {
     setResult(null);
     onPathFound?.({ found: false, steps: [], total_cost: 0 });
   }, [onPathFound]);
   const stateName = (stateId) => states.find((s) => s.state_id === stateId)?.name ?? stateId;
-  return /* @__PURE__ */ jsxs11("div", { className: "flex flex-col gap-4 p-4", children: [
-    /* @__PURE__ */ jsx11("h3", { className: "text-sm font-semibold text-text-primary", children: "Pathfinding" }),
-    /* @__PURE__ */ jsxs11("div", { className: "grid grid-cols-2 gap-3", children: [
-      /* @__PURE__ */ jsxs11("div", { children: [
-        /* @__PURE__ */ jsx11("label", { className: "block text-xs text-text-secondary mb-1", children: "From" }),
-        /* @__PURE__ */ jsxs11(
+  return /* @__PURE__ */ jsxs14("div", { className: "flex flex-col gap-4 p-4", children: [
+    /* @__PURE__ */ jsx14("h3", { className: "text-sm font-semibold text-text-primary", children: "Pathfinding" }),
+    /* @__PURE__ */ jsxs14("div", { className: "grid grid-cols-2 gap-3", children: [
+      /* @__PURE__ */ jsxs14("div", { children: [
+        /* @__PURE__ */ jsx14("label", { className: "block text-xs text-text-secondary mb-1", children: "From" }),
+        /* @__PURE__ */ jsxs14(
           "select",
           {
             value: fromStateId,
@@ -3965,15 +4908,15 @@ function PathfindingPanel({
             className: "w-full px-2 py-1.5 text-sm bg-bg-tertiary border border-border-secondary rounded text-text-primary [&>option]:text-black [&>option]:bg-white",
             style: { colorScheme: "dark" },
             children: [
-              /* @__PURE__ */ jsx11("option", { value: "", children: "Select state..." }),
-              states.map((s) => /* @__PURE__ */ jsx11("option", { value: s.state_id, children: s.name }, s.state_id))
+              /* @__PURE__ */ jsx14("option", { value: "", children: "Select state..." }),
+              states.map((s) => /* @__PURE__ */ jsx14("option", { value: s.state_id, children: s.name }, s.state_id))
             ]
           }
         )
       ] }),
-      /* @__PURE__ */ jsxs11("div", { children: [
-        /* @__PURE__ */ jsx11("label", { className: "block text-xs text-text-secondary mb-1", children: "To" }),
-        /* @__PURE__ */ jsxs11(
+      /* @__PURE__ */ jsxs14("div", { children: [
+        /* @__PURE__ */ jsx14("label", { className: "block text-xs text-text-secondary mb-1", children: "To" }),
+        /* @__PURE__ */ jsxs14(
           "select",
           {
             value: targetStateId,
@@ -3981,15 +4924,15 @@ function PathfindingPanel({
             className: "w-full px-2 py-1.5 text-sm bg-bg-tertiary border border-border-secondary rounded text-text-primary [&>option]:text-black [&>option]:bg-white",
             style: { colorScheme: "dark" },
             children: [
-              /* @__PURE__ */ jsx11("option", { value: "", children: "Select state..." }),
-              states.map((s) => /* @__PURE__ */ jsx11("option", { value: s.state_id, children: s.name }, s.state_id))
+              /* @__PURE__ */ jsx14("option", { value: "", children: "Select state..." }),
+              states.map((s) => /* @__PURE__ */ jsx14("option", { value: s.state_id, children: s.name }, s.state_id))
             ]
           }
         )
       ] })
     ] }),
-    /* @__PURE__ */ jsxs11("div", { className: "flex gap-2", children: [
-      !onFindPath && /* @__PURE__ */ jsxs11(
+    /* @__PURE__ */ jsxs14("div", { className: "flex gap-2", children: [
+      !onFindPath && /* @__PURE__ */ jsxs14(
         "select",
         {
           value: algorithm,
@@ -3997,21 +4940,21 @@ function PathfindingPanel({
           className: "px-2 py-1.5 text-sm bg-bg-tertiary border border-border-secondary rounded text-text-primary [&>option]:text-black [&>option]:bg-white",
           style: { colorScheme: "dark" },
           children: [
-            /* @__PURE__ */ jsx11("option", { value: "dijkstra", children: "Dijkstra (cheapest)" }),
-            /* @__PURE__ */ jsx11("option", { value: "bfs", children: "BFS (shortest)" })
+            /* @__PURE__ */ jsx14("option", { value: "dijkstra", children: "Dijkstra (cheapest)" }),
+            /* @__PURE__ */ jsx14("option", { value: "bfs", children: "BFS (shortest)" })
           ]
         }
       ),
-      /* @__PURE__ */ jsx11(
+      /* @__PURE__ */ jsx14(
         "button",
         {
           onClick: handleFind,
           disabled: !fromStateId || !targetStateId || isSearching,
           className: "flex-1 px-3 py-1.5 text-sm font-medium text-white bg-brand-primary hover:bg-brand-primary/90 disabled:opacity-50 disabled:cursor-not-allowed rounded",
-          children: /* @__PURE__ */ jsx11("span", { children: isSearching ? "Searching..." : "Find Path" })
+          children: /* @__PURE__ */ jsx14("span", { children: isSearching ? "Searching..." : "Find Path" })
         }
       ),
-      result && /* @__PURE__ */ jsx11(
+      result && /* @__PURE__ */ jsx14(
         "button",
         {
           onClick: clearResult,
@@ -4020,41 +4963,41 @@ function PathfindingPanel({
         }
       )
     ] }),
-    result && /* @__PURE__ */ jsx11("div", { className: "border-t border-border-secondary pt-3", children: result.found ? /* @__PURE__ */ jsxs11(Fragment5, { children: [
-      /* @__PURE__ */ jsxs11("div", { className: "flex items-center justify-between mb-2", children: [
-        /* @__PURE__ */ jsxs11("span", { className: "text-xs text-green-400 font-medium", children: [
+    result && /* @__PURE__ */ jsx14("div", { className: "border-t border-border-secondary pt-3", children: result.found ? /* @__PURE__ */ jsxs14(Fragment5, { children: [
+      /* @__PURE__ */ jsxs14("div", { className: "flex items-center justify-between mb-2", children: [
+        /* @__PURE__ */ jsxs14("span", { className: "text-xs text-green-400 font-medium", children: [
           "Path found (",
           result.steps.length,
           " step",
           result.steps.length !== 1 ? "s" : "",
           ")"
         ] }),
-        /* @__PURE__ */ jsxs11("span", { className: "text-xs text-text-secondary", children: [
+        /* @__PURE__ */ jsxs14("span", { className: "text-xs text-text-secondary", children: [
           "Total cost: ",
           result.total_cost.toFixed(1)
         ] })
       ] }),
-      result.steps.length === 0 ? /* @__PURE__ */ jsx11("p", { className: "text-xs text-text-secondary italic", children: "Already at target state" }) : /* @__PURE__ */ jsx11("div", { className: "space-y-1.5", children: result.steps.map((step, i) => /* @__PURE__ */ jsxs11(
+      result.steps.length === 0 ? /* @__PURE__ */ jsx14("p", { className: "text-xs text-text-secondary italic", children: "Already at target state" }) : /* @__PURE__ */ jsx14("div", { className: "space-y-1.5", children: result.steps.map((step, i) => /* @__PURE__ */ jsxs14(
         "div",
         {
           className: "p-2 bg-bg-tertiary border border-border-secondary rounded text-xs",
           children: [
-            /* @__PURE__ */ jsxs11("div", { className: "flex items-center justify-between", children: [
-              /* @__PURE__ */ jsxs11("span", { className: "font-medium text-text-primary", children: [
+            /* @__PURE__ */ jsxs14("div", { className: "flex items-center justify-between", children: [
+              /* @__PURE__ */ jsxs14("span", { className: "font-medium text-text-primary", children: [
                 i + 1,
                 ". ",
                 step.transition_name
               ] }),
-              /* @__PURE__ */ jsxs11("span", { className: "text-text-secondary", children: [
+              /* @__PURE__ */ jsxs14("span", { className: "text-text-secondary", children: [
                 "cost: ",
                 step.path_cost.toFixed(1)
               ] })
             ] }),
-            /* @__PURE__ */ jsxs11("div", { className: "mt-1 text-text-secondary", children: [
+            /* @__PURE__ */ jsxs14("div", { className: "mt-1 text-text-secondary", children: [
               step.from_states.map(stateName).join(", "),
               " \u2192 ",
               step.activate_states.map(stateName).join(", "),
-              step.exit_states.length > 0 && /* @__PURE__ */ jsxs11("span", { className: "text-red-400", children: [
+              step.exit_states.length > 0 && /* @__PURE__ */ jsxs14("span", { className: "text-red-400", children: [
                 " (exits: ",
                 step.exit_states.map(stateName).join(", "),
                 ")"
@@ -4064,38 +5007,38 @@ function PathfindingPanel({
         },
         `${i}-${step.transition_name}`
       )) })
-    ] }) : /* @__PURE__ */ jsx11("div", { className: "text-xs text-red-400", children: result.error ?? "No path found between the specified states" }) })
+    ] }) : /* @__PURE__ */ jsx14("div", { className: "text-xs text-red-400", children: result.error ?? "No path found between the specified states" }) })
   ] });
 }
 
 // src/components/state-machine/StateViewTable.tsx
-import { useState as useState10, useMemo as useMemo8 } from "react";
+import { useState as useState11, useMemo as useMemo9 } from "react";
 import {
   getElementTypeStyle as getElementTypeStyle2,
   getElementTypePrefix as getElementTypePrefix4,
   getConfidenceColor as getConfidenceColor2
 } from "@qontinui/workflow-utils";
-import { jsx as jsx12, jsxs as jsxs12 } from "react/jsx-runtime";
+import { jsx as jsx15, jsxs as jsxs15 } from "react/jsx-runtime";
 function StateViewTable({
   states,
   selectedStateId,
   onSelectState
 }) {
-  const [filter, setFilter] = useState10("");
-  const filteredStates = useMemo8(() => {
+  const [filter, setFilter] = useState11("");
+  const filteredStates = useMemo9(() => {
     if (!filter.trim()) return states;
     const q = filter.toLowerCase();
     return states.filter(
       (s) => s.name.toLowerCase().includes(q) || s.element_ids.some((eid) => eid.toLowerCase().includes(q))
     );
   }, [states, filter]);
-  return /* @__PURE__ */ jsxs12("div", { className: "flex flex-col gap-3 p-4", children: [
-    /* @__PURE__ */ jsx12("div", { className: "flex items-center justify-between", children: /* @__PURE__ */ jsxs12("h3", { className: "text-sm font-semibold text-text-primary", children: [
+  return /* @__PURE__ */ jsxs15("div", { className: "flex flex-col gap-3 p-4", children: [
+    /* @__PURE__ */ jsx15("div", { className: "flex items-center justify-between", children: /* @__PURE__ */ jsxs15("h3", { className: "text-sm font-semibold text-text-primary", children: [
       "States (",
       states.length,
       ")"
     ] }) }),
-    /* @__PURE__ */ jsx12(
+    /* @__PURE__ */ jsx15(
       "input",
       {
         type: "text",
@@ -4105,7 +5048,7 @@ function StateViewTable({
         className: "w-full px-2 py-1.5 text-sm bg-bg-tertiary border border-border-secondary rounded text-text-primary placeholder:text-text-muted"
       }
     ),
-    /* @__PURE__ */ jsxs12("div", { className: "space-y-1", children: [
+    /* @__PURE__ */ jsxs15("div", { className: "space-y-1", children: [
       filteredStates.map((state) => {
         const isSelected = state.state_id === selectedStateId;
         const confidenceColor = getConfidenceColor2(state.confidence);
@@ -4118,29 +5061,29 @@ function StateViewTable({
         const sortedTypes = Array.from(typeCounts.entries()).sort(
           (a, b) => b[1] - a[1]
         );
-        return /* @__PURE__ */ jsxs12(
+        return /* @__PURE__ */ jsxs15(
           "button",
           {
             onClick: () => onSelectState(isSelected ? null : state.state_id),
             className: `w-full text-left p-2.5 rounded border transition-colors ${isSelected ? "bg-brand-primary/10 border-brand-primary/30" : "bg-bg-tertiary border-border-secondary hover:border-text-muted"}`,
             children: [
-              /* @__PURE__ */ jsxs12("div", { className: "flex items-center justify-between mb-1", children: [
-                /* @__PURE__ */ jsx12("span", { className: "text-sm font-medium text-text-primary truncate", children: state.name }),
-                /* @__PURE__ */ jsxs12("div", { className: "flex items-center gap-2 text-xs shrink-0 ml-2", children: [
-                  /* @__PURE__ */ jsxs12("span", { className: "text-text-secondary", children: [
+              /* @__PURE__ */ jsxs15("div", { className: "flex items-center justify-between mb-1", children: [
+                /* @__PURE__ */ jsx15("span", { className: "text-sm font-medium text-text-primary truncate", children: state.name }),
+                /* @__PURE__ */ jsxs15("div", { className: "flex items-center gap-2 text-xs shrink-0 ml-2", children: [
+                  /* @__PURE__ */ jsxs15("span", { className: "text-text-secondary", children: [
                     state.element_ids.length,
                     " el"
                   ] }),
-                  /* @__PURE__ */ jsxs12("span", { className: confidenceColor, children: [
+                  /* @__PURE__ */ jsxs15("span", { className: confidenceColor, children: [
                     confidencePct,
                     "%"
                   ] })
                 ] })
               ] }),
-              sortedTypes.length > 0 && /* @__PURE__ */ jsxs12("div", { className: "flex flex-wrap gap-1 mt-1", children: [
+              sortedTypes.length > 0 && /* @__PURE__ */ jsxs15("div", { className: "flex flex-wrap gap-1 mt-1", children: [
                 sortedTypes.slice(0, 5).map(([prefix, count]) => {
                   const style = getElementTypeStyle2(`${prefix}:dummy`);
-                  return /* @__PURE__ */ jsxs12(
+                  return /* @__PURE__ */ jsxs15(
                     "span",
                     {
                       className: `px-1.5 py-0.5 text-[10px] rounded border ${style.bg} ${style.text} ${style.border}`,
@@ -4153,27 +5096,27 @@ function StateViewTable({
                     prefix
                   );
                 }),
-                sortedTypes.length > 5 && /* @__PURE__ */ jsxs12("span", { className: "px-1 py-0.5 text-[10px] text-text-muted", children: [
+                sortedTypes.length > 5 && /* @__PURE__ */ jsxs15("span", { className: "px-1 py-0.5 text-[10px] text-text-muted", children: [
                   "+",
                   sortedTypes.length - 5,
                   " more"
                 ] })
               ] }),
-              state.description && /* @__PURE__ */ jsx12("p", { className: "text-xs text-text-secondary mt-1 line-clamp-1", children: state.description })
+              state.description && /* @__PURE__ */ jsx15("p", { className: "text-xs text-text-secondary mt-1 line-clamp-1", children: state.description })
             ]
           },
           state.state_id
         );
       }),
-      filteredStates.length === 0 && /* @__PURE__ */ jsx12("p", { className: "text-xs text-text-muted italic text-center py-4", children: filter ? "No states match the filter" : "No states in this config" })
+      filteredStates.length === 0 && /* @__PURE__ */ jsx15("p", { className: "text-xs text-text-muted italic text-center py-4", children: filter ? "No states match the filter" : "No states in this config" })
     ] })
   ] });
 }
 
 // src/components/state-machine/DiagramTab.tsx
-import { useEffect as useEffect8, useRef as useRef5, useState as useState11 } from "react";
-import { RefreshCw, Loader2, Workflow } from "lucide-react";
-import { jsx as jsx13, jsxs as jsxs13 } from "react/jsx-runtime";
+import { useEffect as useEffect9, useRef as useRef6, useState as useState12 } from "react";
+import { RefreshCw as RefreshCw2, Loader2, Workflow } from "lucide-react";
+import { jsx as jsx16, jsxs as jsxs16 } from "react/jsx-runtime";
 function DiagramTab({
   activeStateIds,
   diagramSource,
@@ -4181,10 +5124,10 @@ function DiagramTab({
   onRefresh,
   unavailableReason
 }) {
-  const containerRef = useRef5(null);
-  const [importError, setImportError] = useState11(null);
-  const [renderError, setRenderError] = useState11(null);
-  useEffect8(() => {
+  const containerRef = useRef6(null);
+  const [importError, setImportError] = useState12(null);
+  const [renderError, setRenderError] = useState12(null);
+  useEffect9(() => {
     if (unavailableReason) {
       if (containerRef.current) containerRef.current.innerHTML = "";
       setRenderError(null);
@@ -4238,12 +5181,12 @@ function DiagramTab({
     };
   }, [diagramSource, unavailableReason]);
   const hasSource = !!diagramSource && diagramSource.trim().length > 0;
-  return /* @__PURE__ */ jsxs13("div", { className: "flex flex-col h-full w-full", children: [
-    /* @__PURE__ */ jsxs13("div", { className: "flex items-center justify-between px-6 py-3 border-b border-border-primary bg-surface-primary", children: [
-      /* @__PURE__ */ jsxs13("div", { className: "flex items-center gap-2", children: [
-        /* @__PURE__ */ jsx13(Workflow, { className: "size-4 text-brand-primary" }),
-        /* @__PURE__ */ jsx13("h2", { className: "text-sm font-semibold text-text-primary", children: "State Machine Diagram" }),
-        activeStateIds && activeStateIds.length > 0 && /* @__PURE__ */ jsxs13("span", { className: "text-xs text-text-muted ml-2", children: [
+  return /* @__PURE__ */ jsxs16("div", { className: "flex flex-col h-full w-full", children: [
+    /* @__PURE__ */ jsxs16("div", { className: "flex items-center justify-between px-6 py-3 border-b border-border-primary bg-surface-primary", children: [
+      /* @__PURE__ */ jsxs16("div", { className: "flex items-center gap-2", children: [
+        /* @__PURE__ */ jsx16(Workflow, { className: "size-4 text-brand-primary" }),
+        /* @__PURE__ */ jsx16("h2", { className: "text-sm font-semibold text-text-primary", children: "State Machine Diagram" }),
+        activeStateIds && activeStateIds.length > 0 && /* @__PURE__ */ jsxs16("span", { className: "text-xs text-text-muted ml-2", children: [
           "(highlighting ",
           activeStateIds.length,
           " hypothetical active state",
@@ -4251,7 +5194,7 @@ function DiagramTab({
           ")"
         ] })
       ] }),
-      onRefresh && /* @__PURE__ */ jsxs13(
+      onRefresh && /* @__PURE__ */ jsxs16(
         "button",
         {
           type: "button",
@@ -4259,8 +5202,8 @@ function DiagramTab({
           disabled: isLoading,
           className: "inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium border border-border-primary text-text-primary hover:bg-surface-secondary disabled:opacity-50",
           children: [
-            /* @__PURE__ */ jsx13(
-              RefreshCw,
+            /* @__PURE__ */ jsx16(
+              RefreshCw2,
               {
                 className: `size-3.5 ${isLoading ? "animate-spin" : ""}`
               }
@@ -4270,33 +5213,33 @@ function DiagramTab({
         }
       )
     ] }),
-    /* @__PURE__ */ jsxs13("div", { className: "flex-1 min-h-0 overflow-auto p-6 bg-surface-secondary", children: [
-      unavailableReason && /* @__PURE__ */ jsx13("div", { className: "flex items-center justify-center h-full text-text-muted text-sm text-center px-6", children: unavailableReason }),
-      !unavailableReason && isLoading && /* @__PURE__ */ jsxs13("div", { className: "flex items-center justify-center h-full text-text-muted gap-2", children: [
-        /* @__PURE__ */ jsx13(Loader2, { className: "size-4 animate-spin" }),
+    /* @__PURE__ */ jsxs16("div", { className: "flex-1 min-h-0 overflow-auto p-6 bg-surface-secondary", children: [
+      unavailableReason && /* @__PURE__ */ jsx16("div", { className: "flex items-center justify-center h-full text-text-muted text-sm text-center px-6", children: unavailableReason }),
+      !unavailableReason && isLoading && /* @__PURE__ */ jsxs16("div", { className: "flex items-center justify-center h-full text-text-muted gap-2", children: [
+        /* @__PURE__ */ jsx16(Loader2, { className: "size-4 animate-spin" }),
         "Loading diagram\u2026"
       ] }),
-      !unavailableReason && !isLoading && importError && /* @__PURE__ */ jsxs13("div", { className: "max-w-xl mx-auto p-4 border border-border-primary rounded-md bg-surface-primary text-sm text-text-primary", children: [
-        /* @__PURE__ */ jsx13("p", { className: "font-semibold mb-1", children: "Mermaid is not available in this bundle." }),
-        /* @__PURE__ */ jsxs13("p", { className: "text-text-muted", children: [
+      !unavailableReason && !isLoading && importError && /* @__PURE__ */ jsxs16("div", { className: "max-w-xl mx-auto p-4 border border-border-primary rounded-md bg-surface-primary text-sm text-text-primary", children: [
+        /* @__PURE__ */ jsx16("p", { className: "font-semibold mb-1", children: "Mermaid is not available in this bundle." }),
+        /* @__PURE__ */ jsxs16("p", { className: "text-text-muted", children: [
           "Install ",
-          /* @__PURE__ */ jsx13("code", { className: "font-mono", children: "mermaid" }),
+          /* @__PURE__ */ jsx16("code", { className: "font-mono", children: "mermaid" }),
           " (e.g.",
           " ",
-          /* @__PURE__ */ jsx13("code", { className: "font-mono", children: "npm install mermaid" }),
+          /* @__PURE__ */ jsx16("code", { className: "font-mono", children: "npm install mermaid" }),
           ") to enable the Diagram tab."
         ] }),
-        /* @__PURE__ */ jsxs13("p", { className: "text-xs text-text-muted mt-2", children: [
+        /* @__PURE__ */ jsxs16("p", { className: "text-xs text-text-muted mt-2", children: [
           "Import error: ",
           importError
         ] })
       ] }),
-      !unavailableReason && !isLoading && !importError && !hasSource && /* @__PURE__ */ jsx13("div", { className: "flex items-center justify-center h-full text-text-muted", children: "No diagram available" }),
-      !unavailableReason && !isLoading && !importError && hasSource && renderError && /* @__PURE__ */ jsxs13("div", { className: "max-w-xl mx-auto p-4 border border-border-primary rounded-md bg-surface-primary text-sm", children: [
-        /* @__PURE__ */ jsx13("p", { className: "font-semibold mb-1 text-text-primary", children: "Failed to render diagram." }),
-        /* @__PURE__ */ jsx13("pre", { className: "text-xs text-text-muted whitespace-pre-wrap", children: renderError })
+      !unavailableReason && !isLoading && !importError && !hasSource && /* @__PURE__ */ jsx16("div", { className: "flex items-center justify-center h-full text-text-muted", children: "No diagram available" }),
+      !unavailableReason && !isLoading && !importError && hasSource && renderError && /* @__PURE__ */ jsxs16("div", { className: "max-w-xl mx-auto p-4 border border-border-primary rounded-md bg-surface-primary text-sm", children: [
+        /* @__PURE__ */ jsx16("p", { className: "font-semibold mb-1 text-text-primary", children: "Failed to render diagram." }),
+        /* @__PURE__ */ jsx16("pre", { className: "text-xs text-text-muted whitespace-pre-wrap", children: renderError })
       ] }),
-      /* @__PURE__ */ jsx13(
+      /* @__PURE__ */ jsx16(
         "div",
         {
           ref: containerRef,
@@ -4310,6 +5253,9 @@ function DiagramTab({
   ] });
 }
 export {
+  ChunkOverviewNode,
+  ChunkPortNode,
+  ChunkedGraphView,
   DiagramTab,
   PathfindingPanel,
   StateDetailPanel,

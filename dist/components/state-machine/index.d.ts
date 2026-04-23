@@ -2,6 +2,7 @@ import * as react_jsx_runtime from 'react/jsx-runtime';
 import { StateMachineState, StateMachineTransition, PathfindingStep, StateMachineTransitionCreate, StateMachineStateUpdate, PathfindingResult } from '@qontinui/shared-types';
 import * as React$1 from 'react';
 import { NodeProps, EdgeProps } from '@xyflow/react';
+import { Chunk } from '@qontinui/workflow-utils';
 import { P as PermittedTrigger, B as BlockedTrigger } from '../../types-BcoFAlzg.js';
 import '@qontinui/shared-types/workflow';
 import '@qontinui/shared-types/library';
@@ -65,6 +66,30 @@ interface StateMachineGraphViewProps {
     elementThumbnails?: Record<string, string>;
 }
 declare function StateMachineGraphView(props: StateMachineGraphViewProps): react_jsx_runtime.JSX.Element;
+
+interface ChunkedGraphViewProps extends StateMachineGraphViewProps {
+}
+declare function ChunkedGraphView(props: ChunkedGraphViewProps): react_jsx_runtime.JSX.Element;
+
+interface ChunkNodeData {
+    chunk: Chunk;
+    matchCount?: number;
+}
+declare function ChunkOverviewNodeInner({ data, selected }: NodeProps): react_jsx_runtime.JSX.Element;
+declare const ChunkOverviewNode: React$1.MemoExoticComponent<typeof ChunkOverviewNodeInner>;
+
+interface ChunkPortNodeData {
+    /** "input" = incoming cross-chunk edge; "output" = outgoing. */
+    direction: "input" | "output";
+    /** Adjacent chunk id this port represents. */
+    adjacentChunkId: string;
+    /** Adjacent chunk name (used in the label). */
+    adjacentChunkName: string;
+    /** Click handler — navigate to `adjacentChunkId`. */
+    onNavigate?: (chunkId: string) => void;
+}
+declare function ChunkPortNodeInner({ data }: NodeProps): react_jsx_runtime.JSX.Element;
+declare const ChunkPortNode: React$1.MemoExoticComponent<typeof ChunkPortNodeInner>;
 
 declare function StateMachineStateNodeInner({ data }: NodeProps): react_jsx_runtime.JSX.Element;
 declare const StateMachineStateNode: React$1.MemoExoticComponent<typeof StateMachineStateNodeInner>;
@@ -230,4 +255,4 @@ interface DiagramTabProps {
 }
 declare function DiagramTab({ activeStateIds, diagramSource, isLoading, onRefresh, unavailableReason, }: DiagramTabProps): react_jsx_runtime.JSX.Element;
 
-export { type CaptureScreenshotMeta, DiagramTab, type DiagramTabProps, type FingerprintDetail, PathfindingPanel, type PathfindingPanelProps, StateDetailPanel, type StateDetailPanelProps, StateMachineGraphView, type StateMachineGraphViewProps, StateMachineStateNode, StateMachineTransitionEdge, StateViewPanel, type StateViewPanelProps, StateViewTable, type StateViewTableProps, TransitionEditor, type TransitionEditorProps, TransitionsPanel, type TransitionsPanelProps };
+export { type CaptureScreenshotMeta, type ChunkNodeData, ChunkOverviewNode, ChunkPortNode, type ChunkPortNodeData, ChunkedGraphView, type ChunkedGraphViewProps, DiagramTab, type DiagramTabProps, type FingerprintDetail, PathfindingPanel, type PathfindingPanelProps, StateDetailPanel, type StateDetailPanelProps, StateMachineGraphView, type StateMachineGraphViewProps, StateMachineStateNode, StateMachineTransitionEdge, StateViewPanel, type StateViewPanelProps, StateViewTable, type StateViewTableProps, TransitionEditor, type TransitionEditorProps, TransitionsPanel, type TransitionsPanelProps };
