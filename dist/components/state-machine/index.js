@@ -3446,11 +3446,8 @@ function StateViewPanel({
       setHasAutoSwitched(true);
     }
   }, [captureScreenshots, hasAutoSwitched]);
-  const [localSelectedStateId, setLocalSelectedStateId] = useState8(
-    selectedStateId
-  );
   const [selectedStateIds, setSelectedStateIds] = useState8(/* @__PURE__ */ new Set());
-  const effectiveSelectedStateId = localSelectedStateId;
+  const effectiveSelectedStateId = selectedStateId;
   const selectedState = useMemo7(
     () => states.find((s) => s.state_id === effectiveSelectedStateId),
     [states, effectiveSelectedStateId]
@@ -3528,13 +3525,13 @@ function StateViewPanel({
         setSelectedStateIds(
           isSelected ? /* @__PURE__ */ new Set() : /* @__PURE__ */ new Set([state.state_id])
         );
-        setLocalSelectedStateId(isSelected ? null : state.state_id);
+        onSelectState(isSelected ? null : state.state_id);
       } else {
-        setLocalSelectedStateId(isSelected ? null : state.state_id);
+        onSelectState(isSelected ? null : state.state_id);
       }
       if (!isExpanded) toggleExpanded(state.state_id);
     },
-    [viewMode, selectedStateIds, effectiveSelectedStateId, expandedStates, toggleExpanded]
+    [viewMode, selectedStateIds, effectiveSelectedStateId, expandedStates, toggleExpanded, onSelectState]
   );
   useEffect7(() => {
     if (!effectiveSelectedStateId) return;
@@ -3644,7 +3641,7 @@ function StateViewPanel({
         states,
         transitions,
         selectedStateId: effectiveSelectedStateId,
-        onSelectState: setLocalSelectedStateId
+        onSelectState
       }
     ) : selectedState ? /* @__PURE__ */ jsxs10("div", { className: "p-6 space-y-6 overflow-y-auto h-full", children: [
       /* @__PURE__ */ jsxs10("div", { children: [

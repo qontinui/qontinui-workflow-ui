@@ -267,18 +267,14 @@ export function StateViewPanel({
     }
   }, [captureScreenshots, hasAutoSwitched]);
 
-  // Local selection state — the page-level selectedStateId gets clobbered by the
-  // ReactFlow graph component in a hidden tab (fires onSelectionChange → null).
-  // We maintain our own selection that only changes from user clicks in this panel.
-  const [localSelectedStateId, setLocalSelectedStateId] = useState<string | null>(
-    selectedStateId,
-  );
-
-  // Multi-select support for screenshot mode
+  // Multi-select support for screenshot mode — this IS local because it's a
+  // mode-specific UI concern, not part of the page's single-selection model.
   const [selectedStateIds, setSelectedStateIds] = useState<Set<string>>(new Set());
 
-  // Use local selection for everything in this component
-  const effectiveSelectedStateId = localSelectedStateId;
+  // Single selection is fully controlled by the parent via `selectedStateId` /
+  // `onSelectState`. The parent is responsible for filtering spurious events
+  // from hidden tabs (see activeTab gate in UIBridgeStateMachinePage).
+  const effectiveSelectedStateId = selectedStateId;
 
   const selectedState = useMemo(
     () => states.find((s) => s.state_id === effectiveSelectedStateId),
@@ -375,13 +371,13 @@ export function StateViewPanel({
         setSelectedStateIds(
           isSelected ? new Set() : new Set([state.state_id]),
         );
-        setLocalSelectedStateId(isSelected ? null : state.state_id);
+        onSelectState(isSelected ? null : state.state_id);
       } else {
-        setLocalSelectedStateId(isSelected ? null : state.state_id);
+        onSelectState(isSelected ? null : state.state_id);
       }
       if (!isExpanded) toggleExpanded(state.state_id);
     },
-    [viewMode, selectedStateIds, effectiveSelectedStateId, expandedStates, toggleExpanded],
+    [viewMode, selectedStateIds, effectiveSelectedStateId, expandedStates, toggleExpanded, onSelectState],
   );
 
   // Scroll the list to the selected state when it changes from outside.
@@ -498,7 +494,7 @@ export function StateViewPanel({
             states={states}
             transitions={transitions}
             selectedStateId={effectiveSelectedStateId}
-            onSelectState={setLocalSelectedStateId}
+            onSelectState={onSelectState}
           />
         ) : selectedState ? (
           <div className="p-6 space-y-6 overflow-y-auto h-full">

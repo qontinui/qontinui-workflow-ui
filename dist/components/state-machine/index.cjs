@@ -3375,11 +3375,8 @@ function StateViewPanel({
       setHasAutoSwitched(true);
     }
   }, [captureScreenshots, hasAutoSwitched]);
-  const [localSelectedStateId, setLocalSelectedStateId] = (0, import_react13.useState)(
-    selectedStateId
-  );
   const [selectedStateIds, setSelectedStateIds] = (0, import_react13.useState)(/* @__PURE__ */ new Set());
-  const effectiveSelectedStateId = localSelectedStateId;
+  const effectiveSelectedStateId = selectedStateId;
   const selectedState = (0, import_react13.useMemo)(
     () => states.find((s) => s.state_id === effectiveSelectedStateId),
     [states, effectiveSelectedStateId]
@@ -3457,13 +3454,13 @@ function StateViewPanel({
         setSelectedStateIds(
           isSelected ? /* @__PURE__ */ new Set() : /* @__PURE__ */ new Set([state.state_id])
         );
-        setLocalSelectedStateId(isSelected ? null : state.state_id);
+        onSelectState(isSelected ? null : state.state_id);
       } else {
-        setLocalSelectedStateId(isSelected ? null : state.state_id);
+        onSelectState(isSelected ? null : state.state_id);
       }
       if (!isExpanded) toggleExpanded(state.state_id);
     },
-    [viewMode, selectedStateIds, effectiveSelectedStateId, expandedStates, toggleExpanded]
+    [viewMode, selectedStateIds, effectiveSelectedStateId, expandedStates, toggleExpanded, onSelectState]
   );
   (0, import_react13.useEffect)(() => {
     if (!effectiveSelectedStateId) return;
@@ -3573,7 +3570,7 @@ function StateViewPanel({
         states,
         transitions,
         selectedStateId: effectiveSelectedStateId,
-        onSelectState: setLocalSelectedStateId
+        onSelectState
       }
     ) : selectedState ? /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("div", { className: "p-6 space-y-6 overflow-y-auto h-full", children: [
       /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("div", { children: [
