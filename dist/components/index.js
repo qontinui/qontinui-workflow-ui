@@ -10,7 +10,7 @@ import {
   ChatInput,
   ChatMessageArea,
   WorkflowPreviewPanel
-} from "../chunk-XPVL67TR.js";
+} from "../chunk-HXI7LBFZ.js";
 
 // src/components/PhaseSection.tsx
 import { useState, useCallback } from "react";

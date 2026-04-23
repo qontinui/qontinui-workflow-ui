@@ -17,7 +17,13 @@
  * - ScreenshotStateView.tsx: Screenshot gallery with bounding box overlays
  */
 
-import React, { useState, useMemo, useEffect } from "react";
+import React, { useState, useMemo, useEffect, useCallback, useRef } from "react";
+import {
+  List as VirtualList,
+  useListRef,
+  useDynamicRowHeight,
+  type RowComponentProps,
+} from "react-window";
 import {
   Layers,
   ChevronRight,
@@ -79,6 +85,161 @@ export interface StateViewPanelProps {
   captureScreenshots?: CaptureScreenshotMeta[];
   /** Callback to load a screenshot image on demand. Returns data URL. */
   onLoadScreenshotImage?: (screenshotId: string) => Promise<string>;
+}
+
+// =============================================================================
+// StateRow — extracted so react-window can virtualize rendering
+// =============================================================================
+
+type StateRowProps = {
+  filteredStates: StateMachineState[];
+  states: StateMachineState[];
+  transitionMap: {
+    outgoing: Map<string, StateMachineTransition[]>;
+    incoming: Map<string, StateMachineTransition[]>;
+  };
+  sharedElements: Map<string, string[]>;
+  fingerprintDetails?: Record<string, FingerprintDetail>;
+  expandedStates: Set<string>;
+  effectiveSelectedStateId: string | null;
+  viewMode: ViewMode;
+  selectedStateIds: Set<string>;
+  onToggleExpanded: (stateId: string) => void;
+  onRowClick: (state: StateMachineState, e: React.MouseEvent) => void;
+  dynamicRowHeight: ReturnType<typeof useDynamicRowHeight>;
+};
+
+function StateRow({
+  index,
+  style,
+  ariaAttributes,
+  filteredStates,
+  states,
+  transitionMap,
+  sharedElements,
+  fingerprintDetails,
+  expandedStates,
+  effectiveSelectedStateId,
+  viewMode,
+  selectedStateIds,
+  onRowClick,
+  dynamicRowHeight,
+}: RowComponentProps<StateRowProps>) {
+  const state = filteredStates[index]!;
+  const rowRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!rowRef.current) return;
+    return dynamicRowHeight.observeRowElements([rowRef.current]);
+  }, [dynamicRowHeight]);
+
+  const colorIdx = states.indexOf(state);
+  const color = STATE_COLORS[colorIdx % STATE_COLORS.length]!;
+  const isSelected =
+    viewMode === "screenshot"
+      ? selectedStateIds.has(state.state_id)
+      : state.state_id === effectiveSelectedStateId;
+  const isExpanded = expandedStates.has(state.state_id);
+  const stateOutgoing = transitionMap.outgoing.get(state.state_id) ?? [];
+  const stateIncoming = transitionMap.incoming.get(state.state_id) ?? [];
+  const isInitial = state.extra_metadata?.initial === true;
+  const isBlocking = state.extra_metadata?.blocking === true;
+
+  return (
+    <div ref={rowRef} style={style} {...ariaAttributes}>
+      <button
+        data-ui-id={`state-item-${state.state_id}`}
+        onClick={(e) => onRowClick(state, e)}
+        className={`
+          w-full text-left px-3 py-2 rounded-md transition-colors text-sm
+          ${
+            isSelected
+              ? "bg-brand-primary/10 border border-brand-primary/30"
+              : "hover:bg-bg-secondary border border-transparent"
+          }
+        `}
+      >
+        <div className="flex items-center gap-2">
+          <div
+            className="w-2.5 h-2.5 rounded-full shrink-0"
+            style={{ backgroundColor: color.border }}
+          />
+          {isInitial && (
+            <Play className="size-3 text-yellow-500 fill-yellow-500 shrink-0" />
+          )}
+          {isBlocking && (
+            <Lock className="size-3 text-amber-500 shrink-0" />
+          )}
+          <span className="font-medium text-text-primary truncate flex-1">
+            {state.name}
+          </span>
+          {isExpanded ? (
+            <ChevronDown className="size-3 text-text-muted transition-transform" />
+          ) : (
+            <ChevronRight className="size-3 text-text-muted transition-transform" />
+          )}
+        </div>
+        <div className="flex items-center gap-2 mt-1 ml-4.5 text-xs text-text-muted">
+          <span>{state.element_ids.length} elements</span>
+          <span
+            className={
+              Math.round(state.confidence * 100) >= 80
+                ? "text-green-400"
+                : Math.round(state.confidence * 100) >= 50
+                  ? "text-amber-400"
+                  : "text-red-400"
+            }
+          >
+            {Math.round(state.confidence * 100)}%
+          </span>
+          {stateOutgoing.length > 0 && (
+            <span className="text-brand-secondary flex items-center gap-0.5">
+              <ArrowUpRight className="size-2" />
+              {stateOutgoing.length}
+            </span>
+          )}
+          {stateIncoming.length > 0 && (
+            <span className="text-brand-primary flex items-center gap-0.5">
+              <ArrowDownLeft className="size-2" />
+              {stateIncoming.length}
+            </span>
+          )}
+        </div>
+      </button>
+
+      {/* Expanded element list */}
+      {isExpanded && (
+        <div className="ml-5 pl-2 border-l border-border-secondary mt-1 mb-2 space-y-0.5">
+          {state.element_ids.slice(0, 20).map((eid) => {
+            const prefix = getElementTypePrefix(eid);
+            const label = resolveElementLabel(eid, fingerprintDetails, state);
+            const Icon = ELEMENT_ICONS[prefix] ?? Layers;
+            const stateCount = sharedElements.get(eid)?.length ?? 1;
+            return (
+              <div
+                key={eid}
+                className="text-[10px] text-text-muted flex items-center gap-1 py-0.5 px-1 rounded hover:bg-bg-secondary"
+                title={`${eid}${stateCount > 1 ? ` (shared across ${stateCount} states)` : ""}`}
+              >
+                <Icon className="size-2.5 shrink-0" />
+                <span className="truncate flex-1">{label}</span>
+                {stateCount > 1 && (
+                  <span className="text-[8px] text-brand-primary bg-brand-primary/10 px-1 rounded-full shrink-0">
+                    {stateCount}
+                  </span>
+                )}
+              </div>
+            );
+          })}
+          {state.element_ids.length > 20 && (
+            <div className="text-[10px] text-text-muted py-0.5 px-1">
+              +{state.element_ids.length - 20} more
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
 }
 
 // =============================================================================
@@ -196,10 +357,58 @@ export function StateViewPanel({
     });
   };
 
+  const listRef = useListRef(null);
+  const dynamicRowHeight = useDynamicRowHeight({ defaultRowHeight: 60 });
+
+  const handleRowClick = useCallback(
+    (state: StateMachineState, e: React.MouseEvent) => {
+      const isSelected =
+        viewMode === "screenshot"
+          ? selectedStateIds.has(state.state_id)
+          : state.state_id === effectiveSelectedStateId;
+      const isExpanded = expandedStates.has(state.state_id);
+      if (viewMode === "screenshot" && (e.ctrlKey || e.metaKey)) {
+        setSelectedStateIds((prev) => {
+          const next = new Set(prev);
+          if (next.has(state.state_id)) {
+            next.delete(state.state_id);
+          } else {
+            next.add(state.state_id);
+          }
+          return next;
+        });
+      } else if (viewMode === "screenshot") {
+        setSelectedStateIds(
+          isSelected ? new Set() : new Set([state.state_id]),
+        );
+        setLocalSelectedStateId(isSelected ? null : state.state_id);
+      } else {
+        setLocalSelectedStateId(isSelected ? null : state.state_id);
+      }
+      if (!isExpanded) toggleExpanded(state.state_id);
+    },
+    [viewMode, selectedStateIds, effectiveSelectedStateId, expandedStates],
+  );
+
+  // Scroll the list to the selected state when it changes from outside.
+  useEffect(() => {
+    if (!effectiveSelectedStateId) return;
+    const idx = filteredStates.findIndex(
+      (s) => s.state_id === effectiveSelectedStateId,
+    );
+    if (idx >= 0) {
+      listRef.current?.scrollToRow({
+        index: idx,
+        align: "smart",
+        behavior: "smooth",
+      });
+    }
+  }, [effectiveSelectedStateId, filteredStates, listRef]);
+
   return (
     <div className="flex flex-1 h-full min-w-0">
       {/* Left Panel: State List */}
-      <div className="w-72 border-r border-border-secondary bg-bg-primary overflow-y-auto shrink-0">
+      <div className="w-72 border-r border-border-secondary bg-bg-primary shrink-0 flex flex-col min-h-0">
         <div className="p-3 border-b border-border-secondary">
           <div className="flex items-center gap-2 mb-2">
             <Layers className="size-4 text-brand-primary" />
@@ -249,142 +458,34 @@ export function StateViewPanel({
           </div>
         </div>
 
-        <div className="p-2 space-y-0.5">
-          {filteredStates.map((state) => {
-            const colorIdx = states.indexOf(state);
-            const color = STATE_COLORS[colorIdx % STATE_COLORS.length]!;
-            const isSelected = viewMode === "screenshot"
-              ? selectedStateIds.has(state.state_id)
-              : state.state_id === effectiveSelectedStateId;
-            const isExpanded = expandedStates.has(state.state_id);
-            const stateOutgoing =
-              transitionMap.outgoing.get(state.state_id) ?? [];
-            const stateIncoming =
-              transitionMap.incoming.get(state.state_id) ?? [];
-            const isInitial = state.extra_metadata?.initial === true;
-            const isBlocking = state.extra_metadata?.blocking === true;
-
-            return (
-              <div key={state.state_id}>
-                <button
-                  data-ui-id={`state-item-${state.state_id}`}
-                  onClick={(e) => {
-                    if (viewMode === "screenshot" && (e.ctrlKey || e.metaKey)) {
-                      // Multi-select in screenshot mode
-                      setSelectedStateIds(prev => {
-                        const next = new Set(prev);
-                        if (next.has(state.state_id)) {
-                          next.delete(state.state_id);
-                        } else {
-                          next.add(state.state_id);
-                        }
-                        return next;
-                      });
-                    } else if (viewMode === "screenshot") {
-                      // Single select in screenshot mode — replace selection
-                      setSelectedStateIds(isSelected ? new Set() : new Set([state.state_id]));
-                      setLocalSelectedStateId(isSelected ? null : state.state_id);
-                    } else {
-                      setLocalSelectedStateId(isSelected ? null : state.state_id);
-                    }
-                    if (!isExpanded) toggleExpanded(state.state_id);
-                  }}
-                  className={`
-                    w-full text-left px-3 py-2 rounded-md transition-colors text-sm
-                    ${
-                      isSelected
-                        ? "bg-brand-primary/10 border border-brand-primary/30"
-                        : "hover:bg-bg-secondary border border-transparent"
-                    }
-                  `}
-                >
-                  <div className="flex items-center gap-2">
-                    <div
-                      className="w-2.5 h-2.5 rounded-full shrink-0"
-                      style={{ backgroundColor: color.border }}
-                    />
-                    {isInitial && (
-                      <Play className="size-3 text-yellow-500 fill-yellow-500 shrink-0" />
-                    )}
-                    {isBlocking && (
-                      <Lock className="size-3 text-amber-500 shrink-0" />
-                    )}
-                    <span className="font-medium text-text-primary truncate flex-1">
-                      {state.name}
-                    </span>
-                    {isExpanded ? (
-                      <ChevronDown className="size-3 text-text-muted transition-transform" />
-                    ) : (
-                      <ChevronRight className="size-3 text-text-muted transition-transform" />
-                    )}
-                  </div>
-                  <div className="flex items-center gap-2 mt-1 ml-4.5 text-xs text-text-muted">
-                    <span>{state.element_ids.length} elements</span>
-                    <span
-                      className={
-                        Math.round(state.confidence * 100) >= 80
-                          ? "text-green-400"
-                          : Math.round(state.confidence * 100) >= 50
-                            ? "text-amber-400"
-                            : "text-red-400"
-                      }
-                    >
-                      {Math.round(state.confidence * 100)}%
-                    </span>
-                    {stateOutgoing.length > 0 && (
-                      <span className="text-brand-secondary flex items-center gap-0.5">
-                        <ArrowUpRight className="size-2" />
-                        {stateOutgoing.length}
-                      </span>
-                    )}
-                    {stateIncoming.length > 0 && (
-                      <span className="text-brand-primary flex items-center gap-0.5">
-                        <ArrowDownLeft className="size-2" />
-                        {stateIncoming.length}
-                      </span>
-                    )}
-                  </div>
-                </button>
-
-                {/* Expanded element list */}
-                {isExpanded && (
-                  <div className="ml-5 pl-2 border-l border-border-secondary mt-1 mb-2 space-y-0.5">
-                    {state.element_ids.slice(0, 20).map((eid) => {
-                      const prefix = getElementTypePrefix(eid);
-                      const label = resolveElementLabel(eid, fingerprintDetails, state);
-                      const Icon = ELEMENT_ICONS[prefix] ?? Layers;
-                      const stateCount = sharedElements.get(eid)?.length ?? 1;
-                      return (
-                        <div
-                          key={eid}
-                          className="text-[10px] text-text-muted flex items-center gap-1 py-0.5 px-1 rounded hover:bg-bg-secondary"
-                          title={`${eid}${stateCount > 1 ? ` (shared across ${stateCount} states)` : ""}`}
-                        >
-                          <Icon className="size-2.5 shrink-0" />
-                          <span className="truncate flex-1">{label}</span>
-                          {stateCount > 1 && (
-                            <span className="text-[8px] text-brand-primary bg-brand-primary/10 px-1 rounded-full shrink-0">
-                              {stateCount}
-                            </span>
-                          )}
-                        </div>
-                      );
-                    })}
-                    {state.element_ids.length > 20 && (
-                      <div className="text-[10px] text-text-muted py-0.5 px-1">
-                        +{state.element_ids.length - 20} more
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-            );
-          })}
-
-          {filteredStates.length === 0 && (
+        <div className="flex-1 min-h-0 p-2">
+          {filteredStates.length === 0 ? (
             <p className="text-xs text-text-muted text-center py-4">
               No states match filter.
             </p>
+          ) : (
+            <VirtualList
+              listRef={listRef}
+              rowCount={filteredStates.length}
+              rowHeight={dynamicRowHeight}
+              rowComponent={StateRow}
+              rowProps={{
+                filteredStates,
+                states,
+                transitionMap,
+                sharedElements,
+                fingerprintDetails,
+                expandedStates,
+                effectiveSelectedStateId,
+                viewMode,
+                selectedStateIds,
+                onToggleExpanded: toggleExpanded,
+                onRowClick: handleRowClick,
+                dynamicRowHeight,
+              }}
+              overscanCount={5}
+              style={{ width: "100%", height: "100%" }}
+            />
           )}
         </div>
       </div>

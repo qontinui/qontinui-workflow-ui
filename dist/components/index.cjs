@@ -2185,13 +2185,13 @@ function StepTypeIcon({ type }) {
 function getStepsForPhase(workflow, phase) {
   switch (phase) {
     case "setup":
-      return workflow.setup_steps || [];
+      return workflow.setupSteps || [];
     case "verification":
-      return workflow.verification_steps || [];
+      return workflow.verificationSteps || [];
     case "agentic":
-      return workflow.agentic_steps || [];
+      return workflow.agenticSteps || [];
     case "completion":
-      return workflow.completion_steps || [];
+      return workflow.completionSteps || [];
     default:
       return [];
   }

@@ -2269,6 +2269,7 @@ function StateDetailPanel({
 
 // src/components/state-machine/StateViewPanel.tsx
 var import_react13 = require("react");
+var import_react_window = require("react-window");
 var import_lucide_react9 = require("lucide-react");
 var import_workflow_utils8 = require("@qontinui/workflow-utils");
 
@@ -3247,6 +3248,115 @@ function ScreenshotStateView({
 
 // src/components/state-machine/StateViewPanel.tsx
 var import_jsx_runtime10 = require("react/jsx-runtime");
+function StateRow({
+  index,
+  style,
+  ariaAttributes,
+  filteredStates,
+  states,
+  transitionMap,
+  sharedElements,
+  fingerprintDetails,
+  expandedStates,
+  effectiveSelectedStateId,
+  viewMode,
+  selectedStateIds,
+  onRowClick,
+  dynamicRowHeight
+}) {
+  const state = filteredStates[index];
+  const rowRef = (0, import_react13.useRef)(null);
+  (0, import_react13.useEffect)(() => {
+    if (!rowRef.current) return;
+    return dynamicRowHeight.observeRowElements([rowRef.current]);
+  }, [dynamicRowHeight]);
+  const colorIdx = states.indexOf(state);
+  const color = import_workflow_utils8.STATE_COLORS[colorIdx % import_workflow_utils8.STATE_COLORS.length];
+  const isSelected = viewMode === "screenshot" ? selectedStateIds.has(state.state_id) : state.state_id === effectiveSelectedStateId;
+  const isExpanded = expandedStates.has(state.state_id);
+  const stateOutgoing = transitionMap.outgoing.get(state.state_id) ?? [];
+  const stateIncoming = transitionMap.incoming.get(state.state_id) ?? [];
+  const isInitial = state.extra_metadata?.initial === true;
+  const isBlocking = state.extra_metadata?.blocking === true;
+  return /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("div", { ref: rowRef, style, ...ariaAttributes, children: [
+    /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)(
+      "button",
+      {
+        "data-ui-id": `state-item-${state.state_id}`,
+        onClick: (e) => onRowClick(state, e),
+        className: `
+          w-full text-left px-3 py-2 rounded-md transition-colors text-sm
+          ${isSelected ? "bg-brand-primary/10 border border-brand-primary/30" : "hover:bg-bg-secondary border border-transparent"}
+        `,
+        children: [
+          /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("div", { className: "flex items-center gap-2", children: [
+            /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(
+              "div",
+              {
+                className: "w-2.5 h-2.5 rounded-full shrink-0",
+                style: { backgroundColor: color.border }
+              }
+            ),
+            isInitial && /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(import_lucide_react9.Play, { className: "size-3 text-yellow-500 fill-yellow-500 shrink-0" }),
+            isBlocking && /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(import_lucide_react9.Lock, { className: "size-3 text-amber-500 shrink-0" }),
+            /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("span", { className: "font-medium text-text-primary truncate flex-1", children: state.name }),
+            isExpanded ? /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(import_lucide_react9.ChevronDown, { className: "size-3 text-text-muted transition-transform" }) : /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(import_lucide_react9.ChevronRight, { className: "size-3 text-text-muted transition-transform" })
+          ] }),
+          /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("div", { className: "flex items-center gap-2 mt-1 ml-4.5 text-xs text-text-muted", children: [
+            /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("span", { children: [
+              state.element_ids.length,
+              " elements"
+            ] }),
+            /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)(
+              "span",
+              {
+                className: Math.round(state.confidence * 100) >= 80 ? "text-green-400" : Math.round(state.confidence * 100) >= 50 ? "text-amber-400" : "text-red-400",
+                children: [
+                  Math.round(state.confidence * 100),
+                  "%"
+                ]
+              }
+            ),
+            stateOutgoing.length > 0 && /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("span", { className: "text-brand-secondary flex items-center gap-0.5", children: [
+              /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(import_lucide_react9.ArrowUpRight, { className: "size-2" }),
+              stateOutgoing.length
+            ] }),
+            stateIncoming.length > 0 && /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("span", { className: "text-brand-primary flex items-center gap-0.5", children: [
+              /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(import_lucide_react9.ArrowDownLeft, { className: "size-2" }),
+              stateIncoming.length
+            ] })
+          ] })
+        ]
+      }
+    ),
+    isExpanded && /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("div", { className: "ml-5 pl-2 border-l border-border-secondary mt-1 mb-2 space-y-0.5", children: [
+      state.element_ids.slice(0, 20).map((eid) => {
+        const prefix = (0, import_workflow_utils8.getElementTypePrefix)(eid);
+        const label = resolveElementLabel(eid, fingerprintDetails, state);
+        const Icon = ELEMENT_ICONS[prefix] ?? import_lucide_react9.Layers;
+        const stateCount = sharedElements.get(eid)?.length ?? 1;
+        return /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)(
+          "div",
+          {
+            className: "text-[10px] text-text-muted flex items-center gap-1 py-0.5 px-1 rounded hover:bg-bg-secondary",
+            title: `${eid}${stateCount > 1 ? ` (shared across ${stateCount} states)` : ""}`,
+            children: [
+              /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(Icon, { className: "size-2.5 shrink-0" }),
+              /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("span", { className: "truncate flex-1", children: label }),
+              stateCount > 1 && /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("span", { className: "text-[8px] text-brand-primary bg-brand-primary/10 px-1 rounded-full shrink-0", children: stateCount })
+            ]
+          },
+          eid
+        );
+      }),
+      state.element_ids.length > 20 && /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("div", { className: "text-[10px] text-text-muted py-0.5 px-1", children: [
+        "+",
+        state.element_ids.length - 20,
+        " more"
+      ] })
+    ] })
+  ] });
+}
 function StateViewPanel({
   states,
   transitions,
@@ -3333,8 +3443,49 @@ function StateViewPanel({
       return next;
     });
   };
+  const listRef = (0, import_react_window.useListRef)(null);
+  const dynamicRowHeight = (0, import_react_window.useDynamicRowHeight)({ defaultRowHeight: 60 });
+  const handleRowClick = (0, import_react13.useCallback)(
+    (state, e) => {
+      const isSelected = viewMode === "screenshot" ? selectedStateIds.has(state.state_id) : state.state_id === effectiveSelectedStateId;
+      const isExpanded = expandedStates.has(state.state_id);
+      if (viewMode === "screenshot" && (e.ctrlKey || e.metaKey)) {
+        setSelectedStateIds((prev) => {
+          const next = new Set(prev);
+          if (next.has(state.state_id)) {
+            next.delete(state.state_id);
+          } else {
+            next.add(state.state_id);
+          }
+          return next;
+        });
+      } else if (viewMode === "screenshot") {
+        setSelectedStateIds(
+          isSelected ? /* @__PURE__ */ new Set() : /* @__PURE__ */ new Set([state.state_id])
+        );
+        setLocalSelectedStateId(isSelected ? null : state.state_id);
+      } else {
+        setLocalSelectedStateId(isSelected ? null : state.state_id);
+      }
+      if (!isExpanded) toggleExpanded(state.state_id);
+    },
+    [viewMode, selectedStateIds, effectiveSelectedStateId, expandedStates]
+  );
+  (0, import_react13.useEffect)(() => {
+    if (!effectiveSelectedStateId) return;
+    const idx = filteredStates.findIndex(
+      (s) => s.state_id === effectiveSelectedStateId
+    );
+    if (idx >= 0) {
+      listRef.current?.scrollToRow({
+        index: idx,
+        align: "smart",
+        behavior: "smooth"
+      });
+    }
+  }, [effectiveSelectedStateId, filteredStates, listRef]);
   return /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("div", { className: "flex flex-1 h-full min-w-0", children: [
-    /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("div", { className: "w-72 border-r border-border-secondary bg-bg-primary overflow-y-auto shrink-0", children: [
+    /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("div", { className: "w-72 border-r border-border-secondary bg-bg-primary shrink-0 flex flex-col min-h-0", children: [
       /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("div", { className: "p-3 border-b border-border-secondary", children: [
         /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("div", { className: "flex items-center gap-2 mb-2", children: [
           /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(import_lucide_react9.Layers, { className: "size-4 text-brand-primary" }),
@@ -3388,115 +3539,31 @@ function StateViewPanel({
           ] })
         ] })
       ] }),
-      /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("div", { className: "p-2 space-y-0.5", children: [
-        filteredStates.map((state) => {
-          const colorIdx = states.indexOf(state);
-          const color = import_workflow_utils8.STATE_COLORS[colorIdx % import_workflow_utils8.STATE_COLORS.length];
-          const isSelected = viewMode === "screenshot" ? selectedStateIds.has(state.state_id) : state.state_id === effectiveSelectedStateId;
-          const isExpanded = expandedStates.has(state.state_id);
-          const stateOutgoing = transitionMap.outgoing.get(state.state_id) ?? [];
-          const stateIncoming = transitionMap.incoming.get(state.state_id) ?? [];
-          const isInitial = state.extra_metadata?.initial === true;
-          const isBlocking = state.extra_metadata?.blocking === true;
-          return /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("div", { children: [
-            /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)(
-              "button",
-              {
-                "data-ui-id": `state-item-${state.state_id}`,
-                onClick: (e) => {
-                  if (viewMode === "screenshot" && (e.ctrlKey || e.metaKey)) {
-                    setSelectedStateIds((prev) => {
-                      const next = new Set(prev);
-                      if (next.has(state.state_id)) {
-                        next.delete(state.state_id);
-                      } else {
-                        next.add(state.state_id);
-                      }
-                      return next;
-                    });
-                  } else if (viewMode === "screenshot") {
-                    setSelectedStateIds(isSelected ? /* @__PURE__ */ new Set() : /* @__PURE__ */ new Set([state.state_id]));
-                    setLocalSelectedStateId(isSelected ? null : state.state_id);
-                  } else {
-                    setLocalSelectedStateId(isSelected ? null : state.state_id);
-                  }
-                  if (!isExpanded) toggleExpanded(state.state_id);
-                },
-                className: `
-                    w-full text-left px-3 py-2 rounded-md transition-colors text-sm
-                    ${isSelected ? "bg-brand-primary/10 border border-brand-primary/30" : "hover:bg-bg-secondary border border-transparent"}
-                  `,
-                children: [
-                  /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("div", { className: "flex items-center gap-2", children: [
-                    /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(
-                      "div",
-                      {
-                        className: "w-2.5 h-2.5 rounded-full shrink-0",
-                        style: { backgroundColor: color.border }
-                      }
-                    ),
-                    isInitial && /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(import_lucide_react9.Play, { className: "size-3 text-yellow-500 fill-yellow-500 shrink-0" }),
-                    isBlocking && /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(import_lucide_react9.Lock, { className: "size-3 text-amber-500 shrink-0" }),
-                    /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("span", { className: "font-medium text-text-primary truncate flex-1", children: state.name }),
-                    isExpanded ? /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(import_lucide_react9.ChevronDown, { className: "size-3 text-text-muted transition-transform" }) : /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(import_lucide_react9.ChevronRight, { className: "size-3 text-text-muted transition-transform" })
-                  ] }),
-                  /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("div", { className: "flex items-center gap-2 mt-1 ml-4.5 text-xs text-text-muted", children: [
-                    /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("span", { children: [
-                      state.element_ids.length,
-                      " elements"
-                    ] }),
-                    /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)(
-                      "span",
-                      {
-                        className: Math.round(state.confidence * 100) >= 80 ? "text-green-400" : Math.round(state.confidence * 100) >= 50 ? "text-amber-400" : "text-red-400",
-                        children: [
-                          Math.round(state.confidence * 100),
-                          "%"
-                        ]
-                      }
-                    ),
-                    stateOutgoing.length > 0 && /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("span", { className: "text-brand-secondary flex items-center gap-0.5", children: [
-                      /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(import_lucide_react9.ArrowUpRight, { className: "size-2" }),
-                      stateOutgoing.length
-                    ] }),
-                    stateIncoming.length > 0 && /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("span", { className: "text-brand-primary flex items-center gap-0.5", children: [
-                      /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(import_lucide_react9.ArrowDownLeft, { className: "size-2" }),
-                      stateIncoming.length
-                    ] })
-                  ] })
-                ]
-              }
-            ),
-            isExpanded && /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("div", { className: "ml-5 pl-2 border-l border-border-secondary mt-1 mb-2 space-y-0.5", children: [
-              state.element_ids.slice(0, 20).map((eid) => {
-                const prefix = (0, import_workflow_utils8.getElementTypePrefix)(eid);
-                const label = resolveElementLabel(eid, fingerprintDetails, state);
-                const Icon = ELEMENT_ICONS[prefix] ?? import_lucide_react9.Layers;
-                const stateCount = sharedElements.get(eid)?.length ?? 1;
-                return /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)(
-                  "div",
-                  {
-                    className: "text-[10px] text-text-muted flex items-center gap-1 py-0.5 px-1 rounded hover:bg-bg-secondary",
-                    title: `${eid}${stateCount > 1 ? ` (shared across ${stateCount} states)` : ""}`,
-                    children: [
-                      /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(Icon, { className: "size-2.5 shrink-0" }),
-                      /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("span", { className: "truncate flex-1", children: label }),
-                      stateCount > 1 && /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("span", { className: "text-[8px] text-brand-primary bg-brand-primary/10 px-1 rounded-full shrink-0", children: stateCount })
-                    ]
-                  },
-                  eid
-                );
-              }),
-              state.element_ids.length > 20 && /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("div", { className: "text-[10px] text-text-muted py-0.5 px-1", children: [
-                "+",
-                state.element_ids.length - 20,
-                " more"
-              ] })
-            ] })
-          ] }, state.state_id);
-        }),
-        filteredStates.length === 0 && /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("p", { className: "text-xs text-text-muted text-center py-4", children: "No states match filter." })
-      ] })
+      /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("div", { className: "flex-1 min-h-0 p-2", children: filteredStates.length === 0 ? /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("p", { className: "text-xs text-text-muted text-center py-4", children: "No states match filter." }) : /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(
+        import_react_window.List,
+        {
+          listRef,
+          rowCount: filteredStates.length,
+          rowHeight: dynamicRowHeight,
+          rowComponent: StateRow,
+          rowProps: {
+            filteredStates,
+            states,
+            transitionMap,
+            sharedElements,
+            fingerprintDetails,
+            expandedStates,
+            effectiveSelectedStateId,
+            viewMode,
+            selectedStateIds,
+            onToggleExpanded: toggleExpanded,
+            onRowClick: handleRowClick,
+            dynamicRowHeight
+          },
+          overscanCount: 5,
+          style: { width: "100%", height: "100%" }
+        }
+      ) })
     ] }),
     /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("div", { className: "flex-1 overflow-hidden", children: viewMode === "screenshot" && captureScreenshots && onLoadScreenshotImage ? /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(
       ScreenshotStateView,
