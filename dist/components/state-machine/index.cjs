@@ -560,6 +560,11 @@ var drilledNodeTypes = {
   chunkPort: ChunkPortNode
 };
 var drilledEdgeTypes = { transitionEdge: StateMachineTransitionEdge };
+function firstActionTargetString(action) {
+  if (typeof action?.target === "string") return action.target;
+  if (typeof action?.url === "string") return action.url;
+  return void 0;
+}
 function OverviewCanvasInner({
   chunkGraph,
   dagreLib,
@@ -853,7 +858,7 @@ function DrilledCanvasInner({
               actionTypes: t.actions.map((a) => a.type),
               isHighlighted: highlightedTransitionIds.has(t.transition_id),
               staysVisible: t.stays_visible,
-              firstActionTarget: t.actions[0]?.target ?? t.actions[0]?.url ?? void 0
+              firstActionTarget: firstActionTargetString(t.actions[0])
             }
           });
         }
@@ -1310,6 +1315,11 @@ function ChunkedGraphView(props) {
 var import_jsx_runtime6 = require("react/jsx-runtime");
 var nodeTypes = { stateNode: StateMachineStateNode };
 var edgeTypes = { transitionEdge: StateMachineTransitionEdge };
+function firstActionTargetString2(action) {
+  if (typeof action?.target === "string") return action.target;
+  if (typeof action?.url === "string") return action.url;
+  return void 0;
+}
 var FIT_VIEW_OPTIONS2 = { padding: 0.2, minZoom: 0.3 };
 var FIT_VIEW_OPTIONS_ANIMATED = { ...FIT_VIEW_OPTIONS2, duration: 300 };
 var CHUNKED_VIEW_THRESHOLD = 80;
@@ -1416,7 +1426,7 @@ function StateMachineGraphViewInner({
               actionTypes: trans.actions.map((a) => a.type),
               isHighlighted: highlightedTransitionIds.has(trans.transition_id),
               staysVisible: trans.stays_visible,
-              firstActionTarget: trans.actions[0]?.target ?? trans.actions[0]?.url ?? void 0
+              firstActionTarget: firstActionTargetString2(trans.actions[0])
             }
           });
         }

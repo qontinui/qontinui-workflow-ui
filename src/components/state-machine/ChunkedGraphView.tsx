@@ -99,6 +99,17 @@ const drilledNodeTypes = {
 };
 const drilledEdgeTypes = { transitionEdge: StateMachineTransitionEdge };
 
+// Some persisted action payloads store `target` as a recognition object
+// (e.g. `{ text: "Abort" }`) instead of the `string | null` the schema
+// declares. Rendering an object as a React child throws #31, so coerce.
+function firstActionTargetString(
+  action: StateMachineTransition["actions"][number] | undefined,
+): string | undefined {
+  if (typeof action?.target === "string") return action.target;
+  if (typeof action?.url === "string") return action.url;
+  return undefined;
+}
+
 // =============================================================================
 // Overview canvas
 // =============================================================================
@@ -482,8 +493,7 @@ function DrilledCanvasInner({
               actionTypes: t.actions.map((a) => a.type),
               isHighlighted: highlightedTransitionIds.has(t.transition_id),
               staysVisible: t.stays_visible,
-              firstActionTarget:
-                t.actions[0]?.target ?? t.actions[0]?.url ?? undefined,
+              firstActionTarget: firstActionTargetString(t.actions[0]),
             } satisfies TransitionEdgeData,
           });
         }

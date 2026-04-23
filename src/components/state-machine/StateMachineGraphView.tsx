@@ -43,6 +43,17 @@ import { ChunkedGraphView } from "./ChunkedGraphView";
 const nodeTypes = { stateNode: StateMachineStateNode };
 const edgeTypes = { transitionEdge: StateMachineTransitionEdge };
 
+// Some persisted action payloads store `target` as a recognition object
+// (e.g. `{ text: "Abort" }`) instead of the `string | null` the schema
+// declares. Rendering an object as a React child throws #31, so coerce.
+function firstActionTargetString(
+  action: StateMachineTransition["actions"][number] | undefined,
+): string | undefined {
+  if (typeof action?.target === "string") return action.target;
+  if (typeof action?.url === "string") return action.url;
+  return undefined;
+}
+
 // Shared fitView options. minZoom prevents fitView from zooming so far out
 // that every node lands in the viewport on large graphs, which would defeat
 // <ReactFlow onlyRenderVisibleElements>.
@@ -253,7 +264,7 @@ function StateMachineGraphViewInner({
               actionTypes: trans.actions.map((a) => a.type),
               isHighlighted: highlightedTransitionIds.has(trans.transition_id),
               staysVisible: trans.stays_visible,
-              firstActionTarget: trans.actions[0]?.target ?? trans.actions[0]?.url ?? undefined,
+              firstActionTarget: firstActionTargetString(trans.actions[0]),
             } satisfies TransitionEdgeData,
           });
         }
