@@ -2295,7 +2295,7 @@ function StateDetailPanel({
 }
 
 // src/components/state-machine/StateViewPanel.tsx
-import { useState as useState8, useMemo as useMemo7, useEffect as useEffect7, useCallback as useCallback7, useRef as useRef5 } from "react";
+import { useState as useState8, useMemo as useMemo7, useEffect as useEffect7, useCallback as useCallback7 } from "react";
 import {
   List as VirtualList,
   useListRef,
@@ -3332,15 +3332,9 @@ function StateRow({
   effectiveSelectedStateId,
   viewMode,
   selectedStateIds,
-  onRowClick,
-  dynamicRowHeight
+  onRowClick
 }) {
   const state = filteredStates[index];
-  const rowRef = useRef5(null);
-  useEffect7(() => {
-    if (!rowRef.current) return;
-    return dynamicRowHeight.observeRowElements([rowRef.current]);
-  }, [dynamicRowHeight]);
   const colorIdx = states.indexOf(state);
   const color = STATE_COLORS3[colorIdx % STATE_COLORS3.length];
   const isSelected = viewMode === "screenshot" ? selectedStateIds.has(state.state_id) : state.state_id === effectiveSelectedStateId;
@@ -3349,7 +3343,7 @@ function StateRow({
   const stateIncoming = transitionMap.incoming.get(state.state_id) ?? [];
   const isInitial = state.extra_metadata?.initial === true;
   const isBlocking = state.extra_metadata?.blocking === true;
-  return /* @__PURE__ */ jsxs10("div", { ref: rowRef, style, ...ariaAttributes, children: [
+  return /* @__PURE__ */ jsxs10("div", { style, ...ariaAttributes, children: [
     /* @__PURE__ */ jsxs10(
       "button",
       {
@@ -3503,7 +3497,7 @@ function StateViewPanel({
       (s) => s.name.toLowerCase().includes(lower) || s.state_id.toLowerCase().includes(lower) || s.element_ids.some((eid) => eid.toLowerCase().includes(lower))
     );
   }, [states, searchFilter]);
-  const toggleExpanded = (stateId) => {
+  const toggleExpanded = useCallback7((stateId) => {
     setExpandedStates((prev) => {
       const next = new Set(prev);
       if (next.has(stateId)) {
@@ -3513,7 +3507,7 @@ function StateViewPanel({
       }
       return next;
     });
-  };
+  }, []);
   const listRef = useListRef(null);
   const dynamicRowHeight = useDynamicRowHeight({ defaultRowHeight: 60 });
   const handleRowClick = useCallback7(
@@ -3540,7 +3534,7 @@ function StateViewPanel({
       }
       if (!isExpanded) toggleExpanded(state.state_id);
     },
-    [viewMode, selectedStateIds, effectiveSelectedStateId, expandedStates]
+    [viewMode, selectedStateIds, effectiveSelectedStateId, expandedStates, toggleExpanded]
   );
   useEffect7(() => {
     if (!effectiveSelectedStateId) return;
@@ -3627,9 +3621,7 @@ function StateViewPanel({
             effectiveSelectedStateId,
             viewMode,
             selectedStateIds,
-            onToggleExpanded: toggleExpanded,
-            onRowClick: handleRowClick,
-            dynamicRowHeight
+            onRowClick: handleRowClick
           },
           overscanCount: 5,
           style: { width: "100%", height: "100%" }
@@ -4160,7 +4152,7 @@ function StateViewTable({
 }
 
 // src/components/state-machine/DiagramTab.tsx
-import { useEffect as useEffect8, useRef as useRef6, useState as useState11 } from "react";
+import { useEffect as useEffect8, useRef as useRef5, useState as useState11 } from "react";
 import { RefreshCw, Loader2, Workflow } from "lucide-react";
 import { jsx as jsx13, jsxs as jsxs13 } from "react/jsx-runtime";
 function DiagramTab({
@@ -4169,7 +4161,7 @@ function DiagramTab({
   isLoading,
   onRefresh
 }) {
-  const containerRef = useRef6(null);
+  const containerRef = useRef5(null);
   const [importError, setImportError] = useState11(null);
   const [renderError, setRenderError] = useState11(null);
   useEffect8(() => {

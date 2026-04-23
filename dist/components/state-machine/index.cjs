@@ -3261,15 +3261,9 @@ function StateRow({
   effectiveSelectedStateId,
   viewMode,
   selectedStateIds,
-  onRowClick,
-  dynamicRowHeight
+  onRowClick
 }) {
   const state = filteredStates[index];
-  const rowRef = (0, import_react13.useRef)(null);
-  (0, import_react13.useEffect)(() => {
-    if (!rowRef.current) return;
-    return dynamicRowHeight.observeRowElements([rowRef.current]);
-  }, [dynamicRowHeight]);
   const colorIdx = states.indexOf(state);
   const color = import_workflow_utils8.STATE_COLORS[colorIdx % import_workflow_utils8.STATE_COLORS.length];
   const isSelected = viewMode === "screenshot" ? selectedStateIds.has(state.state_id) : state.state_id === effectiveSelectedStateId;
@@ -3278,7 +3272,7 @@ function StateRow({
   const stateIncoming = transitionMap.incoming.get(state.state_id) ?? [];
   const isInitial = state.extra_metadata?.initial === true;
   const isBlocking = state.extra_metadata?.blocking === true;
-  return /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("div", { ref: rowRef, style, ...ariaAttributes, children: [
+  return /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("div", { style, ...ariaAttributes, children: [
     /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)(
       "button",
       {
@@ -3432,7 +3426,7 @@ function StateViewPanel({
       (s) => s.name.toLowerCase().includes(lower) || s.state_id.toLowerCase().includes(lower) || s.element_ids.some((eid) => eid.toLowerCase().includes(lower))
     );
   }, [states, searchFilter]);
-  const toggleExpanded = (stateId) => {
+  const toggleExpanded = (0, import_react13.useCallback)((stateId) => {
     setExpandedStates((prev) => {
       const next = new Set(prev);
       if (next.has(stateId)) {
@@ -3442,7 +3436,7 @@ function StateViewPanel({
       }
       return next;
     });
-  };
+  }, []);
   const listRef = (0, import_react_window.useListRef)(null);
   const dynamicRowHeight = (0, import_react_window.useDynamicRowHeight)({ defaultRowHeight: 60 });
   const handleRowClick = (0, import_react13.useCallback)(
@@ -3469,7 +3463,7 @@ function StateViewPanel({
       }
       if (!isExpanded) toggleExpanded(state.state_id);
     },
-    [viewMode, selectedStateIds, effectiveSelectedStateId, expandedStates]
+    [viewMode, selectedStateIds, effectiveSelectedStateId, expandedStates, toggleExpanded]
   );
   (0, import_react13.useEffect)(() => {
     if (!effectiveSelectedStateId) return;
@@ -3556,9 +3550,7 @@ function StateViewPanel({
             effectiveSelectedStateId,
             viewMode,
             selectedStateIds,
-            onToggleExpanded: toggleExpanded,
-            onRowClick: handleRowClick,
-            dynamicRowHeight
+            onRowClick: handleRowClick
           },
           overscanCount: 5,
           style: { width: "100%", height: "100%" }

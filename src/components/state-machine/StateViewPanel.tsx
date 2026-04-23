@@ -17,7 +17,7 @@
  * - ScreenshotStateView.tsx: Screenshot gallery with bounding box overlays
  */
 
-import React, { useState, useMemo, useEffect, useCallback, useRef } from "react";
+import React, { useState, useMemo, useEffect, useCallback } from "react";
 import {
   List as VirtualList,
   useListRef,
@@ -104,10 +104,12 @@ type StateRowProps = {
   effectiveSelectedStateId: string | null;
   viewMode: ViewMode;
   selectedStateIds: Set<string>;
-  onToggleExpanded: (stateId: string) => void;
   onRowClick: (state: StateMachineState, e: React.MouseEvent) => void;
-  dynamicRowHeight: ReturnType<typeof useDynamicRowHeight>;
 };
+
+// react-window's <List> auto-observes its container's children when rowHeight
+// is a DynamicRowHeight (see useDynamicRowHeight), so each row only needs to
+// accept the style/ariaAttributes props — no manual observer registration.
 
 function StateRow({
   index,
@@ -123,16 +125,8 @@ function StateRow({
   viewMode,
   selectedStateIds,
   onRowClick,
-  dynamicRowHeight,
 }: RowComponentProps<StateRowProps>) {
   const state = filteredStates[index]!;
-  const rowRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!rowRef.current) return;
-    return dynamicRowHeight.observeRowElements([rowRef.current]);
-  }, [dynamicRowHeight]);
-
   const colorIdx = states.indexOf(state);
   const color = STATE_COLORS[colorIdx % STATE_COLORS.length]!;
   const isSelected =
@@ -146,7 +140,7 @@ function StateRow({
   const isBlocking = state.extra_metadata?.blocking === true;
 
   return (
-    <div ref={rowRef} style={style} {...ariaAttributes}>
+    <div style={style} {...ariaAttributes}>
       <button
         data-ui-id={`state-item-${state.state_id}`}
         onClick={(e) => onRowClick(state, e)}
@@ -345,7 +339,7 @@ export function StateViewPanel({
     );
   }, [states, searchFilter]);
 
-  const toggleExpanded = (stateId: string) => {
+  const toggleExpanded = useCallback((stateId: string) => {
     setExpandedStates((prev) => {
       const next = new Set(prev);
       if (next.has(stateId)) {
@@ -355,7 +349,7 @@ export function StateViewPanel({
       }
       return next;
     });
-  };
+  }, []);
 
   const listRef = useListRef(null);
   const dynamicRowHeight = useDynamicRowHeight({ defaultRowHeight: 60 });
@@ -387,7 +381,7 @@ export function StateViewPanel({
       }
       if (!isExpanded) toggleExpanded(state.state_id);
     },
-    [viewMode, selectedStateIds, effectiveSelectedStateId, expandedStates],
+    [viewMode, selectedStateIds, effectiveSelectedStateId, expandedStates, toggleExpanded],
   );
 
   // Scroll the list to the selected state when it changes from outside.
@@ -479,9 +473,7 @@ export function StateViewPanel({
                 effectiveSelectedStateId,
                 viewMode,
                 selectedStateIds,
-                onToggleExpanded: toggleExpanded,
                 onRowClick: handleRowClick,
-                dynamicRowHeight,
               }}
               overscanCount={5}
               style={{ width: "100%", height: "100%" }}
