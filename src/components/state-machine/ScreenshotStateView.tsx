@@ -340,8 +340,14 @@ export function ScreenshotStateView({
     [getElementAtPoint],
   );
 
-  const handlePrev = () => setCurrentIndex(i => Math.max(0, i - 1));
-  const handleNext = () => setCurrentIndex(i => Math.min(captureScreenshots.length - 1, i + 1));
+  const handlePrev = useCallback(
+    () => setCurrentIndex(i => Math.max(0, i - 1)),
+    [],
+  );
+  const handleNext = useCallback(
+    () => setCurrentIndex(i => Math.min(captureScreenshots.length - 1, i + 1)),
+    [captureScreenshots.length],
+  );
 
   // Keyboard navigation
   useEffect(() => {
@@ -352,7 +358,7 @@ export function ScreenshotStateView({
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [captureScreenshots.length]);
+  }, [handlePrev, handleNext]);
 
   if (captureScreenshots.length === 0) {
     return (
