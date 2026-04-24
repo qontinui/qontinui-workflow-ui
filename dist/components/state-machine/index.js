@@ -14,7 +14,11 @@ import {
   BackgroundVariant as BackgroundVariant2
 } from "@xyflow/react";
 import { LayoutGrid, Keyboard, Maximize, Play as Play3 } from "lucide-react";
-import { getLayoutedElements as getLayoutedElements2, STATE_MACHINE_LAYOUT_OPTIONS as STATE_MACHINE_LAYOUT_OPTIONS2 } from "@qontinui/workflow-utils";
+import {
+  firstActionTargetString as firstActionTargetString2,
+  getLayoutedElements as getLayoutedElements2,
+  STATE_MACHINE_LAYOUT_OPTIONS as STATE_MACHINE_LAYOUT_OPTIONS2
+} from "@qontinui/workflow-utils";
 
 // src/components/state-machine/StateMachineStateNode.tsx
 import { memo, useMemo } from "react";
@@ -411,6 +415,7 @@ import {
 import { ArrowLeft as ArrowLeft2, Layers as Layers2 } from "lucide-react";
 import {
   chunkStateMachine,
+  firstActionTargetString,
   getLayoutedElements,
   STATE_MACHINE_LAYOUT_OPTIONS
 } from "@qontinui/workflow-utils";
@@ -580,11 +585,6 @@ var drilledNodeTypes = {
   chunkPort: ChunkPortNode
 };
 var drilledEdgeTypes = { transitionEdge: StateMachineTransitionEdge };
-function firstActionTargetString(action) {
-  if (typeof action?.target === "string") return action.target;
-  if (typeof action?.url === "string") return action.url;
-  return void 0;
-}
 function OverviewCanvasInner({
   chunkGraph,
   dagreLib,
@@ -1306,7 +1306,7 @@ function DrilledBreadcrumb({
           children: "All states"
         }
       ),
-      /* @__PURE__ */ jsx5("span", { className: "text-text-muted/60", children: "/" }),
+      /* @__PURE__ */ jsx5("span", { className: "text-text-muted/60", children: ">" }),
       /* @__PURE__ */ jsx5("span", { className: "text-text-primary font-medium truncate max-w-[240px]", children: chunkName })
     ] })
   ] });
@@ -1335,11 +1335,6 @@ function ChunkedGraphView(props) {
 import { Fragment as Fragment2, jsx as jsx6, jsxs as jsxs6 } from "react/jsx-runtime";
 var nodeTypes = { stateNode: StateMachineStateNode };
 var edgeTypes = { transitionEdge: StateMachineTransitionEdge };
-function firstActionTargetString2(action) {
-  if (typeof action?.target === "string") return action.target;
-  if (typeof action?.url === "string") return action.url;
-  return void 0;
-}
 var FIT_VIEW_OPTIONS2 = { padding: 0.2, minZoom: 0.3 };
 var FIT_VIEW_OPTIONS_ANIMATED = { ...FIT_VIEW_OPTIONS2, duration: 300 };
 var CHUNKED_VIEW_THRESHOLD = 80;

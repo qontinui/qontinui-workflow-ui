@@ -560,11 +560,6 @@ var drilledNodeTypes = {
   chunkPort: ChunkPortNode
 };
 var drilledEdgeTypes = { transitionEdge: StateMachineTransitionEdge };
-function firstActionTargetString(action) {
-  if (typeof action?.target === "string") return action.target;
-  if (typeof action?.url === "string") return action.url;
-  return void 0;
-}
 function OverviewCanvasInner({
   chunkGraph,
   dagreLib,
@@ -858,7 +853,7 @@ function DrilledCanvasInner({
               actionTypes: t.actions.map((a) => a.type),
               isHighlighted: highlightedTransitionIds.has(t.transition_id),
               staysVisible: t.stays_visible,
-              firstActionTarget: firstActionTargetString(t.actions[0])
+              firstActionTarget: (0, import_workflow_utils.firstActionTargetString)(t.actions[0])
             }
           });
         }
@@ -1286,7 +1281,7 @@ function DrilledBreadcrumb({
           children: "All states"
         }
       ),
-      /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("span", { className: "text-text-muted/60", children: "/" }),
+      /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("span", { className: "text-text-muted/60", children: ">" }),
       /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("span", { className: "text-text-primary font-medium truncate max-w-[240px]", children: chunkName })
     ] })
   ] });
@@ -1315,11 +1310,6 @@ function ChunkedGraphView(props) {
 var import_jsx_runtime6 = require("react/jsx-runtime");
 var nodeTypes = { stateNode: StateMachineStateNode };
 var edgeTypes = { transitionEdge: StateMachineTransitionEdge };
-function firstActionTargetString2(action) {
-  if (typeof action?.target === "string") return action.target;
-  if (typeof action?.url === "string") return action.url;
-  return void 0;
-}
 var FIT_VIEW_OPTIONS2 = { padding: 0.2, minZoom: 0.3 };
 var FIT_VIEW_OPTIONS_ANIMATED = { ...FIT_VIEW_OPTIONS2, duration: 300 };
 var CHUNKED_VIEW_THRESHOLD = 80;
@@ -1426,7 +1416,7 @@ function StateMachineGraphViewInner({
               actionTypes: trans.actions.map((a) => a.type),
               isHighlighted: highlightedTransitionIds.has(trans.transition_id),
               staysVisible: trans.stays_visible,
-              firstActionTarget: firstActionTargetString2(trans.actions[0])
+              firstActionTarget: (0, import_workflow_utils2.firstActionTargetString)(trans.actions[0])
             }
           });
         }

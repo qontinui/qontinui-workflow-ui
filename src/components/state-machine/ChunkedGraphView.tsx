@@ -50,6 +50,7 @@ import type {
 } from "@qontinui/shared-types";
 import {
   chunkStateMachine,
+  firstActionTargetString,
   getLayoutedElements,
   STATE_MACHINE_LAYOUT_OPTIONS,
   type Chunk,
@@ -99,16 +100,6 @@ const drilledNodeTypes = {
 };
 const drilledEdgeTypes = { transitionEdge: StateMachineTransitionEdge };
 
-// Some persisted action payloads store `target` as a recognition object
-// (e.g. `{ text: "Abort" }`) instead of the `string | null` the schema
-// declares. Rendering an object as a React child throws #31, so coerce.
-function firstActionTargetString(
-  action: StateMachineTransition["actions"][number] | undefined,
-): string | undefined {
-  if (typeof action?.target === "string") return action.target;
-  if (typeof action?.url === "string") return action.url;
-  return undefined;
-}
 
 // =============================================================================
 // Overview canvas
@@ -1015,7 +1006,7 @@ function DrilledBreadcrumb({
         >
           All states
         </button>
-        <span className="text-text-muted/60">/</span>
+        <span className="text-text-muted/60">&gt;</span>
         <span className="text-text-primary font-medium truncate max-w-[240px]">
           {chunkName}
         </span>

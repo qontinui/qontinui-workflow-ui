@@ -34,7 +34,11 @@ import type {
   TransitionEdgeData,
   PathfindingStep,
 } from "@qontinui/shared-types";
-import { getLayoutedElements, STATE_MACHINE_LAYOUT_OPTIONS } from "@qontinui/workflow-utils";
+import {
+  firstActionTargetString,
+  getLayoutedElements,
+  STATE_MACHINE_LAYOUT_OPTIONS,
+} from "@qontinui/workflow-utils";
 import { StateMachineStateNode } from "./StateMachineStateNode";
 import { StateMachineTransitionEdge } from "./StateMachineTransitionEdge";
 import { ChunkedGraphView } from "./ChunkedGraphView";
@@ -42,17 +46,6 @@ import { ChunkedGraphView } from "./ChunkedGraphView";
 // Register custom node/edge types once (outside component to avoid re-renders)
 const nodeTypes = { stateNode: StateMachineStateNode };
 const edgeTypes = { transitionEdge: StateMachineTransitionEdge };
-
-// Some persisted action payloads store `target` as a recognition object
-// (e.g. `{ text: "Abort" }`) instead of the `string | null` the schema
-// declares. Rendering an object as a React child throws #31, so coerce.
-function firstActionTargetString(
-  action: StateMachineTransition["actions"][number] | undefined,
-): string | undefined {
-  if (typeof action?.target === "string") return action.target;
-  if (typeof action?.url === "string") return action.url;
-  return undefined;
-}
 
 // Shared fitView options. minZoom prevents fitView from zooming so far out
 // that every node lands in the viewport on large graphs, which would defeat
