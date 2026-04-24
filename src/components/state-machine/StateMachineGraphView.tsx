@@ -135,6 +135,36 @@ export interface StateMachineGraphViewProps {
   // --- Element thumbnails (optional) ---
   /** Map of element ID → base64 PNG thumbnail for rendering in state node tiles. */
   elementThumbnails?: Record<string, string>;
+
+  // --- Chunked-view search (optional) ---
+  /**
+   * If set, the chunked overview narrows to chunks containing matching
+   * states and shows per-chunk match counts (`Login flow (2 matches)`).
+   * Case-insensitive substring match against each state's name and
+   * description. Has no effect on the non-chunked single-view path.
+   * Consumers typically thread this through from a page-level search
+   * input — if no such input exists above `<StateMachineGraphView>`,
+   * leave it undefined.
+   */
+  searchQuery?: string;
+
+  // --- Chunk labels (optional, chunked view only) ---
+  /**
+   * User-chosen chunk labels keyed by chunk id (stable djb2 hash under
+   * input reorder). When set, overrides the auto-derived `chunk.name`
+   * shown in the chunked overview.
+   *
+   * Ignored when the graph is below the chunking threshold (single-view
+   * path doesn't render chunk cards).
+   */
+  chunkLabels?: Map<string, string>;
+  /**
+   * Called when the user saves a new chunk label. Passing an empty string
+   * removes the override and the view falls back to the auto-derived
+   * name. When this callback is absent the library renders the chunked
+   * overview read-only — the rename affordance is hidden entirely.
+   */
+  onSaveChunkLabel?: (chunkId: string, label: string) => void;
 }
 
 // =============================================================================

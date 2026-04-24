@@ -400,11 +400,111 @@ var import_react5 = require("react");
 var import_react6 = require("@xyflow/react");
 var import_lucide_react3 = require("lucide-react");
 var import_jsx_runtime3 = require("react/jsx-runtime");
+function buildTooltip(chunkName, stateNames) {
+  if (!stateNames || stateNames.length === 0) return chunkName;
+  const visible = stateNames.slice(0, 15);
+  const overflow = stateNames.length > 15 ? `
+\u2026 +${stateNames.length - 15} more` : "";
+  return `${chunkName}
+
+${visible.join("\n")}${overflow}`;
+}
 function ChunkOverviewNodeInner({ data, selected }) {
-  const { chunk, matchCount } = data;
+  const {
+    chunk,
+    matchCount,
+    stateNames,
+    isExpanded,
+    onToggleExpand,
+    userLabel,
+    onSaveLabel
+  } = data;
   const stateCount = chunk.stateIds.length;
   const plural = stateCount !== 1 ? "s" : "";
   const matchPlural = matchCount !== 1 ? "es" : "";
+  const showExpandToggle = chunk.kind === "chain" && typeof onToggleExpand === "function";
+  const showRenameAffordance = typeof onSaveLabel === "function";
+  const effectiveName = userLabel && userLabel.length > 0 ? userLabel : chunk.name;
+  const [isEditing, setIsEditing] = (0, import_react5.useState)(false);
+  const [draft, setDraft] = (0, import_react5.useState)(effectiveName);
+  const inputRef = (0, import_react5.useRef)(null);
+  (0, import_react5.useEffect)(() => {
+    if (!isEditing) setDraft(effectiveName);
+  }, [effectiveName, isEditing]);
+  (0, import_react5.useEffect)(() => {
+    if (isEditing) {
+      inputRef.current?.focus();
+      inputRef.current?.select();
+    }
+  }, [isEditing]);
+  const handleStartEdit = (0, import_react5.useCallback)(
+    (e) => {
+      e.stopPropagation();
+      e.preventDefault();
+      if (!showRenameAffordance) return;
+      setDraft(effectiveName);
+      setIsEditing(true);
+    },
+    [effectiveName, showRenameAffordance]
+  );
+  const hasCommittedRef = (0, import_react5.useRef)(false);
+  const commit = (0, import_react5.useCallback)(() => {
+    if (!onSaveLabel) {
+      setIsEditing(false);
+      return;
+    }
+    if (hasCommittedRef.current) return;
+    hasCommittedRef.current = true;
+    const trimmed = draft.trim();
+    onSaveLabel(chunk.id, trimmed);
+    setIsEditing(false);
+  }, [draft, chunk.id, onSaveLabel]);
+  const cancel = (0, import_react5.useCallback)(() => {
+    hasCommittedRef.current = true;
+    setDraft(effectiveName);
+    setIsEditing(false);
+  }, [effectiveName]);
+  const handleKeyDown = (0, import_react5.useCallback)(
+    (e) => {
+      e.stopPropagation();
+      if (e.key === "Enter") {
+        e.preventDefault();
+        commit();
+      } else if (e.key === "Escape") {
+        e.preventDefault();
+        cancel();
+      }
+    },
+    [commit, cancel]
+  );
+  const handleBlur = (0, import_react5.useCallback)(() => {
+    commit();
+  }, [commit]);
+  const handleInputChange = (0, import_react5.useCallback)(
+    (e) => {
+      setDraft(e.target.value);
+    },
+    []
+  );
+  (0, import_react5.useEffect)(() => {
+    if (isEditing) {
+      hasCommittedRef.current = false;
+    }
+  }, [isEditing]);
+  const stopPropagation = (0, import_react5.useCallback)((e) => {
+    e.stopPropagation();
+  }, []);
+  const handleToggleClick = (0, import_react5.useCallback)(
+    (e) => {
+      e.stopPropagation();
+      e.preventDefault();
+      onToggleExpand?.(chunk.id);
+    },
+    [onToggleExpand, chunk.id]
+  );
+  const handleToggleMouseDown = (0, import_react5.useCallback)((e) => {
+    e.stopPropagation();
+  }, []);
   return /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { "data-chunk-id": chunk.id, style: { width: 200 }, children: [
     /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(
       import_react6.Handle,
@@ -417,13 +517,14 @@ function ChunkOverviewNodeInner({ data, selected }) {
     /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)(
       "div",
       {
+        title: buildTooltip(effectiveName, stateNames),
         className: `
           rounded-lg border-2 px-3 py-2.5 shadow-md
           transition-all duration-150
           ${selected ? "border-indigo-400 bg-indigo-500/15 ring-2 ring-indigo-400/40 shadow-indigo-500/20 shadow-lg" : chunk.containsInitialState ? "border-indigo-400/70 bg-bg-secondary/80 hover:border-indigo-300 hover:shadow-lg" : "border-indigo-500/40 bg-bg-secondary/60 hover:border-indigo-400 hover:shadow-lg"}
         `,
         children: [
-          /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "flex items-center gap-1.5 mb-1", children: [
+          /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "flex items-center gap-1.5 mb-1 group", children: [
             chunk.containsInitialState && /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(
               import_lucide_react3.Play,
               {
@@ -444,7 +545,46 @@ function ChunkOverviewNodeInner({ data, selected }) {
                 "aria-label": "Linear chain"
               }
             ),
-            /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("span", { className: "text-xs font-medium text-text-primary truncate flex-1", children: chunk.name })
+            isEditing ? /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(
+              "input",
+              {
+                ref: inputRef,
+                type: "text",
+                value: draft,
+                onChange: handleInputChange,
+                onKeyDown: handleKeyDown,
+                onBlur: handleBlur,
+                onClick: stopPropagation,
+                onMouseDown: stopPropagation,
+                className: "flex-1 min-w-0 text-xs font-medium text-text-primary bg-bg-primary border border-indigo-400 rounded px-1 py-0.5 outline-hidden focus:ring-1 focus:ring-indigo-400 nodrag",
+                placeholder: chunk.name,
+                "aria-label": "Chunk label"
+              }
+            ) : /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("span", { className: "text-xs font-medium text-text-primary truncate flex-1", children: effectiveName }),
+            !isEditing && showRenameAffordance && /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(
+              "button",
+              {
+                type: "button",
+                onClick: handleStartEdit,
+                onMouseDown: stopPropagation,
+                className: "shrink-0 p-0.5 rounded hover:bg-indigo-500/20 text-indigo-300/60 hover:text-indigo-200 transition-colors nodrag opacity-0 group-hover:opacity-100",
+                title: "Rename chunk",
+                "aria-label": "Rename chunk",
+                children: /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(import_lucide_react3.Pencil, { className: "size-3" })
+              }
+            ),
+            !isEditing && showExpandToggle && /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(
+              "button",
+              {
+                type: "button",
+                onClick: handleToggleClick,
+                onMouseDown: handleToggleMouseDown,
+                className: "shrink-0 p-0.5 rounded hover:bg-indigo-500/20 text-indigo-300 hover:text-indigo-200 transition-colors nodrag",
+                title: isExpanded ? "Collapse chain" : "Expand chain inline",
+                "aria-label": isExpanded ? "Collapse chain" : "Expand chain inline",
+                children: isExpanded ? /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(import_lucide_react3.ChevronDown, { className: "size-3" }) : /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(import_lucide_react3.ChevronRight, { className: "size-3" })
+              }
+            )
           ] }),
           /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "text-[10px] text-text-muted", children: [
             stateCount,
@@ -553,8 +693,11 @@ var OVERVIEW_LAYOUT_OPTIONS = {
   nodeSep: 60,
   rankSep: 100
 };
-var overviewNodeTypes = { chunkOverview: ChunkOverviewNode };
-var overviewEdgeTypes = {};
+var overviewNodeTypes = {
+  chunkOverview: ChunkOverviewNode,
+  stateNode: StateMachineStateNode
+};
+var overviewEdgeTypes = { transitionEdge: StateMachineTransitionEdge };
 var drilledNodeTypes = {
   stateNode: StateMachineStateNode,
   chunkPort: ChunkPortNode
@@ -563,25 +706,123 @@ var drilledEdgeTypes = { transitionEdge: StateMachineTransitionEdge };
 function OverviewCanvasInner({
   chunkGraph,
   dagreLib,
-  onDrillIn
+  onDrillIn,
+  stateNamesByChunkId,
+  perChunkMatches,
+  expandedChainIds,
+  onToggleChainExpand,
+  chunkLabels,
+  onSaveChunkLabel,
+  states,
+  transitionCounts,
+  effectiveInitialStateId,
+  selectedStateId,
+  onSelectState,
+  onSelectTransition,
+  elementThumbnails
 }) {
   const reactFlowInstance = (0, import_react10.useReactFlow)();
-  const baseNodes = (0, import_react9.useMemo)(
-    () => chunkGraph.chunks.map((chunk) => ({
-      id: chunk.id,
-      type: "chunkOverview",
-      position: { x: 0, y: 0 },
-      data: { chunk }
-    })),
-    [chunkGraph.chunks]
+  const stateById = (0, import_react9.useMemo)(() => {
+    const m = /* @__PURE__ */ new Map();
+    for (const s of states) m.set(s.state_id, s);
+    return m;
+  }, [states]);
+  const baseNodes = (0, import_react9.useMemo)(() => {
+    const list = [];
+    for (const chunk of chunkGraph.chunks) {
+      if (perChunkMatches !== null && !perChunkMatches.has(chunk.id)) {
+        continue;
+      }
+      const isExpandedChain = chunk.kind === "chain" && expandedChainIds.has(chunk.id);
+      if (isExpandedChain) {
+        for (const stateId of chunk.stateIds) {
+          const state = stateById.get(stateId);
+          if (!state) continue;
+          list.push({
+            id: stateId,
+            type: "stateNode",
+            position: { x: 0, y: 0 },
+            data: {
+              stateId: state.state_id,
+              name: state.name,
+              elementCount: state.element_ids.length,
+              confidence: state.confidence,
+              elementIds: state.element_ids,
+              description: state.description ?? null,
+              isBlocking: state.extra_metadata?.blocking === true,
+              isSelected: state.state_id === selectedStateId,
+              isInitial: state.state_id === effectiveInitialStateId,
+              outgoingCount: transitionCounts.outgoing.get(state.state_id) ?? 0,
+              incomingCount: transitionCounts.incoming.get(state.state_id) ?? 0,
+              isDropTarget: false,
+              onStartElementDrag: void 0,
+              elementThumbnails
+            }
+          });
+        }
+      } else {
+        list.push({
+          id: chunk.id,
+          type: "chunkOverview",
+          position: { x: 0, y: 0 },
+          data: {
+            chunk,
+            matchCount: perChunkMatches?.get(chunk.id),
+            stateNames: stateNamesByChunkId.get(chunk.id),
+            isExpanded: false,
+            onToggleExpand: chunk.kind === "chain" ? onToggleChainExpand : void 0,
+            userLabel: chunkLabels?.get(chunk.id),
+            onSaveLabel: onSaveChunkLabel
+          }
+        });
+      }
+    }
+    return list;
+  }, [
+    chunkGraph.chunks,
+    perChunkMatches,
+    expandedChainIds,
+    stateById,
+    selectedStateId,
+    effectiveInitialStateId,
+    transitionCounts,
+    elementThumbnails,
+    stateNamesByChunkId,
+    onToggleChainExpand,
+    chunkLabels,
+    onSaveChunkLabel
+  ]);
+  const expandedEndpointFor = (0, import_react9.useCallback)(
+    (chunkId, role) => {
+      if (!expandedChainIds.has(chunkId)) return null;
+      const chunk = chunkGraph.chunks.find((c) => c.id === chunkId);
+      if (!chunk || chunk.stateIds.length === 0) return null;
+      if (role === "source") {
+        const tail = chunk.stateIds[chunk.stateIds.length - 1];
+        return { id: tail, kind: "chain-tail" };
+      }
+      const head = chunk.stateIds[0];
+      return { id: head, kind: "chain-head" };
+    },
+    [expandedChainIds, chunkGraph.chunks]
   );
-  const baseEdges = (0, import_react9.useMemo)(
-    () => chunkGraph.edges.map((e) => {
+  const baseEdges = (0, import_react9.useMemo)(() => {
+    const list = [];
+    for (const e of chunkGraph.edges) {
+      if (perChunkMatches !== null) {
+        if (!perChunkMatches.has(e.from) || !perChunkMatches.has(e.to)) {
+          continue;
+        }
+      }
+      const sourceRemap = expandedEndpointFor(e.from, "source");
+      const targetRemap = expandedEndpointFor(e.to, "target");
+      const source = sourceRemap?.id ?? e.from;
+      const target = targetRemap?.id ?? e.to;
       const thickness = Math.log(Math.max(e.transitionCount, 1)) + 1;
-      return {
+      list.push({
         id: `chunk-edge-${e.from}-${e.to}`,
-        source: e.from,
-        target: e.to,
+        source,
+        target,
         markerEnd: { type: import_react10.MarkerType.ArrowClosed, width: 15, height: 15 },
         label: String(e.transitionCount),
         labelBgPadding: [4, 2],
@@ -600,10 +841,36 @@ function OverviewCanvasInner({
           strokeWidth: thickness,
           stroke: "var(--border-secondary, #555)"
         }
-      };
-    }),
-    [chunkGraph.edges]
-  );
+      });
+    }
+    for (const chunkId of expandedChainIds) {
+      const chunk = chunkGraph.chunks.find((c) => c.id === chunkId);
+      if (!chunk || chunk.kind !== "chain") continue;
+      if (perChunkMatches !== null && !perChunkMatches.has(chunkId)) continue;
+      for (let i = 0; i < chunk.stateIds.length - 1; i++) {
+        const from = chunk.stateIds[i];
+        const to = chunk.stateIds[i + 1];
+        list.push({
+          id: `chain-inline-${chunkId}-${from}-${to}`,
+          source: from,
+          target: to,
+          markerEnd: { type: import_react10.MarkerType.ArrowClosed, width: 12, height: 12 },
+          style: {
+            stroke: "var(--indigo-400, #818cf8)",
+            strokeWidth: 1.5,
+            opacity: 0.7
+          }
+        });
+      }
+    }
+    return list;
+  }, [
+    chunkGraph.edges,
+    chunkGraph.chunks,
+    perChunkMatches,
+    expandedEndpointFor,
+    expandedChainIds
+  ]);
   const layouted = (0, import_react9.useMemo)(() => {
     if (baseNodes.length === 0) return { nodes: [], edges: [] };
     return (0, import_workflow_utils.getLayoutedElements)(
@@ -628,12 +895,20 @@ function OverviewCanvasInner({
     ({ nodes: selectedNodes }) => {
       const first = selectedNodes[0];
       if (!first) return;
-      const d = first.data;
-      if (!d?.chunk) return;
-      onDrillIn(d.chunk.id);
-      clearOverviewSelection();
+      if (first.type === "chunkOverview") {
+        const d = first.data;
+        if (!d?.chunk) return;
+        onDrillIn(d.chunk.id);
+        clearOverviewSelection();
+        return;
+      }
+      if (first.type === "stateNode") {
+        const d = first.data;
+        onSelectState(d.stateId);
+        onSelectTransition(null);
+      }
     },
-    [onDrillIn, clearOverviewSelection]
+    [onDrillIn, clearOverviewSelection, onSelectState, onSelectTransition]
   );
   const fitView = (0, import_react9.useCallback)(() => {
     reactFlowInstance.fitView({ ...FIT_VIEW_OPTIONS, duration: 300 });
@@ -705,6 +980,7 @@ function DrilledCanvasInner({
   selectedTransitionId,
   effectiveInitialStateId,
   elementThumbnails,
+  chunkLabels,
   highlightedTransitionIds,
   transitionCounts,
   onSelectState,
@@ -780,9 +1056,12 @@ function DrilledCanvasInner({
   }, [transitions, chunkStateIds, chunkGraph, chunk.id]);
   const chunkNameById = (0, import_react9.useMemo)(() => {
     const m = /* @__PURE__ */ new Map();
-    for (const c of chunkGraph.chunks) m.set(c.id, c.name);
+    for (const c of chunkGraph.chunks) {
+      const override = chunkLabels?.get(c.id);
+      m.set(c.id, override && override.length > 0 ? override : c.name);
+    }
     return m;
-  }, [chunkGraph.chunks]);
+  }, [chunkGraph.chunks, chunkLabels]);
   const stateNodes = (0, import_react9.useMemo)(
     () => chunkStates.map((state) => ({
       id: state.state_id,
@@ -1129,7 +1408,10 @@ function ChunkedGraphViewInner(props) {
     onDrop,
     isDragging,
     dropTargetStateId,
-    resolveTransitionSelectionId
+    resolveTransitionSelectionId,
+    searchQuery,
+    chunkLabels,
+    onSaveChunkLabel
   } = props;
   const effectiveInitialStateId = (0, import_react9.useMemo)(() => {
     if (initialStateId) return initialStateId;
@@ -1166,6 +1448,43 @@ function ChunkedGraphViewInner(props) {
     [highlightedPath]
   );
   const [viewMode, setViewMode] = (0, import_react9.useState)({ kind: "overview" });
+  const [expandedChainIds, setExpandedChainIds] = (0, import_react9.useState)(
+    () => /* @__PURE__ */ new Set()
+  );
+  const toggleChainExpand = (0, import_react9.useCallback)((chunkId) => {
+    setExpandedChainIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(chunkId)) next.delete(chunkId);
+      else next.add(chunkId);
+      return next;
+    });
+  }, []);
+  const stateNamesByChunkId = (0, import_react9.useMemo)(() => {
+    const nameById = /* @__PURE__ */ new Map();
+    for (const s of states) nameById.set(s.state_id, s.name);
+    const m = /* @__PURE__ */ new Map();
+    for (const c of chunkGraph.chunks) {
+      m.set(
+        c.id,
+        c.stateIds.map((id) => nameById.get(id) ?? id)
+      );
+    }
+    return m;
+  }, [chunkGraph.chunks, states]);
+  const perChunkMatches = (0, import_react9.useMemo)(() => {
+    const q = (searchQuery ?? "").trim().toLowerCase();
+    if (!q) return null;
+    const m = /* @__PURE__ */ new Map();
+    for (const s of states) {
+      const name = s.name.toLowerCase();
+      const desc = (s.description ?? "").toLowerCase();
+      if (name.includes(q) || desc.includes(q)) {
+        const cid = chunkGraph.stateIndex.get(s.state_id);
+        if (cid) m.set(cid, (m.get(cid) ?? 0) + 1);
+      }
+    }
+    return m;
+  }, [searchQuery, states, chunkGraph.stateIndex]);
   const currentChunkId = viewMode.kind === "drilled" ? viewMode.chunkId : null;
   (0, import_react9.useEffect)(() => {
     if (!selectedStateId) return;
@@ -1201,6 +1520,7 @@ function ChunkedGraphViewInner(props) {
       return /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(ChunkedGraphViewFallbackMissingChunk, { onBack: goOverview });
     }
     const isGiant = chunk.stateIds.length > CHUNK_MAX_NODES;
+    const drilledName = chunkLabels?.get(chunk.id) || chunk.name;
     return /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)(
       "div",
       {
@@ -1208,7 +1528,7 @@ function ChunkedGraphViewInner(props) {
         onDragOver,
         onDrop,
         children: [
-          /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(DrilledBreadcrumb, { chunkName: chunk.name, onBack: goOverview }),
+          /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(DrilledBreadcrumb, { chunkName: drilledName, onBack: goOverview }),
           /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("div", { className: "flex-1 min-h-0", children: isGiant ? /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(
             GiantChunkPanel,
             {
@@ -1229,6 +1549,7 @@ function ChunkedGraphViewInner(props) {
               selectedTransitionId,
               effectiveInitialStateId,
               elementThumbnails,
+              chunkLabels,
               highlightedTransitionIds,
               transitionCounts,
               onSelectState,
@@ -1249,7 +1570,20 @@ function ChunkedGraphViewInner(props) {
     {
       chunkGraph,
       dagreLib,
-      onDrillIn: drillInto
+      onDrillIn: drillInto,
+      stateNamesByChunkId,
+      perChunkMatches,
+      expandedChainIds,
+      onToggleChainExpand: toggleChainExpand,
+      chunkLabels,
+      onSaveChunkLabel,
+      states,
+      transitionCounts,
+      effectiveInitialStateId,
+      selectedStateId,
+      onSelectState,
+      onSelectTransition,
+      elementThumbnails
     }
   ) });
 }

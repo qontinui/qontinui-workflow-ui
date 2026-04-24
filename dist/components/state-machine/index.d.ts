@@ -64,6 +64,32 @@ interface StateMachineGraphViewProps {
     extraShortcutEntries?: [string, string][];
     /** Map of element ID → base64 PNG thumbnail for rendering in state node tiles. */
     elementThumbnails?: Record<string, string>;
+    /**
+     * If set, the chunked overview narrows to chunks containing matching
+     * states and shows per-chunk match counts (`Login flow (2 matches)`).
+     * Case-insensitive substring match against each state's name and
+     * description. Has no effect on the non-chunked single-view path.
+     * Consumers typically thread this through from a page-level search
+     * input — if no such input exists above `<StateMachineGraphView>`,
+     * leave it undefined.
+     */
+    searchQuery?: string;
+    /**
+     * User-chosen chunk labels keyed by chunk id (stable djb2 hash under
+     * input reorder). When set, overrides the auto-derived `chunk.name`
+     * shown in the chunked overview.
+     *
+     * Ignored when the graph is below the chunking threshold (single-view
+     * path doesn't render chunk cards).
+     */
+    chunkLabels?: Map<string, string>;
+    /**
+     * Called when the user saves a new chunk label. Passing an empty string
+     * removes the override and the view falls back to the auto-derived
+     * name. When this callback is absent the library renders the chunked
+     * overview read-only — the rename affordance is hidden entirely.
+     */
+    onSaveChunkLabel?: (chunkId: string, label: string) => void;
 }
 declare function StateMachineGraphView(props: StateMachineGraphViewProps): react_jsx_runtime.JSX.Element;
 
@@ -74,6 +100,37 @@ declare function ChunkedGraphView(props: ChunkedGraphViewProps): react_jsx_runti
 interface ChunkNodeData {
     chunk: Chunk;
     matchCount?: number;
+    /**
+     * Names of the states contained in this chunk, used to populate the
+     * hover tooltip. Supplied by the chunk node builder; if absent the
+     * tooltip degrades to showing only the chunk name.
+     */
+    stateNames?: string[];
+    /**
+     * True when this chain chunk is currently expanded inline in the
+     * overview (so that the chevron renders rotated). Ignored for
+     * non-chain chunks.
+     */
+    isExpanded?: boolean;
+    /**
+     * Toggle inline-expansion of a chain chunk. When provided AND the
+     * chunk is a chain, a chevron toggle button is rendered on the card
+     * header. Clicking the toggle calls this (and swallows the event so
+     * the body click — which drills in — doesn't also fire).
+     */
+    onToggleExpand?: (chunkId: string) => void;
+    /**
+     * User-chosen label override. If set and non-empty, takes precedence
+     * over `chunk.name` in the rendered card header and tooltip.
+     */
+    userLabel?: string;
+    /**
+     * Called when the user saves a new label. Passing an empty string
+     * removes the override (the view reverts to the auto-derived name).
+     * When this prop is absent the rename affordance (pencil icon) is not
+     * rendered — the library is effectively read-only for renames.
+     */
+    onSaveLabel?: (chunkId: string, label: string) => void;
 }
 declare function ChunkOverviewNodeInner({ data, selected }: NodeProps): react_jsx_runtime.JSX.Element;
 declare const ChunkOverviewNode: React$1.MemoExoticComponent<typeof ChunkOverviewNodeInner>;

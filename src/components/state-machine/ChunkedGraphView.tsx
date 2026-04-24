@@ -92,8 +92,15 @@ const OVERVIEW_LAYOUT_OPTIONS = {
 // Node types maps — registered once, outside components, to avoid
 // ReactFlow's "it looks like you've created a new nodeTypes or edgeTypes
 // object" warning that forces a full re-render.
-const overviewNodeTypes = { chunkOverview: ChunkOverviewNode };
-const overviewEdgeTypes = {};
+//
+// The overview also registers `stateNode` + `transitionEdge` so a chain
+// chunk that is inline-expanded can render its component states directly
+// inside the overview canvas (v2 expand-inline alternative to drill-in).
+const overviewNodeTypes = {
+  chunkOverview: ChunkOverviewNode,
+  stateNode: StateMachineStateNode,
+};
+const overviewEdgeTypes = { transitionEdge: StateMachineTransitionEdge };
 const drilledNodeTypes = {
   stateNode: StateMachineStateNode,
   chunkPort: ChunkPortNode,
@@ -109,58 +116,261 @@ interface OverviewCanvasProps {
   chunkGraph: ChunkGraph;
   dagreLib: StateMachineGraphViewProps["dagre"];
   onDrillIn: (chunkId: string) => void;
+  /**
+   * Names of states contained in each chunk, keyed by chunk id. Used to
+   * populate per-chunk hover tooltips. May be absent (tooltip degrades).
+   */
+  stateNamesByChunkId: Map<string, string[]>;
+  /**
+   * Per-chunk match counts when a search is active; `null` means "no
+   * search / show everything". When set to a Map, chunks not present
+   * in the map are filtered out of the overview.
+   */
+  perChunkMatches: Map<string, number> | null;
+  /** Set of chain chunks currently inline-expanded. */
+  expandedChainIds: Set<string>;
+  /** Toggle a chain chunk's inline expansion. */
+  onToggleChainExpand: (chunkId: string) => void;
+  /**
+   * User-chosen chunk labels keyed by chunk id. When set and non-empty,
+   * overrides the auto-derived `chunk.name` on the chunk card.
+   */
+  chunkLabels?: Map<string, string>;
+  /**
+   * Save handler for chunk label overrides. Empty strings remove the
+   * override. When absent, the rename affordance is hidden in the
+   * chunk card (read-only).
+   */
+  onSaveChunkLabel?: (chunkId: string, label: string) => void;
+  /**
+   * Full state list — needed so inline-expanded chain chunks can render
+   * real `stateNode`s with the same data shape as the drilled canvas.
+   */
+  states: StateMachineState[];
+  /**
+   * Transition counts across the whole graph; used to populate the
+   * incoming/outgoing badges on inline-expanded state nodes. Mirrors
+   * the drilled canvas so badges stay consistent.
+   */
+  transitionCounts: {
+    outgoing: Map<string, number>;
+    incoming: Map<string, number>;
+  };
+  effectiveInitialStateId: string | null;
+  selectedStateId: string | null;
+  /** State-selection handler (fires when an inline-expanded state is clicked). */
+  onSelectState: (stateId: string | null) => void;
+  onSelectTransition: (transitionId: string | null) => void;
+  elementThumbnails?: Record<string, string>;
 }
 
 function OverviewCanvasInner({
   chunkGraph,
   dagreLib,
   onDrillIn,
+  stateNamesByChunkId,
+  perChunkMatches,
+  expandedChainIds,
+  onToggleChainExpand,
+  chunkLabels,
+  onSaveChunkLabel,
+  states,
+  transitionCounts,
+  effectiveInitialStateId,
+  selectedStateId,
+  onSelectState,
+  onSelectTransition,
+  elementThumbnails,
 }: OverviewCanvasProps) {
   const reactFlowInstance = useReactFlow();
 
-  // Build chunk nodes.
-  const baseNodes: Node[] = useMemo(
-    () =>
-      chunkGraph.chunks.map((chunk) => ({
-        id: chunk.id,
-        type: "chunkOverview",
-        position: { x: 0, y: 0 },
-        data: { chunk } satisfies ChunkNodeData,
-      })),
-    [chunkGraph.chunks],
+  // State lookup for inline-expanded chain rendering.
+  const stateById = useMemo(() => {
+    const m = new Map<string, StateMachineState>();
+    for (const s of states) m.set(s.state_id, s);
+    return m;
+  }, [states]);
+
+  // Build chunk nodes — plus, for each inline-expanded chain, a sequence
+  // of real stateNodes instead of the chunk card.
+  //
+  // When `perChunkMatches` is set (search active), chunks with zero
+  // matches are filtered out entirely. Expanded chains still respect
+  // this filter via their parent chunk.
+  const baseNodes: Node[] = useMemo(() => {
+    const list: Node[] = [];
+    for (const chunk of chunkGraph.chunks) {
+      // Search filter: drop chunks with no matching states.
+      if (perChunkMatches !== null && !perChunkMatches.has(chunk.id)) {
+        continue;
+      }
+
+      const isExpandedChain =
+        chunk.kind === "chain" && expandedChainIds.has(chunk.id);
+
+      if (isExpandedChain) {
+        // Emit one stateNode per state in the chain, in order.
+        for (const stateId of chunk.stateIds) {
+          const state = stateById.get(stateId);
+          if (!state) continue;
+          list.push({
+            id: stateId,
+            type: "stateNode",
+            position: { x: 0, y: 0 },
+            data: {
+              stateId: state.state_id,
+              name: state.name,
+              elementCount: state.element_ids.length,
+              confidence: state.confidence,
+              elementIds: state.element_ids,
+              description: state.description ?? null,
+              isBlocking:
+                (state.extra_metadata as Record<string, unknown>)?.blocking ===
+                true,
+              isSelected: state.state_id === selectedStateId,
+              isInitial: state.state_id === effectiveInitialStateId,
+              outgoingCount: transitionCounts.outgoing.get(state.state_id) ?? 0,
+              incomingCount: transitionCounts.incoming.get(state.state_id) ?? 0,
+              isDropTarget: false,
+              onStartElementDrag: undefined,
+              elementThumbnails,
+            } satisfies StateNodeData,
+          });
+        }
+      } else {
+        list.push({
+          id: chunk.id,
+          type: "chunkOverview",
+          position: { x: 0, y: 0 },
+          data: {
+            chunk,
+            matchCount: perChunkMatches?.get(chunk.id),
+            stateNames: stateNamesByChunkId.get(chunk.id),
+            isExpanded: false,
+            onToggleExpand:
+              chunk.kind === "chain" ? onToggleChainExpand : undefined,
+            userLabel: chunkLabels?.get(chunk.id),
+            onSaveLabel: onSaveChunkLabel,
+          } satisfies ChunkNodeData,
+        });
+      }
+    }
+    return list;
+  }, [
+    chunkGraph.chunks,
+    perChunkMatches,
+    expandedChainIds,
+    stateById,
+    selectedStateId,
+    effectiveInitialStateId,
+    transitionCounts,
+    elementThumbnails,
+    stateNamesByChunkId,
+    onToggleChainExpand,
+    chunkLabels,
+    onSaveChunkLabel,
+  ]);
+
+  // For inline-expanded chains, rewrite cross-chunk edge endpoints so
+  // they connect to the chain's first state (inbound) or last state
+  // (outbound) instead of the now-missing chunk node. This matches the
+  // "chain = linear flow" semantic — entry flows to the head, exit
+  // flows from the tail.
+  const expandedEndpointFor = useCallback(
+    (
+      chunkId: string,
+      role: "source" | "target",
+    ): { id: string; kind: "chain-head" | "chain-tail" } | null => {
+      if (!expandedChainIds.has(chunkId)) return null;
+      const chunk = chunkGraph.chunks.find((c) => c.id === chunkId);
+      if (!chunk || chunk.stateIds.length === 0) return null;
+      if (role === "source") {
+        // Outbound from this expanded chain → use the tail.
+        const tail = chunk.stateIds[chunk.stateIds.length - 1]!;
+        return { id: tail, kind: "chain-tail" };
+      }
+      // Inbound into this expanded chain → use the head.
+      const head = chunk.stateIds[0]!;
+      return { id: head, kind: "chain-head" };
+    },
+    [expandedChainIds, chunkGraph.chunks],
   );
 
-  // Build aggregated cross-chunk edges.
-  const baseEdges: Edge[] = useMemo(
-    () =>
-      chunkGraph.edges.map((e) => {
-        const thickness = Math.log(Math.max(e.transitionCount, 1)) + 1;
-        return {
-          id: `chunk-edge-${e.from}-${e.to}`,
-          source: e.from,
-          target: e.to,
-          markerEnd: { type: MarkerType.ArrowClosed, width: 15, height: 15 },
-          label: String(e.transitionCount),
-          labelBgPadding: [4, 2] as [number, number],
-          labelBgBorderRadius: 4,
-          labelBgStyle: {
-            fill: "var(--bg-secondary, #1a1a1a)",
-            stroke: "var(--border-secondary, #333)",
-            strokeWidth: 1,
-          },
-          labelStyle: {
-            fontSize: 10,
-            fill: "var(--text-muted, #999)",
-            fontWeight: 500,
-          },
+  // Build aggregated cross-chunk edges + internal chain edges for
+  // inline-expanded chains.
+  const baseEdges: Edge[] = useMemo(() => {
+    const list: Edge[] = [];
+
+    // Cross-chunk edges. Skip edges whose endpoint was filtered out by
+    // the search narrowing; rewrite endpoints for inline-expanded chains.
+    for (const e of chunkGraph.edges) {
+      if (perChunkMatches !== null) {
+        if (!perChunkMatches.has(e.from) || !perChunkMatches.has(e.to)) {
+          continue;
+        }
+      }
+
+      const sourceRemap = expandedEndpointFor(e.from, "source");
+      const targetRemap = expandedEndpointFor(e.to, "target");
+      const source = sourceRemap?.id ?? e.from;
+      const target = targetRemap?.id ?? e.to;
+
+      const thickness = Math.log(Math.max(e.transitionCount, 1)) + 1;
+      list.push({
+        id: `chunk-edge-${e.from}-${e.to}`,
+        source,
+        target,
+        markerEnd: { type: MarkerType.ArrowClosed, width: 15, height: 15 },
+        label: String(e.transitionCount),
+        labelBgPadding: [4, 2] as [number, number],
+        labelBgBorderRadius: 4,
+        labelBgStyle: {
+          fill: "var(--bg-secondary, #1a1a1a)",
+          stroke: "var(--border-secondary, #333)",
+          strokeWidth: 1,
+        },
+        labelStyle: {
+          fontSize: 10,
+          fill: "var(--text-muted, #999)",
+          fontWeight: 500,
+        },
+        style: {
+          strokeWidth: thickness,
+          stroke: "var(--border-secondary, #555)",
+        },
+      });
+    }
+
+    // Internal sequential edges for each inline-expanded chain.
+    for (const chunkId of expandedChainIds) {
+      const chunk = chunkGraph.chunks.find((c) => c.id === chunkId);
+      if (!chunk || chunk.kind !== "chain") continue;
+      if (perChunkMatches !== null && !perChunkMatches.has(chunkId)) continue;
+      for (let i = 0; i < chunk.stateIds.length - 1; i++) {
+        const from = chunk.stateIds[i]!;
+        const to = chunk.stateIds[i + 1]!;
+        list.push({
+          id: `chain-inline-${chunkId}-${from}-${to}`,
+          source: from,
+          target: to,
+          markerEnd: { type: MarkerType.ArrowClosed, width: 12, height: 12 },
           style: {
-            strokeWidth: thickness,
-            stroke: "var(--border-secondary, #555)",
+            stroke: "var(--indigo-400, #818cf8)",
+            strokeWidth: 1.5,
+            opacity: 0.7,
           },
-        };
-      }),
-    [chunkGraph.edges],
-  );
+        });
+      }
+    }
+
+    return list;
+  }, [
+    chunkGraph.edges,
+    chunkGraph.chunks,
+    perChunkMatches,
+    expandedEndpointFor,
+    expandedChainIds,
+  ]);
 
   // Apply dagre layout with the lighter overview options.
   const layouted = useMemo(() => {
@@ -191,18 +401,31 @@ function OverviewCanvasInner({
     );
   }, [setNodes]);
 
-  // Overview selection = drill trigger, NOT state selection.
+  // Overview selection semantics:
+  //   chunkOverview node     → drill in
+  //   stateNode (inline chain expand) → state selection (no drill)
+  //   transition edge inside an inline chain → no-op (no semantic id)
   const onSelectionChange = useCallback(
     ({ nodes: selectedNodes }: OnSelectionChangeParams) => {
       const first = selectedNodes[0];
       if (!first) return;
-      const d = first.data as unknown as ChunkNodeData;
-      if (!d?.chunk) return;
-      onDrillIn(d.chunk.id);
-      // Don't await state update — drill-in replaces the canvas anyway.
-      clearOverviewSelection();
+
+      if (first.type === "chunkOverview") {
+        const d = first.data as unknown as ChunkNodeData;
+        if (!d?.chunk) return;
+        onDrillIn(d.chunk.id);
+        // Don't await state update — drill-in replaces the canvas anyway.
+        clearOverviewSelection();
+        return;
+      }
+
+      if (first.type === "stateNode") {
+        const d = first.data as unknown as StateNodeData;
+        onSelectState(d.stateId);
+        onSelectTransition(null);
+      }
     },
-    [onDrillIn, clearOverviewSelection],
+    [onDrillIn, clearOverviewSelection, onSelectState, onSelectTransition],
   );
 
   const fitView = useCallback(() => {
@@ -266,6 +489,15 @@ function OverviewCanvas(props: OverviewCanvasProps) {
   );
 }
 
+/**
+ * When a chain is inline-expanded, the `ChunkOverviewNode` tooltip
+ * shows only the first 15 state names of the chunk. The inline state
+ * nodes have their own native tooltips via `StateMachineStateNode`.
+ * Both coexist — the chunk-card tooltip and the state-node tooltip
+ * never render for the same node because an expanded chunk replaces
+ * its card with state nodes.
+ */
+
 // =============================================================================
 // Drilled canvas (state nodes + phantom ports in one ReactFlow)
 // =============================================================================
@@ -280,6 +512,11 @@ interface DrilledCanvasProps {
   selectedTransitionId: string | null;
   effectiveInitialStateId: string | null;
   elementThumbnails?: Record<string, string>;
+  /**
+   * User-chosen chunk labels keyed by chunk id. When set, phantom port
+   * labels reflect the override rather than the auto-derived chunk name.
+   */
+  chunkLabels?: Map<string, string>;
   highlightedTransitionIds: Set<string>;
   transitionCounts: {
     outgoing: Map<string, number>;
@@ -304,6 +541,7 @@ function DrilledCanvasInner({
   selectedTransitionId,
   effectiveInitialStateId,
   elementThumbnails,
+  chunkLabels,
   highlightedTransitionIds,
   transitionCounts,
   onSelectState,
@@ -398,12 +636,16 @@ function DrilledCanvasInner({
       };
     }, [transitions, chunkStateIds, chunkGraph, chunk.id]);
 
-  // Chunk-name lookup for phantom port labels.
+  // Chunk-name lookup for phantom port labels. Respects user-chosen
+  // chunk label overrides when present.
   const chunkNameById = useMemo(() => {
     const m = new Map<string, string>();
-    for (const c of chunkGraph.chunks) m.set(c.id, c.name);
+    for (const c of chunkGraph.chunks) {
+      const override = chunkLabels?.get(c.id);
+      m.set(c.id, override && override.length > 0 ? override : c.name);
+    }
     return m;
-  }, [chunkGraph.chunks]);
+  }, [chunkGraph.chunks, chunkLabels]);
 
   // Build state nodes (mirrors StateMachineGraphView's stateNode build).
   const stateNodes: Node[] = useMemo(
@@ -822,6 +1064,9 @@ function ChunkedGraphViewInner(props: ChunkedGraphViewProps) {
     isDragging,
     dropTargetStateId,
     resolveTransitionSelectionId,
+    searchQuery,
+    chunkLabels,
+    onSaveChunkLabel,
   } = props;
 
   // Effective initial state: mirror StateMachineGraphView's logic.
@@ -868,6 +1113,53 @@ function ChunkedGraphViewInner(props: ChunkedGraphViewProps) {
   );
 
   const [viewMode, setViewMode] = useState<ViewMode>({ kind: "overview" });
+
+  // Chain chunks expanded inline in the overview. Held at this level
+  // (not inside `OverviewCanvasInner`) so the set survives overview
+  // remounts caused by switching between drilled and overview view.
+  const [expandedChainIds, setExpandedChainIds] = useState<Set<string>>(
+    () => new Set(),
+  );
+  const toggleChainExpand = useCallback((chunkId: string) => {
+    setExpandedChainIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(chunkId)) next.delete(chunkId);
+      else next.add(chunkId);
+      return next;
+    });
+  }, []);
+
+  // Chunk id → list of contained state names (for hover tooltips).
+  const stateNamesByChunkId = useMemo(() => {
+    const nameById = new Map<string, string>();
+    for (const s of states) nameById.set(s.state_id, s.name);
+    const m = new Map<string, string[]>();
+    for (const c of chunkGraph.chunks) {
+      m.set(
+        c.id,
+        c.stateIds.map((id) => nameById.get(id) ?? id),
+      );
+    }
+    return m;
+  }, [chunkGraph.chunks, states]);
+
+  // Per-chunk match counts when a search is active. `null` means no
+  // search at all (no filtering); an empty-trimmed string also yields
+  // `null` so an empty search doesn't filter the overview to nothing.
+  const perChunkMatches = useMemo<Map<string, number> | null>(() => {
+    const q = (searchQuery ?? "").trim().toLowerCase();
+    if (!q) return null;
+    const m = new Map<string, number>();
+    for (const s of states) {
+      const name = s.name.toLowerCase();
+      const desc = (s.description ?? "").toLowerCase();
+      if (name.includes(q) || desc.includes(q)) {
+        const cid = chunkGraph.stateIndex.get(s.state_id);
+        if (cid) m.set(cid, (m.get(cid) ?? 0) + 1);
+      }
+    }
+    return m;
+  }, [searchQuery, states, chunkGraph.stateIndex]);
 
   // Auto-drill on external selection change.
   //   overview + selected in chunk X      → drill X
@@ -926,13 +1218,15 @@ function ChunkedGraphViewInner(props: ChunkedGraphViewProps) {
 
     const isGiant = chunk.stateIds.length > CHUNK_MAX_NODES;
 
+    const drilledName = chunkLabels?.get(chunk.id) || chunk.name;
+
     return (
       <div
         className="h-full w-full flex flex-col"
         onDragOver={onDragOver}
         onDrop={onDrop}
       >
-        <DrilledBreadcrumb chunkName={chunk.name} onBack={goOverview} />
+        <DrilledBreadcrumb chunkName={drilledName} onBack={goOverview} />
         <div className="flex-1 min-h-0">
           {isGiant ? (
             <GiantChunkPanel
@@ -952,6 +1246,7 @@ function ChunkedGraphViewInner(props: ChunkedGraphViewProps) {
               selectedTransitionId={selectedTransitionId}
               effectiveInitialStateId={effectiveInitialStateId}
               elementThumbnails={elementThumbnails}
+              chunkLabels={chunkLabels}
               highlightedTransitionIds={highlightedTransitionIds}
               transitionCounts={transitionCounts}
               onSelectState={onSelectState}
@@ -975,6 +1270,19 @@ function ChunkedGraphViewInner(props: ChunkedGraphViewProps) {
         chunkGraph={chunkGraph}
         dagreLib={dagreLib}
         onDrillIn={drillInto}
+        stateNamesByChunkId={stateNamesByChunkId}
+        perChunkMatches={perChunkMatches}
+        expandedChainIds={expandedChainIds}
+        onToggleChainExpand={toggleChainExpand}
+        chunkLabels={chunkLabels}
+        onSaveChunkLabel={onSaveChunkLabel}
+        states={states}
+        transitionCounts={transitionCounts}
+        effectiveInitialStateId={effectiveInitialStateId}
+        selectedStateId={selectedStateId}
+        onSelectState={onSelectState}
+        onSelectTransition={onSelectTransition}
+        elementThumbnails={elementThumbnails}
       />
     </div>
   );

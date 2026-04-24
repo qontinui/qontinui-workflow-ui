@@ -1,5 +1,5 @@
 // src/components/state-machine/StateMachineGraphView.tsx
-import { useCallback as useCallback2, useMemo as useMemo3, useEffect as useEffect2, useState as useState2, useRef as useRef2 } from "react";
+import { useCallback as useCallback3, useMemo as useMemo3, useEffect as useEffect3, useState as useState3, useRef as useRef3 } from "react";
 import {
   ReactFlow as ReactFlow2,
   ReactFlowProvider as ReactFlowProvider2,
@@ -393,11 +393,11 @@ var StateMachineTransitionEdge = memo2(StateMachineTransitionEdgeInner);
 
 // src/components/state-machine/ChunkedGraphView.tsx
 import {
-  useCallback,
-  useEffect,
+  useCallback as useCallback2,
+  useEffect as useEffect2,
   useMemo as useMemo2,
-  useRef,
-  useState
+  useRef as useRef2,
+  useState as useState2
 } from "react";
 import {
   ReactFlow,
@@ -421,15 +421,122 @@ import {
 } from "@qontinui/workflow-utils";
 
 // src/components/state-machine/ChunkOverviewNode.tsx
-import { memo as memo3 } from "react";
+import { memo as memo3, useCallback, useEffect, useRef, useState } from "react";
 import { Handle as Handle2, Position as Position2 } from "@xyflow/react";
-import { Play as Play2, RefreshCw, ArrowRight } from "lucide-react";
+import {
+  Play as Play2,
+  RefreshCw,
+  ArrowRight,
+  ChevronDown,
+  ChevronRight,
+  Pencil
+} from "lucide-react";
 import { jsx as jsx3, jsxs as jsxs3 } from "react/jsx-runtime";
+function buildTooltip(chunkName, stateNames) {
+  if (!stateNames || stateNames.length === 0) return chunkName;
+  const visible = stateNames.slice(0, 15);
+  const overflow = stateNames.length > 15 ? `
+\u2026 +${stateNames.length - 15} more` : "";
+  return `${chunkName}
+
+${visible.join("\n")}${overflow}`;
+}
 function ChunkOverviewNodeInner({ data, selected }) {
-  const { chunk, matchCount } = data;
+  const {
+    chunk,
+    matchCount,
+    stateNames,
+    isExpanded,
+    onToggleExpand,
+    userLabel,
+    onSaveLabel
+  } = data;
   const stateCount = chunk.stateIds.length;
   const plural = stateCount !== 1 ? "s" : "";
   const matchPlural = matchCount !== 1 ? "es" : "";
+  const showExpandToggle = chunk.kind === "chain" && typeof onToggleExpand === "function";
+  const showRenameAffordance = typeof onSaveLabel === "function";
+  const effectiveName = userLabel && userLabel.length > 0 ? userLabel : chunk.name;
+  const [isEditing, setIsEditing] = useState(false);
+  const [draft, setDraft] = useState(effectiveName);
+  const inputRef = useRef(null);
+  useEffect(() => {
+    if (!isEditing) setDraft(effectiveName);
+  }, [effectiveName, isEditing]);
+  useEffect(() => {
+    if (isEditing) {
+      inputRef.current?.focus();
+      inputRef.current?.select();
+    }
+  }, [isEditing]);
+  const handleStartEdit = useCallback(
+    (e) => {
+      e.stopPropagation();
+      e.preventDefault();
+      if (!showRenameAffordance) return;
+      setDraft(effectiveName);
+      setIsEditing(true);
+    },
+    [effectiveName, showRenameAffordance]
+  );
+  const hasCommittedRef = useRef(false);
+  const commit = useCallback(() => {
+    if (!onSaveLabel) {
+      setIsEditing(false);
+      return;
+    }
+    if (hasCommittedRef.current) return;
+    hasCommittedRef.current = true;
+    const trimmed = draft.trim();
+    onSaveLabel(chunk.id, trimmed);
+    setIsEditing(false);
+  }, [draft, chunk.id, onSaveLabel]);
+  const cancel = useCallback(() => {
+    hasCommittedRef.current = true;
+    setDraft(effectiveName);
+    setIsEditing(false);
+  }, [effectiveName]);
+  const handleKeyDown = useCallback(
+    (e) => {
+      e.stopPropagation();
+      if (e.key === "Enter") {
+        e.preventDefault();
+        commit();
+      } else if (e.key === "Escape") {
+        e.preventDefault();
+        cancel();
+      }
+    },
+    [commit, cancel]
+  );
+  const handleBlur = useCallback(() => {
+    commit();
+  }, [commit]);
+  const handleInputChange = useCallback(
+    (e) => {
+      setDraft(e.target.value);
+    },
+    []
+  );
+  useEffect(() => {
+    if (isEditing) {
+      hasCommittedRef.current = false;
+    }
+  }, [isEditing]);
+  const stopPropagation = useCallback((e) => {
+    e.stopPropagation();
+  }, []);
+  const handleToggleClick = useCallback(
+    (e) => {
+      e.stopPropagation();
+      e.preventDefault();
+      onToggleExpand?.(chunk.id);
+    },
+    [onToggleExpand, chunk.id]
+  );
+  const handleToggleMouseDown = useCallback((e) => {
+    e.stopPropagation();
+  }, []);
   return /* @__PURE__ */ jsxs3("div", { "data-chunk-id": chunk.id, style: { width: 200 }, children: [
     /* @__PURE__ */ jsx3(
       Handle2,
@@ -442,13 +549,14 @@ function ChunkOverviewNodeInner({ data, selected }) {
     /* @__PURE__ */ jsxs3(
       "div",
       {
+        title: buildTooltip(effectiveName, stateNames),
         className: `
           rounded-lg border-2 px-3 py-2.5 shadow-md
           transition-all duration-150
           ${selected ? "border-indigo-400 bg-indigo-500/15 ring-2 ring-indigo-400/40 shadow-indigo-500/20 shadow-lg" : chunk.containsInitialState ? "border-indigo-400/70 bg-bg-secondary/80 hover:border-indigo-300 hover:shadow-lg" : "border-indigo-500/40 bg-bg-secondary/60 hover:border-indigo-400 hover:shadow-lg"}
         `,
         children: [
-          /* @__PURE__ */ jsxs3("div", { className: "flex items-center gap-1.5 mb-1", children: [
+          /* @__PURE__ */ jsxs3("div", { className: "flex items-center gap-1.5 mb-1 group", children: [
             chunk.containsInitialState && /* @__PURE__ */ jsx3(
               Play2,
               {
@@ -469,7 +577,46 @@ function ChunkOverviewNodeInner({ data, selected }) {
                 "aria-label": "Linear chain"
               }
             ),
-            /* @__PURE__ */ jsx3("span", { className: "text-xs font-medium text-text-primary truncate flex-1", children: chunk.name })
+            isEditing ? /* @__PURE__ */ jsx3(
+              "input",
+              {
+                ref: inputRef,
+                type: "text",
+                value: draft,
+                onChange: handleInputChange,
+                onKeyDown: handleKeyDown,
+                onBlur: handleBlur,
+                onClick: stopPropagation,
+                onMouseDown: stopPropagation,
+                className: "flex-1 min-w-0 text-xs font-medium text-text-primary bg-bg-primary border border-indigo-400 rounded px-1 py-0.5 outline-hidden focus:ring-1 focus:ring-indigo-400 nodrag",
+                placeholder: chunk.name,
+                "aria-label": "Chunk label"
+              }
+            ) : /* @__PURE__ */ jsx3("span", { className: "text-xs font-medium text-text-primary truncate flex-1", children: effectiveName }),
+            !isEditing && showRenameAffordance && /* @__PURE__ */ jsx3(
+              "button",
+              {
+                type: "button",
+                onClick: handleStartEdit,
+                onMouseDown: stopPropagation,
+                className: "shrink-0 p-0.5 rounded hover:bg-indigo-500/20 text-indigo-300/60 hover:text-indigo-200 transition-colors nodrag opacity-0 group-hover:opacity-100",
+                title: "Rename chunk",
+                "aria-label": "Rename chunk",
+                children: /* @__PURE__ */ jsx3(Pencil, { className: "size-3" })
+              }
+            ),
+            !isEditing && showExpandToggle && /* @__PURE__ */ jsx3(
+              "button",
+              {
+                type: "button",
+                onClick: handleToggleClick,
+                onMouseDown: handleToggleMouseDown,
+                className: "shrink-0 p-0.5 rounded hover:bg-indigo-500/20 text-indigo-300 hover:text-indigo-200 transition-colors nodrag",
+                title: isExpanded ? "Collapse chain" : "Expand chain inline",
+                "aria-label": isExpanded ? "Collapse chain" : "Expand chain inline",
+                children: isExpanded ? /* @__PURE__ */ jsx3(ChevronDown, { className: "size-3" }) : /* @__PURE__ */ jsx3(ChevronRight, { className: "size-3" })
+              }
+            )
           ] }),
           /* @__PURE__ */ jsxs3("div", { className: "text-[10px] text-text-muted", children: [
             stateCount,
@@ -578,8 +725,11 @@ var OVERVIEW_LAYOUT_OPTIONS = {
   nodeSep: 60,
   rankSep: 100
 };
-var overviewNodeTypes = { chunkOverview: ChunkOverviewNode };
-var overviewEdgeTypes = {};
+var overviewNodeTypes = {
+  chunkOverview: ChunkOverviewNode,
+  stateNode: StateMachineStateNode
+};
+var overviewEdgeTypes = { transitionEdge: StateMachineTransitionEdge };
 var drilledNodeTypes = {
   stateNode: StateMachineStateNode,
   chunkPort: ChunkPortNode
@@ -588,25 +738,123 @@ var drilledEdgeTypes = { transitionEdge: StateMachineTransitionEdge };
 function OverviewCanvasInner({
   chunkGraph,
   dagreLib,
-  onDrillIn
+  onDrillIn,
+  stateNamesByChunkId,
+  perChunkMatches,
+  expandedChainIds,
+  onToggleChainExpand,
+  chunkLabels,
+  onSaveChunkLabel,
+  states,
+  transitionCounts,
+  effectiveInitialStateId,
+  selectedStateId,
+  onSelectState,
+  onSelectTransition,
+  elementThumbnails
 }) {
   const reactFlowInstance = useReactFlow();
-  const baseNodes = useMemo2(
-    () => chunkGraph.chunks.map((chunk) => ({
-      id: chunk.id,
-      type: "chunkOverview",
-      position: { x: 0, y: 0 },
-      data: { chunk }
-    })),
-    [chunkGraph.chunks]
+  const stateById = useMemo2(() => {
+    const m = /* @__PURE__ */ new Map();
+    for (const s of states) m.set(s.state_id, s);
+    return m;
+  }, [states]);
+  const baseNodes = useMemo2(() => {
+    const list = [];
+    for (const chunk of chunkGraph.chunks) {
+      if (perChunkMatches !== null && !perChunkMatches.has(chunk.id)) {
+        continue;
+      }
+      const isExpandedChain = chunk.kind === "chain" && expandedChainIds.has(chunk.id);
+      if (isExpandedChain) {
+        for (const stateId of chunk.stateIds) {
+          const state = stateById.get(stateId);
+          if (!state) continue;
+          list.push({
+            id: stateId,
+            type: "stateNode",
+            position: { x: 0, y: 0 },
+            data: {
+              stateId: state.state_id,
+              name: state.name,
+              elementCount: state.element_ids.length,
+              confidence: state.confidence,
+              elementIds: state.element_ids,
+              description: state.description ?? null,
+              isBlocking: state.extra_metadata?.blocking === true,
+              isSelected: state.state_id === selectedStateId,
+              isInitial: state.state_id === effectiveInitialStateId,
+              outgoingCount: transitionCounts.outgoing.get(state.state_id) ?? 0,
+              incomingCount: transitionCounts.incoming.get(state.state_id) ?? 0,
+              isDropTarget: false,
+              onStartElementDrag: void 0,
+              elementThumbnails
+            }
+          });
+        }
+      } else {
+        list.push({
+          id: chunk.id,
+          type: "chunkOverview",
+          position: { x: 0, y: 0 },
+          data: {
+            chunk,
+            matchCount: perChunkMatches?.get(chunk.id),
+            stateNames: stateNamesByChunkId.get(chunk.id),
+            isExpanded: false,
+            onToggleExpand: chunk.kind === "chain" ? onToggleChainExpand : void 0,
+            userLabel: chunkLabels?.get(chunk.id),
+            onSaveLabel: onSaveChunkLabel
+          }
+        });
+      }
+    }
+    return list;
+  }, [
+    chunkGraph.chunks,
+    perChunkMatches,
+    expandedChainIds,
+    stateById,
+    selectedStateId,
+    effectiveInitialStateId,
+    transitionCounts,
+    elementThumbnails,
+    stateNamesByChunkId,
+    onToggleChainExpand,
+    chunkLabels,
+    onSaveChunkLabel
+  ]);
+  const expandedEndpointFor = useCallback2(
+    (chunkId, role) => {
+      if (!expandedChainIds.has(chunkId)) return null;
+      const chunk = chunkGraph.chunks.find((c) => c.id === chunkId);
+      if (!chunk || chunk.stateIds.length === 0) return null;
+      if (role === "source") {
+        const tail = chunk.stateIds[chunk.stateIds.length - 1];
+        return { id: tail, kind: "chain-tail" };
+      }
+      const head = chunk.stateIds[0];
+      return { id: head, kind: "chain-head" };
+    },
+    [expandedChainIds, chunkGraph.chunks]
   );
-  const baseEdges = useMemo2(
-    () => chunkGraph.edges.map((e) => {
+  const baseEdges = useMemo2(() => {
+    const list = [];
+    for (const e of chunkGraph.edges) {
+      if (perChunkMatches !== null) {
+        if (!perChunkMatches.has(e.from) || !perChunkMatches.has(e.to)) {
+          continue;
+        }
+      }
+      const sourceRemap = expandedEndpointFor(e.from, "source");
+      const targetRemap = expandedEndpointFor(e.to, "target");
+      const source = sourceRemap?.id ?? e.from;
+      const target = targetRemap?.id ?? e.to;
       const thickness = Math.log(Math.max(e.transitionCount, 1)) + 1;
-      return {
+      list.push({
         id: `chunk-edge-${e.from}-${e.to}`,
-        source: e.from,
-        target: e.to,
+        source,
+        target,
         markerEnd: { type: MarkerType.ArrowClosed, width: 15, height: 15 },
         label: String(e.transitionCount),
         labelBgPadding: [4, 2],
@@ -625,10 +873,36 @@ function OverviewCanvasInner({
           strokeWidth: thickness,
           stroke: "var(--border-secondary, #555)"
         }
-      };
-    }),
-    [chunkGraph.edges]
-  );
+      });
+    }
+    for (const chunkId of expandedChainIds) {
+      const chunk = chunkGraph.chunks.find((c) => c.id === chunkId);
+      if (!chunk || chunk.kind !== "chain") continue;
+      if (perChunkMatches !== null && !perChunkMatches.has(chunkId)) continue;
+      for (let i = 0; i < chunk.stateIds.length - 1; i++) {
+        const from = chunk.stateIds[i];
+        const to = chunk.stateIds[i + 1];
+        list.push({
+          id: `chain-inline-${chunkId}-${from}-${to}`,
+          source: from,
+          target: to,
+          markerEnd: { type: MarkerType.ArrowClosed, width: 12, height: 12 },
+          style: {
+            stroke: "var(--indigo-400, #818cf8)",
+            strokeWidth: 1.5,
+            opacity: 0.7
+          }
+        });
+      }
+    }
+    return list;
+  }, [
+    chunkGraph.edges,
+    chunkGraph.chunks,
+    perChunkMatches,
+    expandedEndpointFor,
+    expandedChainIds
+  ]);
   const layouted = useMemo2(() => {
     if (baseNodes.length === 0) return { nodes: [], edges: [] };
     return getLayoutedElements(
@@ -640,30 +914,38 @@ function OverviewCanvasInner({
   }, [dagreLib, baseNodes, baseEdges]);
   const [nodes, setNodes, onNodesChange] = useNodesState(layouted.nodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(layouted.edges);
-  useEffect(() => {
+  useEffect2(() => {
     setNodes(layouted.nodes);
     setEdges(layouted.edges);
   }, [layouted, setNodes, setEdges]);
-  const clearOverviewSelection = useCallback(() => {
+  const clearOverviewSelection = useCallback2(() => {
     setNodes(
       (prev) => prev.some((n) => n.selected) ? prev.map((n) => n.selected ? { ...n, selected: false } : n) : prev
     );
   }, [setNodes]);
-  const onSelectionChange = useCallback(
+  const onSelectionChange = useCallback2(
     ({ nodes: selectedNodes }) => {
       const first = selectedNodes[0];
       if (!first) return;
-      const d = first.data;
-      if (!d?.chunk) return;
-      onDrillIn(d.chunk.id);
-      clearOverviewSelection();
+      if (first.type === "chunkOverview") {
+        const d = first.data;
+        if (!d?.chunk) return;
+        onDrillIn(d.chunk.id);
+        clearOverviewSelection();
+        return;
+      }
+      if (first.type === "stateNode") {
+        const d = first.data;
+        onSelectState(d.stateId);
+        onSelectTransition(null);
+      }
     },
-    [onDrillIn, clearOverviewSelection]
+    [onDrillIn, clearOverviewSelection, onSelectState, onSelectTransition]
   );
-  const fitView = useCallback(() => {
+  const fitView = useCallback2(() => {
     reactFlowInstance.fitView({ ...FIT_VIEW_OPTIONS, duration: 300 });
   }, [reactFlowInstance]);
-  useEffect(() => {
+  useEffect2(() => {
     const id = setTimeout(fitView, 50);
     return () => clearTimeout(id);
   }, []);
@@ -730,6 +1012,7 @@ function DrilledCanvasInner({
   selectedTransitionId,
   effectiveInitialStateId,
   elementThumbnails,
+  chunkLabels,
   highlightedTransitionIds,
   transitionCounts,
   onSelectState,
@@ -805,9 +1088,12 @@ function DrilledCanvasInner({
   }, [transitions, chunkStateIds, chunkGraph, chunk.id]);
   const chunkNameById = useMemo2(() => {
     const m = /* @__PURE__ */ new Map();
-    for (const c of chunkGraph.chunks) m.set(c.id, c.name);
+    for (const c of chunkGraph.chunks) {
+      const override = chunkLabels?.get(c.id);
+      m.set(c.id, override && override.length > 0 ? override : c.name);
+    }
     return m;
-  }, [chunkGraph.chunks]);
+  }, [chunkGraph.chunks, chunkLabels]);
   const stateNodes = useMemo2(
     () => chunkStates.map((state) => ({
       id: state.state_id,
@@ -841,7 +1127,7 @@ function DrilledCanvasInner({
       elementThumbnails
     ]
   );
-  const getSelectionId = useCallback(
+  const getSelectionId = useCallback2(
     (t) => {
       if (resolveTransitionSelectionId) return resolveTransitionSelectionId(t);
       return t.transition_id;
@@ -1000,11 +1286,11 @@ function DrilledCanvasInner({
   }, [dagreLib, stateNodes, stateEdges, portNodes, portEdges]);
   const [nodes, setNodes, onNodesChange] = useNodesState(layouted.nodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(layouted.edges);
-  useEffect(() => {
+  useEffect2(() => {
     setNodes(layouted.nodes);
     setEdges(layouted.edges);
   }, [layouted, setNodes, setEdges]);
-  const onSelectionChange = useCallback(
+  const onSelectionChange = useCallback2(
     ({ nodes: selectedNodes, edges: selectedEdges }) => {
       const firstNode = selectedNodes[0];
       const firstEdge = selectedEdges[0];
@@ -1036,8 +1322,8 @@ function DrilledCanvasInner({
     },
     [onSelectState, onSelectTransition, transitions, getSelectionId]
   );
-  const didFitRef = useRef(false);
-  useEffect(() => {
+  const didFitRef = useRef2(false);
+  useEffect2(() => {
     if (didFitRef.current) return;
     if (nodes.length === 0) return;
     didFitRef.current = true;
@@ -1154,7 +1440,10 @@ function ChunkedGraphViewInner(props) {
     onDrop,
     isDragging,
     dropTargetStateId,
-    resolveTransitionSelectionId
+    resolveTransitionSelectionId,
+    searchQuery,
+    chunkLabels,
+    onSaveChunkLabel
   } = props;
   const effectiveInitialStateId = useMemo2(() => {
     if (initialStateId) return initialStateId;
@@ -1190,16 +1479,53 @@ function ChunkedGraphViewInner(props) {
     () => new Set(highlightedPath?.map((s) => s.transition_id) ?? []),
     [highlightedPath]
   );
-  const [viewMode, setViewMode] = useState({ kind: "overview" });
+  const [viewMode, setViewMode] = useState2({ kind: "overview" });
+  const [expandedChainIds, setExpandedChainIds] = useState2(
+    () => /* @__PURE__ */ new Set()
+  );
+  const toggleChainExpand = useCallback2((chunkId) => {
+    setExpandedChainIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(chunkId)) next.delete(chunkId);
+      else next.add(chunkId);
+      return next;
+    });
+  }, []);
+  const stateNamesByChunkId = useMemo2(() => {
+    const nameById = /* @__PURE__ */ new Map();
+    for (const s of states) nameById.set(s.state_id, s.name);
+    const m = /* @__PURE__ */ new Map();
+    for (const c of chunkGraph.chunks) {
+      m.set(
+        c.id,
+        c.stateIds.map((id) => nameById.get(id) ?? id)
+      );
+    }
+    return m;
+  }, [chunkGraph.chunks, states]);
+  const perChunkMatches = useMemo2(() => {
+    const q = (searchQuery ?? "").trim().toLowerCase();
+    if (!q) return null;
+    const m = /* @__PURE__ */ new Map();
+    for (const s of states) {
+      const name = s.name.toLowerCase();
+      const desc = (s.description ?? "").toLowerCase();
+      if (name.includes(q) || desc.includes(q)) {
+        const cid = chunkGraph.stateIndex.get(s.state_id);
+        if (cid) m.set(cid, (m.get(cid) ?? 0) + 1);
+      }
+    }
+    return m;
+  }, [searchQuery, states, chunkGraph.stateIndex]);
   const currentChunkId = viewMode.kind === "drilled" ? viewMode.chunkId : null;
-  useEffect(() => {
+  useEffect2(() => {
     if (!selectedStateId) return;
     const targetChunkId = chunkGraph.stateIndex.get(selectedStateId);
     if (!targetChunkId) return;
     if (targetChunkId === currentChunkId) return;
     setViewMode({ kind: "drilled", chunkId: targetChunkId });
   }, [selectedStateId, chunkGraph.stateIndex, currentChunkId]);
-  useEffect(() => {
+  useEffect2(() => {
     if (viewMode.kind !== "drilled") return;
     const handler = (e) => {
       const tag = e.target?.tagName;
@@ -1211,10 +1537,10 @@ function ChunkedGraphViewInner(props) {
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
   }, [viewMode.kind]);
-  const goOverview = useCallback(() => {
+  const goOverview = useCallback2(() => {
     setViewMode({ kind: "overview" });
   }, []);
-  const drillInto = useCallback((chunkId) => {
+  const drillInto = useCallback2((chunkId) => {
     setViewMode({ kind: "drilled", chunkId });
   }, []);
   if (states.length === 0) {
@@ -1226,6 +1552,7 @@ function ChunkedGraphViewInner(props) {
       return /* @__PURE__ */ jsx5(ChunkedGraphViewFallbackMissingChunk, { onBack: goOverview });
     }
     const isGiant = chunk.stateIds.length > CHUNK_MAX_NODES;
+    const drilledName = chunkLabels?.get(chunk.id) || chunk.name;
     return /* @__PURE__ */ jsxs5(
       "div",
       {
@@ -1233,7 +1560,7 @@ function ChunkedGraphViewInner(props) {
         onDragOver,
         onDrop,
         children: [
-          /* @__PURE__ */ jsx5(DrilledBreadcrumb, { chunkName: chunk.name, onBack: goOverview }),
+          /* @__PURE__ */ jsx5(DrilledBreadcrumb, { chunkName: drilledName, onBack: goOverview }),
           /* @__PURE__ */ jsx5("div", { className: "flex-1 min-h-0", children: isGiant ? /* @__PURE__ */ jsx5(
             GiantChunkPanel,
             {
@@ -1254,6 +1581,7 @@ function ChunkedGraphViewInner(props) {
               selectedTransitionId,
               effectiveInitialStateId,
               elementThumbnails,
+              chunkLabels,
               highlightedTransitionIds,
               transitionCounts,
               onSelectState,
@@ -1274,7 +1602,20 @@ function ChunkedGraphViewInner(props) {
     {
       chunkGraph,
       dagreLib,
-      onDrillIn: drillInto
+      onDrillIn: drillInto,
+      stateNamesByChunkId,
+      perChunkMatches,
+      expandedChainIds,
+      onToggleChainExpand: toggleChainExpand,
+      chunkLabels,
+      onSaveChunkLabel,
+      states,
+      transitionCounts,
+      effectiveInitialStateId,
+      selectedStateId,
+      onSelectState,
+      onSelectTransition,
+      elementThumbnails
     }
   ) });
 }
@@ -1360,9 +1701,9 @@ function StateMachineGraphViewInner({
   extraShortcutEntries,
   elementThumbnails
 }) {
-  const [showShortcuts, setShowShortcuts] = useState2(false);
+  const [showShortcuts, setShowShortcuts] = useState3(false);
   const reactFlowInstance = useReactFlow2();
-  const prevStateCountRef = useRef2(states.length);
+  const prevStateCountRef = useRef3(states.length);
   const highlightedTransitionIds = useMemo3(
     () => new Set(highlightedPath?.map((s) => s.transition_id) ?? []),
     [highlightedPath]
@@ -1408,7 +1749,7 @@ function StateMachineGraphViewInner({
     })),
     [states, selectedStateId, effectiveInitialStateId, transitionCounts, isDragging, dropTargetStateId, onStartElementDrag, elementThumbnails]
   );
-  const getSelectionId = useCallback2(
+  const getSelectionId = useCallback3(
     (trans) => {
       if (resolveTransitionSelectionId) return resolveTransitionSelectionId(trans);
       return trans.transition_id;
@@ -1455,17 +1796,17 @@ function StateMachineGraphViewInner({
   }, [dagreLib, initialNodes, initialEdges]);
   const [nodes, setNodes, onNodesChange] = useNodesState2(layouted.nodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState2(layouted.edges);
-  useEffect2(() => {
+  useEffect3(() => {
     setNodes(layouted.nodes);
     setEdges(layouted.edges);
   }, [layouted, setNodes, setEdges]);
-  useEffect2(() => {
+  useEffect3(() => {
     if (states.length > prevStateCountRef.current) {
       setTimeout(() => reactFlowInstance.fitView(FIT_VIEW_OPTIONS_ANIMATED), 100);
     }
     prevStateCountRef.current = states.length;
   }, [states.length, reactFlowInstance]);
-  const onSelectionChange = useCallback2(
+  const onSelectionChange = useCallback3(
     ({ nodes: selectedNodes, edges: selectedEdges }) => {
       const firstNode = selectedNodes[0];
       const firstEdge = selectedEdges[0];
@@ -1485,13 +1826,13 @@ function StateMachineGraphViewInner({
     },
     [onSelectState, onSelectTransition, transitions, getSelectionId]
   );
-  const handleRelayout = useCallback2(() => {
+  const handleRelayout = useCallback3(() => {
     const result = getLayoutedElements2(dagreLib, nodes, edges, STATE_MACHINE_LAYOUT_OPTIONS2);
     setNodes(result.nodes);
     setEdges(result.edges);
     setTimeout(() => reactFlowInstance.fitView(FIT_VIEW_OPTIONS_ANIMATED), 50);
   }, [dagreLib, nodes, edges, setNodes, setEdges, reactFlowInstance]);
-  useEffect2(() => {
+  useEffect3(() => {
     const handleKeyDown = (e) => {
       const tag = e.target.tagName;
       if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
@@ -1717,7 +2058,7 @@ function StateMachineGraphView(props) {
 }
 
 // src/components/state-machine/TransitionEditor.tsx
-import { useState as useState3, useEffect as useEffect3, useCallback as useCallback3 } from "react";
+import { useState as useState4, useEffect as useEffect4, useCallback as useCallback4 } from "react";
 import { jsx as jsx7, jsxs as jsxs7 } from "react/jsx-runtime";
 function makeActionUid() {
   return typeof crypto !== "undefined" && typeof crypto.randomUUID === "function" ? crypto.randomUUID() : `act-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
@@ -1758,15 +2099,15 @@ function TransitionEditor({
   onClose
 }) {
   const isEditing = !!transition;
-  const [name, setName] = useState3("");
-  const [fromStates, setFromStates] = useState3([]);
-  const [activateStates, setActivateStates] = useState3([]);
-  const [exitStates, setExitStates] = useState3([]);
-  const [actions, setActions] = useState3([]);
-  const [pathCost, setPathCost] = useState3(1);
-  const [staysVisible, setStaysVisible] = useState3(false);
-  const [isSaving, setIsSaving] = useState3(false);
-  useEffect3(() => {
+  const [name, setName] = useState4("");
+  const [fromStates, setFromStates] = useState4([]);
+  const [activateStates, setActivateStates] = useState4([]);
+  const [exitStates, setExitStates] = useState4([]);
+  const [actions, setActions] = useState4([]);
+  const [pathCost, setPathCost] = useState4(1);
+  const [staysVisible, setStaysVisible] = useState4(false);
+  const [isSaving, setIsSaving] = useState4(false);
+  useEffect4(() => {
     if (transition) {
       setName(transition.name);
       setFromStates([...transition.from_states]);
@@ -1785,7 +2126,7 @@ function TransitionEditor({
       setStaysVisible(false);
     }
   }, [transition]);
-  const toggleState = useCallback3(
+  const toggleState = useCallback4(
     (arr, setter, stateId) => {
       if (arr.includes(stateId)) {
         setter(arr.filter((s) => s !== stateId));
@@ -1795,13 +2136,13 @@ function TransitionEditor({
     },
     []
   );
-  const addAction = useCallback3(() => {
+  const addAction = useCallback4(() => {
     setActions((prev) => [...prev, toEditableAction({ type: "click" })]);
   }, []);
-  const removeAction = useCallback3((index) => {
+  const removeAction = useCallback4((index) => {
     setActions((prev) => prev.filter((_, i) => i !== index));
   }, []);
-  const updateAction = useCallback3(
+  const updateAction = useCallback4(
     (index, updates) => {
       setActions(
         (prev) => prev.map((a, i) => i === index ? { ...a, ...updates } : a)
@@ -1809,7 +2150,7 @@ function TransitionEditor({
     },
     []
   );
-  const handleSave = useCallback3(async () => {
+  const handleSave = useCallback4(async () => {
     if (!name.trim()) return;
     setIsSaving(true);
     try {
@@ -1843,7 +2184,7 @@ function TransitionEditor({
     onSave,
     onUpdate
   ]);
-  const handleDelete = useCallback3(async () => {
+  const handleDelete = useCallback4(async () => {
     if (!transition) return;
     setIsSaving(true);
     try {
@@ -2186,7 +2527,7 @@ function ActionField({
 }
 
 // src/components/state-machine/TransitionsPanel.tsx
-import { useState as useState4, useMemo as useMemo4, useCallback as useCallback4, useRef as useRef3, useEffect as useEffect4 } from "react";
+import { useState as useState5, useMemo as useMemo4, useCallback as useCallback5, useRef as useRef4, useEffect as useEffect5 } from "react";
 import {
   GitBranch,
   MousePointer as MousePointer3,
@@ -2199,7 +2540,7 @@ import {
   SkipForward,
   SkipBack,
   RotateCcw,
-  ChevronRight,
+  ChevronRight as ChevronRight2,
   Eye as Eye2,
   ArrowRight as ArrowRight3,
   Search,
@@ -2247,11 +2588,11 @@ function TransitionsPanel({
   permittedTriggers,
   blockedTriggers
 }) {
-  const [filterFromState, setFilterFromState] = useState4(null);
-  const [filterToState, setFilterToState] = useState4(null);
-  const [searchFilter, setSearchFilter] = useState4("");
-  const [permittedOnly, setPermittedOnly] = useState4(false);
-  const [animation, setAnimation] = useState4({
+  const [filterFromState, setFilterFromState] = useState5(null);
+  const [filterToState, setFilterToState] = useState5(null);
+  const [searchFilter, setSearchFilter] = useState5("");
+  const [permittedOnly, setPermittedOnly] = useState5(false);
+  const [animation, setAnimation] = useState5({
     isPlaying: false,
     currentActionIndex: -1,
     progress: 0,
@@ -2269,8 +2610,8 @@ function TransitionsPanel({
     return map;
   }, [blockedTriggers]);
   const hasIntrospectionData = (permittedTriggers?.length ?? 0) > 0 || (blockedTriggers?.length ?? 0) > 0 || (activeStateIds?.length ?? 0) > 0;
-  const animationRef = useRef3(null);
-  const startTimeRef = useRef3(0);
+  const animationRef = useRef4(null);
+  const startTimeRef = useRef4(0);
   const selectedTransition = useMemo4(
     () => transitions.find((t) => t.transition_id === selectedTransitionId),
     [transitions, selectedTransitionId]
@@ -2306,14 +2647,14 @@ function TransitionsPanel({
     }
     return map;
   }, [states]);
-  const stopAnimation = useCallback4(() => {
+  const stopAnimation = useCallback5(() => {
     if (animationRef.current) {
       cancelAnimationFrame(animationRef.current);
       animationRef.current = null;
     }
     setAnimation((prev) => ({ ...prev, isPlaying: false }));
   }, []);
-  const animate = useCallback4(() => {
+  const animate = useCallback5(() => {
     if (!selectedTransition || selectedTransition.actions.length === 0) return;
     const tick = (timestamp) => {
       setAnimation((prev) => {
@@ -2340,7 +2681,7 @@ function TransitionsPanel({
     startTimeRef.current = performance.now();
     animationRef.current = requestAnimationFrame(tick);
   }, [selectedTransition]);
-  const playAnimation = useCallback4(() => {
+  const playAnimation = useCallback5(() => {
     setAnimation((prev) => {
       const startIndex = prev.currentActionIndex < 0 ? 0 : prev.currentActionIndex;
       const idx = prev.progress >= 1 && startIndex >= (selectedTransition?.actions.length ?? 0) - 1 ? 0 : startIndex;
@@ -2348,10 +2689,10 @@ function TransitionsPanel({
     });
     setTimeout(animate, 0);
   }, [animate, selectedTransition]);
-  const pauseAnimation = useCallback4(() => {
+  const pauseAnimation = useCallback5(() => {
     stopAnimation();
   }, [stopAnimation]);
-  const resetAnimation = useCallback4(() => {
+  const resetAnimation = useCallback5(() => {
     stopAnimation();
     setAnimation((prev) => ({
       ...prev,
@@ -2359,7 +2700,7 @@ function TransitionsPanel({
       progress: 0
     }));
   }, [stopAnimation]);
-  const stepForward = useCallback4(() => {
+  const stepForward = useCallback5(() => {
     stopAnimation();
     setAnimation((prev) => {
       const next = prev.currentActionIndex + 1;
@@ -2368,7 +2709,7 @@ function TransitionsPanel({
       return { ...prev, currentActionIndex: next, progress: 1 };
     });
   }, [stopAnimation, selectedTransition]);
-  const stepBackward = useCallback4(() => {
+  const stepBackward = useCallback5(() => {
     stopAnimation();
     setAnimation((prev) => {
       const next = prev.currentActionIndex - 1;
@@ -2376,17 +2717,17 @@ function TransitionsPanel({
       return { ...prev, currentActionIndex: next, progress: 1 };
     });
   }, [stopAnimation]);
-  useEffect4(() => {
+  useEffect5(() => {
     return () => {
       if (animationRef.current) {
         cancelAnimationFrame(animationRef.current);
       }
     };
   }, []);
-  useEffect4(() => {
+  useEffect5(() => {
     resetAnimation();
   }, [selectedTransitionId, resetAnimation]);
-  const handleSelectTransition = useCallback4(
+  const handleSelectTransition = useCallback5(
     (tid) => {
       onSelectTransition(tid === selectedTransitionId ? null : tid);
     },
@@ -2639,7 +2980,7 @@ function TransitionsPanel({
           )
         ] }),
         /* @__PURE__ */ jsx8("div", { className: "mt-3 flex items-center justify-center gap-1", children: selectedTransition.actions.map((action, idx) => {
-          const Icon = ACTION_ICONS2[action.type] ?? ChevronRight;
+          const Icon = ACTION_ICONS2[action.type] ?? ChevronRight2;
           const isPastAction = animation.currentActionIndex >= 0 && idx < animation.currentActionIndex;
           const isCurrentAction = idx === animation.currentActionIndex;
           const color = getActionColorConfig(action.type);
@@ -2676,7 +3017,7 @@ function TransitionsPanel({
           ")"
         ] }),
         selectedTransition.actions.length === 0 ? /* @__PURE__ */ jsx8("p", { className: "text-xs text-text-muted", children: "No actions defined." }) : /* @__PURE__ */ jsx8("div", { className: "space-y-2", children: selectedTransition.actions.map((action, idx) => {
-          const Icon = ACTION_ICONS2[action.type] ?? ChevronRight;
+          const Icon = ACTION_ICONS2[action.type] ?? ChevronRight2;
           const color = getActionColorConfig(action.type);
           const isCurrent = idx === animation.currentActionIndex;
           const isPast = animation.currentActionIndex >= 0 && idx < animation.currentActionIndex;
@@ -2759,7 +3100,7 @@ function TransitionsPanel({
                     style: { animationDuration: "0.5s" }
                   }
                 ) }) : action.type === "select" ? /* @__PURE__ */ jsx8("div", { className: "relative w-5 h-5 flex items-center justify-center", children: /* @__PURE__ */ jsx8(
-                  ChevronRight,
+                  ChevronRight2,
                   {
                     className: "size-3.5 text-purple-400 animate-bounce",
                     style: {
@@ -2814,7 +3155,7 @@ function TransitionsPanel({
 }
 
 // src/components/state-machine/StateDetailPanel.tsx
-import { useState as useState5, useEffect as useEffect5, useCallback as useCallback5 } from "react";
+import { useState as useState6, useEffect as useEffect6, useCallback as useCallback6 } from "react";
 import {
   getElementTypeStyle,
   getElementLabel,
@@ -2827,27 +3168,27 @@ function StateDetailPanel({
   onDelete,
   onClose
 }) {
-  const [name, setName] = useState5(state.name);
-  const [description, setDescription] = useState5(state.description ?? "");
-  const [elementIds, setElementIds] = useState5([...state.element_ids]);
-  const [acceptanceCriteria, setAcceptanceCriteria] = useState5([
+  const [name, setName] = useState6(state.name);
+  const [description, setDescription] = useState6(state.description ?? "");
+  const [elementIds, setElementIds] = useState6([...state.element_ids]);
+  const [acceptanceCriteria, setAcceptanceCriteria] = useState6([
     ...state.acceptance_criteria
   ]);
-  const [domainKnowledge, setDomainKnowledge] = useState5(
+  const [domainKnowledge, setDomainKnowledge] = useState6(
     state.domain_knowledge.map((dk) => ({ ...dk, tags: [...dk.tags] }))
   );
-  const [isSaving, setIsSaving] = useState5(false);
-  const [newElementId, setNewElementId] = useState5("");
-  const [newCriterion, setNewCriterion] = useState5("");
-  const [showNewDk, setShowNewDk] = useState5(false);
-  const [newDkTitle, setNewDkTitle] = useState5("");
-  const [newDkContent, setNewDkContent] = useState5("");
-  const [newDkTags, setNewDkTags] = useState5("");
-  const [editingCriterionIdx, setEditingCriterionIdx] = useState5(
+  const [isSaving, setIsSaving] = useState6(false);
+  const [newElementId, setNewElementId] = useState6("");
+  const [newCriterion, setNewCriterion] = useState6("");
+  const [showNewDk, setShowNewDk] = useState6(false);
+  const [newDkTitle, setNewDkTitle] = useState6("");
+  const [newDkContent, setNewDkContent] = useState6("");
+  const [newDkTags, setNewDkTags] = useState6("");
+  const [editingCriterionIdx, setEditingCriterionIdx] = useState6(
     null
   );
-  const [editingCriterionValue, setEditingCriterionValue] = useState5("");
-  useEffect5(() => {
+  const [editingCriterionValue, setEditingCriterionValue] = useState6("");
+  useEffect6(() => {
     setName(state.name);
     setDescription(state.description ?? "");
     setElementIds([...state.element_ids]);
@@ -2861,7 +3202,7 @@ function StateDetailPanel({
     setEditingCriterionIdx(null);
   }, [state]);
   const hasChanges = name !== state.name || description !== (state.description ?? "") || JSON.stringify(elementIds) !== JSON.stringify(state.element_ids) || JSON.stringify(acceptanceCriteria) !== JSON.stringify(state.acceptance_criteria) || JSON.stringify(domainKnowledge) !== JSON.stringify(state.domain_knowledge);
-  const handleSave = useCallback5(async () => {
+  const handleSave = useCallback6(async () => {
     if (!hasChanges) return;
     setIsSaving(true);
     try {
@@ -2889,7 +3230,7 @@ function StateDetailPanel({
     hasChanges,
     onSave
   ]);
-  const handleDelete = useCallback5(async () => {
+  const handleDelete = useCallback6(async () => {
     if (!onDelete) return;
     setIsSaving(true);
     try {
@@ -2898,26 +3239,26 @@ function StateDetailPanel({
       setIsSaving(false);
     }
   }, [state.id, onDelete]);
-  const handleAddElement = useCallback5(() => {
+  const handleAddElement = useCallback6(() => {
     const trimmed = newElementId.trim();
     if (!trimmed || elementIds.includes(trimmed)) return;
     setElementIds((prev) => [...prev, trimmed]);
     setNewElementId("");
   }, [newElementId, elementIds]);
-  const handleRemoveElement = useCallback5((eid) => {
+  const handleRemoveElement = useCallback6((eid) => {
     setElementIds((prev) => prev.filter((e) => e !== eid));
   }, []);
-  const handleAddCriterion = useCallback5(() => {
+  const handleAddCriterion = useCallback6(() => {
     const trimmed = newCriterion.trim();
     if (!trimmed) return;
     setAcceptanceCriteria((prev) => [...prev, trimmed]);
     setNewCriterion("");
   }, [newCriterion]);
-  const handleRemoveCriterion = useCallback5((idx) => {
+  const handleRemoveCriterion = useCallback6((idx) => {
     setAcceptanceCriteria((prev) => prev.filter((_, i) => i !== idx));
     setEditingCriterionIdx(null);
   }, []);
-  const handleSaveCriterionEdit = useCallback5(() => {
+  const handleSaveCriterionEdit = useCallback6(() => {
     if (editingCriterionIdx === null) return;
     const trimmed = editingCriterionValue.trim();
     if (!trimmed) {
@@ -2929,7 +3270,7 @@ function StateDetailPanel({
     );
     setEditingCriterionIdx(null);
   }, [editingCriterionIdx, editingCriterionValue, handleRemoveCriterion]);
-  const handleAddDk = useCallback5(() => {
+  const handleAddDk = useCallback6(() => {
     const title = newDkTitle.trim();
     const content = newDkContent.trim();
     if (!title || !content) return;
@@ -2951,7 +3292,7 @@ function StateDetailPanel({
     setNewDkTags("");
     setShowNewDk(false);
   }, [newDkTitle, newDkContent, newDkTags]);
-  const handleRemoveDk = useCallback5((dkId) => {
+  const handleRemoveDk = useCallback6((dkId) => {
     setDomainKnowledge((prev) => prev.filter((dk) => dk.id !== dkId));
   }, []);
   const confidenceColor = getConfidenceColor(state.confidence);
@@ -3265,7 +3606,7 @@ function StateDetailPanel({
 }
 
 // src/components/state-machine/StateViewPanel.tsx
-import { useState as useState9, useMemo as useMemo8, useEffect as useEffect8, useCallback as useCallback8 } from "react";
+import { useState as useState10, useMemo as useMemo8, useEffect as useEffect9, useCallback as useCallback9 } from "react";
 import {
   List as VirtualList,
   useListRef,
@@ -3273,8 +3614,8 @@ import {
 } from "react-window";
 import {
   Layers as Layers5,
-  ChevronRight as ChevronRight3,
-  ChevronDown,
+  ChevronRight as ChevronRight4,
+  ChevronDown as ChevronDown2,
   Play as Play5,
   Lock as Lock2,
   Eye as Eye3,
@@ -3371,7 +3712,7 @@ function resolveElementTag(elementId, fingerprintDetails, state) {
 }
 
 // src/components/state-machine/SpatialCanvas.tsx
-import { useState as useState6, useMemo as useMemo5, useRef as useRef4, useEffect as useEffect6, useCallback as useCallback6 } from "react";
+import { useState as useState7, useMemo as useMemo5, useRef as useRef5, useEffect as useEffect7, useCallback as useCallback7 } from "react";
 import { ZoomIn, ZoomOut, Maximize as Maximize2 } from "lucide-react";
 import { STATE_COLORS, computeSpatialLayout } from "@qontinui/workflow-utils";
 import { jsx as jsx10, jsxs as jsxs10 } from "react/jsx-runtime";
@@ -3381,11 +3722,11 @@ function SpatialCanvas({
   selectedStateId,
   onSelectState
 }) {
-  const canvasRef = useRef4(null);
-  const containerRef = useRef4(null);
-  const [canvasSize, setCanvasSize] = useState6({ width: 800, height: 600 });
-  const [zoom, setZoom] = useState6(1);
-  const [hoveredStateId, setHoveredStateId] = useState6(null);
+  const canvasRef = useRef5(null);
+  const containerRef = useRef5(null);
+  const [canvasSize, setCanvasSize] = useState7({ width: 800, height: 600 });
+  const [zoom, setZoom] = useState7(1);
+  const [hoveredStateId, setHoveredStateId] = useState7(null);
   const layout = useMemo5(
     () => computeSpatialLayout(
       states,
@@ -3405,7 +3746,7 @@ function SpatialCanvas({
     }
     return elementStateMap;
   }, [states]);
-  useEffect6(() => {
+  useEffect7(() => {
     const container = containerRef.current;
     if (!container) return;
     const observer = new ResizeObserver((entries) => {
@@ -3420,7 +3761,7 @@ function SpatialCanvas({
     observer.observe(container);
     return () => observer.disconnect();
   }, []);
-  useEffect6(() => {
+  useEffect7(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext("2d");
@@ -3561,7 +3902,7 @@ function SpatialCanvas({
     sharedElements,
     zoom
   ]);
-  const getStateAtPoint = useCallback6(
+  const getStateAtPoint = useCallback7(
     (clientX, clientY) => {
       const canvas = canvasRef.current;
       if (!canvas) return null;
@@ -3582,13 +3923,13 @@ function SpatialCanvas({
     },
     [states, layout, zoom]
   );
-  const handleMouseMove = useCallback6(
+  const handleMouseMove = useCallback7(
     (e) => {
       setHoveredStateId(getStateAtPoint(e.clientX, e.clientY));
     },
     [getStateAtPoint]
   );
-  const handleClick = useCallback6(
+  const handleClick = useCallback7(
     (e) => {
       const stateId = getStateAtPoint(e.clientX, e.clientY);
       onSelectState(stateId === selectedStateId ? null : stateId);
@@ -3673,7 +4014,7 @@ function SpatialCanvas({
 }
 
 // src/components/state-machine/StateLayoutView.tsx
-import { useState as useState7, useMemo as useMemo6 } from "react";
+import { useState as useState8, useMemo as useMemo6 } from "react";
 import { Layout } from "lucide-react";
 import { getElementTypePrefix as getElementTypePrefix2, getElementLabel as getElementLabel3 } from "@qontinui/workflow-utils";
 import { jsx as jsx11, jsxs as jsxs11 } from "react/jsx-runtime";
@@ -3682,7 +4023,7 @@ function StateLayoutView({
   elementThumbnails,
   fingerprintDetails
 }) {
-  const [hoveredElement, setHoveredElement] = useState7(null);
+  const [hoveredElement, setHoveredElement] = useState8(null);
   const positionedElements = useMemo6(() => {
     const items = [];
     for (const eid of state.element_ids) {
@@ -3772,11 +4113,11 @@ function StateLayoutView({
 }
 
 // src/components/state-machine/ScreenshotStateView.tsx
-import { useState as useState8, useMemo as useMemo7, useRef as useRef5, useEffect as useEffect7, useCallback as useCallback7 } from "react";
+import { useState as useState9, useMemo as useMemo7, useRef as useRef6, useEffect as useEffect8, useCallback as useCallback8 } from "react";
 import {
   Layers as Layers4,
   ChevronLeft,
-  ChevronRight as ChevronRight2,
+  ChevronRight as ChevronRight3,
   ZoomIn as ZoomIn2,
   ZoomOut as ZoomOut2,
   Maximize as Maximize3,
@@ -3793,19 +4134,19 @@ function ScreenshotStateView({
   fingerprintDetails,
   elementThumbnails
 }) {
-  const canvasRef = useRef5(null);
-  const containerRef = useRef5(null);
-  const imageCache = useRef5(/* @__PURE__ */ new Map());
-  const thumbnailLoadingRef = useRef5(/* @__PURE__ */ new Set());
-  const [currentIndex, setCurrentIndex] = useState8(0);
-  const [userZoom, setUserZoom] = useState8(null);
-  const [autoFitZoom, setAutoFitZoom] = useState8(1);
+  const canvasRef = useRef6(null);
+  const containerRef = useRef6(null);
+  const imageCache = useRef6(/* @__PURE__ */ new Map());
+  const thumbnailLoadingRef = useRef6(/* @__PURE__ */ new Set());
+  const [currentIndex, setCurrentIndex] = useState9(0);
+  const [userZoom, setUserZoom] = useState9(null);
+  const [autoFitZoom, setAutoFitZoom] = useState9(1);
   const zoom = userZoom ?? autoFitZoom;
-  const [hoveredElement, setHoveredElement] = useState8(null);
-  const [canvasSize, setCanvasSize] = useState8({ width: 800, height: 600 });
-  const [isLoading, setIsLoading] = useState8(false);
-  const [selectedElementHash, setSelectedElementHash] = useState8(null);
-  const [thumbnailCache, setThumbnailCache] = useState8(/* @__PURE__ */ new Map());
+  const [hoveredElement, setHoveredElement] = useState9(null);
+  const [canvasSize, setCanvasSize] = useState9({ width: 800, height: 600 });
+  const [isLoading, setIsLoading] = useState9(false);
+  const [selectedElementHash, setSelectedElementHash] = useState9(null);
+  const [thumbnailCache, setThumbnailCache] = useState9(/* @__PURE__ */ new Map());
   const capture = captureScreenshots[currentIndex];
   const elementBounds = useMemo7(() => {
     if (!capture) return {};
@@ -3856,7 +4197,7 @@ function ScreenshotStateView({
     }
     return indices;
   }, [captureScreenshots, selectedStateIds, selectedStateHashes]);
-  useEffect7(() => {
+  useEffect8(() => {
     if (selectedStateIds.size === 0) return;
     let bestIdx = -1;
     let bestOverlap = 0;
@@ -3873,7 +4214,7 @@ function ScreenshotStateView({
     }
     if (bestIdx >= 0) setCurrentIndex(bestIdx);
   }, [selectedStateIds, selectedStateHashes, captureScreenshots]);
-  useEffect7(() => {
+  useEffect8(() => {
     const container = containerRef.current;
     if (!container) return;
     const observer = new ResizeObserver((entries) => {
@@ -3888,7 +4229,7 @@ function ScreenshotStateView({
     observer.observe(container);
     return () => observer.disconnect();
   }, []);
-  useEffect7(() => {
+  useEffect8(() => {
     for (const cap of captureScreenshots) {
       if (thumbnailLoadingRef.current.has(cap.id)) continue;
       thumbnailLoadingRef.current.add(cap.id);
@@ -3902,7 +4243,7 @@ function ScreenshotStateView({
       });
     }
   }, [captureScreenshots, onLoadScreenshotImage]);
-  useEffect7(() => {
+  useEffect8(() => {
     if (!capture) return;
     const cached = imageCache.current.get(capture.id);
     if (cached) {
@@ -3935,7 +4276,7 @@ function ScreenshotStateView({
       cancelled = true;
     };
   }, [capture, onLoadScreenshotImage, canvasSize.width, canvasSize.height]);
-  useEffect7(() => {
+  useEffect8(() => {
     const canvas = canvasRef.current;
     if (!canvas || !capture) return;
     const ctx = canvas.getContext("2d");
@@ -4000,7 +4341,7 @@ function ScreenshotStateView({
       }
     }
   }, [canvasSize, capture, zoom, elementBounds, hoveredElement, selectedStateIds, selectedStateHashes, selectedElementHash, fingerprintDetails, hashToElement]);
-  const getElementAtPoint = useCallback7(
+  const getElementAtPoint = useCallback8(
     (clientX, clientY) => {
       const canvas = canvasRef.current;
       if (!canvas || !capture) return null;
@@ -4033,13 +4374,13 @@ function ScreenshotStateView({
     },
     [capture, zoom, canvasSize, elementBounds, selectedStateIds, selectedStateHashes]
   );
-  const handleMouseMove = useCallback7(
+  const handleMouseMove = useCallback8(
     (e) => {
       setHoveredElement(getElementAtPoint(e.clientX, e.clientY));
     },
     [getElementAtPoint]
   );
-  const handleCanvasClick = useCallback7(
+  const handleCanvasClick = useCallback8(
     (e) => {
       const hash = getElementAtPoint(e.clientX, e.clientY);
       if (!hash) {
@@ -4050,15 +4391,15 @@ function ScreenshotStateView({
     },
     [getElementAtPoint]
   );
-  const handlePrev = useCallback7(
+  const handlePrev = useCallback8(
     () => setCurrentIndex((i) => Math.max(0, i - 1)),
     []
   );
-  const handleNext = useCallback7(
+  const handleNext = useCallback8(
     () => setCurrentIndex((i) => Math.min(captureScreenshots.length - 1, i + 1)),
     [captureScreenshots.length]
   );
-  useEffect7(() => {
+  useEffect8(() => {
     const handler = (e) => {
       if (e.key === "ArrowLeft") handlePrev();
       if (e.key === "ArrowRight") handleNext();
@@ -4139,7 +4480,7 @@ function ScreenshotStateView({
             onClick: handleNext,
             disabled: currentIndex === captureScreenshots.length - 1,
             title: "Next capture",
-            children: /* @__PURE__ */ jsx12(ChevronRight2, { className: "size-4" })
+            children: /* @__PURE__ */ jsx12(ChevronRight3, { className: "size-4" })
           }
         ),
         /* @__PURE__ */ jsx12("div", { className: "flex-1" }),
@@ -4341,7 +4682,7 @@ function StateRow({
             isInitial && /* @__PURE__ */ jsx13(Play5, { className: "size-3 text-yellow-500 fill-yellow-500 shrink-0" }),
             isBlocking && /* @__PURE__ */ jsx13(Lock2, { className: "size-3 text-amber-500 shrink-0" }),
             /* @__PURE__ */ jsx13("span", { className: "font-medium text-text-primary truncate flex-1", children: state.name }),
-            isExpanded ? /* @__PURE__ */ jsx13(ChevronDown, { className: "size-3 text-text-muted transition-transform" }) : /* @__PURE__ */ jsx13(ChevronRight3, { className: "size-3 text-text-muted transition-transform" })
+            isExpanded ? /* @__PURE__ */ jsx13(ChevronDown2, { className: "size-3 text-text-muted transition-transform" }) : /* @__PURE__ */ jsx13(ChevronRight4, { className: "size-3 text-text-muted transition-transform" })
           ] }),
           /* @__PURE__ */ jsxs13("div", { className: "flex items-center gap-2 mt-1 ml-4.5 text-xs text-text-muted", children: [
             /* @__PURE__ */ jsxs13("span", { children: [
@@ -4408,21 +4749,21 @@ function StateViewPanel({
   captureScreenshots,
   onLoadScreenshotImage
 }) {
-  const [expandedStates, setExpandedStates] = useState9(/* @__PURE__ */ new Set());
-  const [searchFilter, setSearchFilter] = useState9("");
-  const [viewMode, setViewMode] = useState9(
+  const [expandedStates, setExpandedStates] = useState10(/* @__PURE__ */ new Set());
+  const [searchFilter, setSearchFilter] = useState10("");
+  const [viewMode, setViewMode] = useState10(
     captureScreenshots && captureScreenshots.length > 0 ? "screenshot" : "list"
   );
-  const [hasAutoSwitched, setHasAutoSwitched] = useState9(
+  const [hasAutoSwitched, setHasAutoSwitched] = useState10(
     () => !!(captureScreenshots && captureScreenshots.length > 0)
   );
-  useEffect8(() => {
+  useEffect9(() => {
     if (!hasAutoSwitched && captureScreenshots && captureScreenshots.length > 0) {
       setViewMode("screenshot");
       setHasAutoSwitched(true);
     }
   }, [captureScreenshots, hasAutoSwitched]);
-  const [selectedStateIds, setSelectedStateIds] = useState9(/* @__PURE__ */ new Set());
+  const [selectedStateIds, setSelectedStateIds] = useState10(/* @__PURE__ */ new Set());
   const effectiveSelectedStateId = selectedStateId;
   const selectedState = useMemo8(
     () => states.find((s) => s.state_id === effectiveSelectedStateId),
@@ -4470,7 +4811,7 @@ function StateViewPanel({
       (s) => s.name.toLowerCase().includes(lower) || s.state_id.toLowerCase().includes(lower) || s.element_ids.some((eid) => eid.toLowerCase().includes(lower))
     );
   }, [states, searchFilter]);
-  const toggleExpanded = useCallback8((stateId) => {
+  const toggleExpanded = useCallback9((stateId) => {
     setExpandedStates((prev) => {
       const next = new Set(prev);
       if (next.has(stateId)) {
@@ -4483,7 +4824,7 @@ function StateViewPanel({
   }, []);
   const listRef = useListRef(null);
   const dynamicRowHeight = useDynamicRowHeight({ defaultRowHeight: 60 });
-  const handleRowClick = useCallback8(
+  const handleRowClick = useCallback9(
     (state, e) => {
       const isSelected = viewMode === "screenshot" ? selectedStateIds.has(state.state_id) : state.state_id === effectiveSelectedStateId;
       const isExpanded = expandedStates.has(state.state_id);
@@ -4509,7 +4850,7 @@ function StateViewPanel({
     },
     [viewMode, selectedStateIds, effectiveSelectedStateId, expandedStates, toggleExpanded, onSelectState]
   );
-  useEffect8(() => {
+  useEffect9(() => {
     if (!effectiveSelectedStateId) return;
     const idx = filteredStates.findIndex(
       (s) => s.state_id === effectiveSelectedStateId
@@ -4858,7 +5199,7 @@ function StateViewPanel({
 }
 
 // src/components/state-machine/PathfindingPanel.tsx
-import { useState as useState10, useCallback as useCallback9 } from "react";
+import { useState as useState11, useCallback as useCallback10 } from "react";
 import {
   findPath
 } from "@qontinui/workflow-utils";
@@ -4869,12 +5210,12 @@ function PathfindingPanel({
   onPathFound,
   onFindPath
 }) {
-  const [fromStateId, setFromStateId] = useState10("");
-  const [targetStateId, setTargetStateId] = useState10("");
-  const [algorithm, setAlgorithm] = useState10("dijkstra");
-  const [result, setResult] = useState10(null);
-  const [isSearching, setIsSearching] = useState10(false);
-  const handleFind = useCallback9(async () => {
+  const [fromStateId, setFromStateId] = useState11("");
+  const [targetStateId, setTargetStateId] = useState11("");
+  const [algorithm, setAlgorithm] = useState11("dijkstra");
+  const [result, setResult] = useState11(null);
+  const [isSearching, setIsSearching] = useState11(false);
+  const handleFind = useCallback10(async () => {
     if (!fromStateId || !targetStateId) return;
     setIsSearching(true);
     try {
@@ -4901,7 +5242,7 @@ function PathfindingPanel({
     onFindPath,
     onPathFound
   ]);
-  const clearResult = useCallback9(() => {
+  const clearResult = useCallback10(() => {
     setResult(null);
     onPathFound?.({ found: false, steps: [], total_cost: 0 });
   }, [onPathFound]);
@@ -5023,7 +5364,7 @@ function PathfindingPanel({
 }
 
 // src/components/state-machine/StateViewTable.tsx
-import { useState as useState11, useMemo as useMemo9 } from "react";
+import { useState as useState12, useMemo as useMemo9 } from "react";
 import {
   getElementTypeStyle as getElementTypeStyle2,
   getElementTypePrefix as getElementTypePrefix4,
@@ -5035,7 +5376,7 @@ function StateViewTable({
   selectedStateId,
   onSelectState
 }) {
-  const [filter, setFilter] = useState11("");
+  const [filter, setFilter] = useState12("");
   const filteredStates = useMemo9(() => {
     if (!filter.trim()) return states;
     const q = filter.toLowerCase();
@@ -5125,7 +5466,7 @@ function StateViewTable({
 }
 
 // src/components/state-machine/DiagramTab.tsx
-import { useEffect as useEffect9, useRef as useRef6, useState as useState12 } from "react";
+import { useEffect as useEffect10, useRef as useRef7, useState as useState13 } from "react";
 import { RefreshCw as RefreshCw2, Loader2, Workflow } from "lucide-react";
 import { jsx as jsx16, jsxs as jsxs16 } from "react/jsx-runtime";
 function DiagramTab({
@@ -5135,10 +5476,10 @@ function DiagramTab({
   onRefresh,
   unavailableReason
 }) {
-  const containerRef = useRef6(null);
-  const [importError, setImportError] = useState12(null);
-  const [renderError, setRenderError] = useState12(null);
-  useEffect9(() => {
+  const containerRef = useRef7(null);
+  const [importError, setImportError] = useState13(null);
+  const [renderError, setRenderError] = useState13(null);
+  useEffect10(() => {
     if (unavailableReason) {
       if (containerRef.current) containerRef.current.innerHTML = "";
       setRenderError(null);
