@@ -312,4 +312,73 @@ interface DiagramTabProps {
 }
 declare function DiagramTab({ activeStateIds, diagramSource, isLoading, onRefresh, unavailableReason, }: DiagramTabProps): react_jsx_runtime.JSX.Element;
 
-export { type CaptureScreenshotMeta, type ChunkNodeData, ChunkOverviewNode, ChunkPortNode, type ChunkPortNodeData, ChunkedGraphView, type ChunkedGraphViewProps, DiagramTab, type DiagramTabProps, type FingerprintDetail, PathfindingPanel, type PathfindingPanelProps, StateDetailPanel, type StateDetailPanelProps, StateMachineGraphView, type StateMachineGraphViewProps, StateMachineStateNode, StateMachineTransitionEdge, StateViewPanel, type StateViewPanelProps, StateViewTable, type StateViewTableProps, TransitionEditor, type TransitionEditorProps, TransitionsPanel, type TransitionsPanelProps };
+/**
+ * Synthetic giant-SCC state machine generator.
+ *
+ * Exists to exercise the nested-drill code path in `ChunkedGraphView` —
+ * the primary chunker never produces a chunk > `CHUNK_MAX_NODES` (150)
+ * from real-world configs, so without a synthetic fixture the
+ * `decomposeGiantSCC` UI branch is unreachable in manual testing.
+ *
+ * The shape is a classic "hub + N linear branches" giant-SCC:
+ *
+ *     H → B1_0 → B1_1 → ... → B1_{m-1} → H    (branch 1)
+ *     H → B2_0 → ...                           (branch 2)
+ *       ...
+ *
+ * All branch nodes are only reachable through H, so every state lies in
+ * a single strongly-connected component. With `m >= 20`, three branches
+ * yields 61 states; ten branches yields 201 states (well above the
+ * 150-state giant-SCC threshold).
+ *
+ * See `qontinui-workflow-utils/src/state-machine/scc-secondary.test.ts`
+ * Case 2 for the canonical shape this mirrors.
+ *
+ * NOT EXPORTED FROM THE PACKAGE ROOT — test/dev-fixture use only. Pull
+ * via the deep import:
+ *
+ *   import { generateGiantSCC } from
+ *     "@qontinui/workflow-ui/dist/components/state-machine/__fixtures__/giant-scc";
+ *
+ * or reach it directly from a neighbouring runner dev component via the
+ * relative source path. Keeping it off the public exports keeps test
+ * helpers out of production bundles.
+ */
+
+interface GenerateGiantSCCOptions {
+    /**
+     * Number of linear branches emanating from the hub. Default 10.
+     * Total states = 1 + branches * branchLength.
+     */
+    branches?: number;
+    /**
+     * States per branch (not counting the hub). Default 20.
+     */
+    branchLength?: number;
+    /**
+     * Stable prefix for generated state ids (e.g. "dev-giant"). Default
+     * "giant".
+     */
+    idPrefix?: string;
+    /**
+     * Config id to stamp on every state + transition. Default
+     * "synthetic-giant-scc".
+     */
+    configId?: string;
+}
+interface GiantSCCFixture {
+    states: StateMachineState[];
+    transitions: StateMachineTransition[];
+    /** The hub state id — convenient for auto-drill targeting. */
+    hubStateId: string;
+}
+/**
+ * Generate a synthetic state machine containing exactly ONE giant SCC.
+ *
+ * Defaults (`branches=10`, `branchLength=20`) produce a 201-state SCC,
+ * which exceeds `ChunkedGraphView`'s 150-state giant-SCC threshold and
+ * therefore triggers the nested-overview render path.
+ */
+declare function generateGiantSCC(opts?: GenerateGiantSCCOptions): GiantSCCFixture;
+
+export { type CaptureScreenshotMeta, type ChunkNodeData, ChunkOverviewNode, ChunkPortNode, type ChunkPortNodeData, ChunkedGraphView, type ChunkedGraphViewProps, DiagramTab, type DiagramTabProps, type FingerprintDetail, type GenerateGiantSCCOptions, type GiantSCCFixture, PathfindingPanel, type PathfindingPanelProps, StateDetailPanel, type StateDetailPanelProps, StateMachineGraphView, type StateMachineGraphViewProps, StateMachineStateNode, StateMachineTransitionEdge, StateViewPanel, type StateViewPanelProps, StateViewTable, type StateViewTableProps, TransitionEditor, type TransitionEditorProps, TransitionsPanel, type TransitionsPanelProps, generateGiantSCC };

@@ -32,7 +32,8 @@ __export(state_machine_exports, {
   StateViewPanel: () => StateViewPanel,
   StateViewTable: () => StateViewTable,
   TransitionEditor: () => TransitionEditor,
-  TransitionsPanel: () => TransitionsPanel
+  TransitionsPanel: () => TransitionsPanel,
+  generateGiantSCC: () => generateGiantSCC
 });
 module.exports = __toCommonJS(state_machine_exports);
 
@@ -685,6 +686,11 @@ var ChunkPortNode = (0, import_react7.memo)(ChunkPortNodeInner);
 // src/components/state-machine/ChunkedGraphView.tsx
 var import_jsx_runtime5 = require("react/jsx-runtime");
 var CHUNK_MAX_NODES = 150;
+var MAX_DEPTH = 2;
+var SUB_CHUNK_MAX = 40;
+var emptySet = /* @__PURE__ */ new Set();
+var noopToggle = () => {
+};
 var FIT_VIEW_OPTIONS = { padding: 0.2, minZoom: 0.3 };
 var OVERVIEW_LAYOUT_OPTIONS = {
   direction: "TB",
@@ -982,6 +988,7 @@ function DrilledCanvasInner({
   elementThumbnails,
   chunkLabels,
   highlightedTransitionIds,
+  weakBridgeTransitionIds,
   transitionCounts,
   onSelectState,
   onSelectTransition,
@@ -1113,6 +1120,7 @@ function DrilledCanvasInner({
     const list = [];
     for (const t of internalTransitions) {
       const isSelected = t.transition_id === selectedTransitionSemanticId;
+      const isWeakBridge = weakBridgeTransitionIds?.has(t.transition_id) === true;
       for (const from of t.from_states) {
         if (!chunkStateIds.has(from)) continue;
         for (const to of t.activate_states) {
@@ -1124,6 +1132,12 @@ function DrilledCanvasInner({
             type: "transitionEdge",
             selected: isSelected,
             markerEnd: { type: import_react10.MarkerType.ArrowClosed, width: 15, height: 15 },
+            ...isWeakBridge ? {
+              style: {
+                stroke: "var(--amber-400, #fbbf24)",
+                strokeWidth: 3
+              }
+            } : {},
             data: {
               transitionId: t.transition_id,
               name: t.name,
@@ -1143,7 +1157,8 @@ function DrilledCanvasInner({
     internalTransitions,
     chunkStateIds,
     selectedTransitionSemanticId,
-    highlightedTransitionIds
+    highlightedTransitionIds,
+    weakBridgeTransitionIds
   ]);
   const portNodes = (0, import_react9.useMemo)(() => {
     const list = [];
@@ -1459,6 +1474,24 @@ function ChunkedGraphViewInner(props) {
       return next;
     });
   }, []);
+  const decomposeCache = (0, import_react9.useRef)(/* @__PURE__ */ new Map());
+  (0, import_react9.useEffect)(() => {
+    decomposeCache.current.clear();
+  }, [states, transitions, effectiveInitialStateId]);
+  const getDecomposition = (0, import_react9.useCallback)(
+    (c) => {
+      const cached = decomposeCache.current.get(c.id);
+      if (cached) return cached;
+      const result = (0, import_workflow_utils.decomposeGiantSCC)(states, transitions, c, {
+        rootStateId: effectiveInitialStateId,
+        subChunkMax: SUB_CHUNK_MAX,
+        maxDepth: MAX_DEPTH
+      });
+      decomposeCache.current.set(c.id, result);
+      return result;
+    },
+    [states, transitions, effectiveInitialStateId]
+  );
   const stateNamesByChunkId = (0, import_react9.useMemo)(() => {
     const nameById = /* @__PURE__ */ new Map();
     for (const s of states) nameById.set(s.state_id, s.name);
@@ -1485,14 +1518,36 @@ function ChunkedGraphViewInner(props) {
     }
     return m;
   }, [searchQuery, states, chunkGraph.stateIndex]);
-  const currentChunkId = viewMode.kind === "drilled" ? viewMode.chunkId : null;
+  const pathForState = (0, import_react9.useCallback)(
+    (stateId) => {
+      const primaryChunkId = chunkGraph.stateIndex.get(stateId);
+      if (!primaryChunkId) return [];
+      const path = [primaryChunkId];
+      let current = chunkById.get(primaryChunkId);
+      while (current && current.stateIds.length > CHUNK_MAX_NODES && path.length - 1 < MAX_DEPTH) {
+        const secondary = getDecomposition(current);
+        if (secondary.degenerate) break;
+        const subChunkId = secondary.stateIndex.get(stateId);
+        if (!subChunkId) break;
+        path.push(subChunkId);
+        const nextChunk = secondary.subChunks.find((c) => c.id === subChunkId);
+        if (!nextChunk) break;
+        current = nextChunk;
+      }
+      return path;
+    },
+    [chunkGraph.stateIndex, chunkById, getDecomposition]
+  );
+  const currentPath = viewMode.kind === "drilled" ? viewMode.path : [];
+  const currentPathKey = currentPath.join(">");
   (0, import_react9.useEffect)(() => {
     if (!selectedStateId) return;
-    const targetChunkId = chunkGraph.stateIndex.get(selectedStateId);
-    if (!targetChunkId) return;
-    if (targetChunkId === currentChunkId) return;
-    setViewMode({ kind: "drilled", chunkId: targetChunkId });
-  }, [selectedStateId, chunkGraph.stateIndex, currentChunkId]);
+    const targetPath = pathForState(selectedStateId);
+    if (targetPath.length === 0) return;
+    const targetKey = targetPath.join(">");
+    if (targetKey === currentPathKey) return;
+    setViewMode({ kind: "drilled", path: targetPath });
+  }, [selectedStateId, pathForState, currentPathKey]);
   (0, import_react9.useEffect)(() => {
     if (viewMode.kind !== "drilled") return;
     const handler = (e) => {
@@ -1509,18 +1564,176 @@ function ChunkedGraphViewInner(props) {
     setViewMode({ kind: "overview" });
   }, []);
   const drillInto = (0, import_react9.useCallback)((chunkId) => {
-    setViewMode({ kind: "drilled", chunkId });
+    setViewMode({ kind: "drilled", path: [chunkId] });
+  }, []);
+  const popToDepth = (0, import_react9.useCallback)((depth) => {
+    setViewMode((prev) => {
+      if (prev.kind !== "drilled") return prev;
+      if (depth < 0) return { kind: "overview" };
+      if (depth >= prev.path.length) return prev;
+      return { kind: "drilled", path: prev.path.slice(0, depth + 1) };
+    });
+  }, []);
+  const popOneLevel = (0, import_react9.useCallback)(() => {
+    setViewMode((prev) => {
+      if (prev.kind !== "drilled") return prev;
+      if (prev.path.length <= 1) return { kind: "overview" };
+      return { kind: "drilled", path: prev.path.slice(0, prev.path.length - 1) };
+    });
   }, []);
   if (states.length === 0) {
     return /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("div", { className: "flex items-center justify-center h-full text-text-muted", children: /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("p", { children: emptyMessage }) });
   }
   if (viewMode.kind === "drilled") {
-    const chunk = chunkById.get(viewMode.chunkId);
-    if (!chunk) {
+    const path = viewMode.path;
+    const primaryChunk = chunkById.get(path[0]);
+    if (!primaryChunk) {
       return /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(ChunkedGraphViewFallbackMissingChunk, { onBack: goOverview });
     }
-    const isGiant = chunk.stateIds.length > CHUNK_MAX_NODES;
-    const drilledName = chunkLabels?.get(chunk.id) || chunk.name;
+    let currentChunk = primaryChunk;
+    let parentSecondary = null;
+    let pathValid = true;
+    for (let i = 1; i < path.length; i++) {
+      const parentIsGiant = currentChunk.stateIds.length > CHUNK_MAX_NODES;
+      if (!parentIsGiant) {
+        pathValid = false;
+        break;
+      }
+      const secondary = getDecomposition(currentChunk);
+      if (secondary.degenerate) {
+        pathValid = false;
+        break;
+      }
+      const nextSubId = path[i];
+      const nextSub = secondary.subChunks.find((c) => c.id === nextSubId);
+      if (!nextSub) {
+        pathValid = false;
+        break;
+      }
+      currentChunk = nextSub;
+      parentSecondary = secondary;
+    }
+    if (!pathValid) {
+      return /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(ChunkedGraphViewFallbackMissingChunk, { onBack: goOverview });
+    }
+    const currentDepth = path.length - 1;
+    const isGiant = currentChunk.stateIds.length > CHUNK_MAX_NODES;
+    const labelFor = (c) => chunkLabels?.get(c.id) || c.name;
+    const labels = [];
+    {
+      let cursor = primaryChunk;
+      labels.push(labelFor(cursor));
+      for (let i = 1; i < path.length; i++) {
+        const secondary = getDecomposition(cursor);
+        const nextSub = secondary.subChunks.find((c) => c.id === path[i]);
+        cursor = nextSub;
+        labels.push(labelFor(cursor));
+      }
+    }
+    let body;
+    if (isGiant) {
+      if (currentDepth >= MAX_DEPTH) {
+        body = /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(
+          GiantChunkPanel,
+          {
+            chunk: currentChunk,
+            states,
+            selectedStateId,
+            onSelectState
+          }
+        );
+      } else {
+        const secondary = getDecomposition(currentChunk);
+        if (secondary.degenerate) {
+          body = /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(
+            GiantChunkPanel,
+            {
+              chunk: currentChunk,
+              states,
+              selectedStateId,
+              onSelectState
+            }
+          );
+        } else {
+          const nestedChunkGraph = {
+            chunks: secondary.subChunks,
+            edges: secondary.edges,
+            stateIndex: secondary.stateIndex
+          };
+          const onDrillInNested = (subId) => {
+            setViewMode({ kind: "drilled", path: [...path, subId] });
+          };
+          const nestedNames = /* @__PURE__ */ new Map();
+          const nameById = /* @__PURE__ */ new Map();
+          for (const s of states) nameById.set(s.state_id, s.name);
+          for (const sc of secondary.subChunks) {
+            nestedNames.set(
+              sc.id,
+              sc.stateIds.map((id) => nameById.get(id) ?? id)
+            );
+          }
+          body = /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(
+            OverviewCanvas,
+            {
+              chunkGraph: nestedChunkGraph,
+              dagreLib,
+              onDrillIn: onDrillInNested,
+              stateNamesByChunkId: nestedNames,
+              perChunkMatches: null,
+              expandedChainIds: emptySet,
+              onToggleChainExpand: noopToggle,
+              chunkLabels: void 0,
+              onSaveChunkLabel: void 0,
+              states,
+              transitionCounts,
+              effectiveInitialStateId,
+              selectedStateId,
+              onSelectState,
+              onSelectTransition,
+              elementThumbnails
+            }
+          );
+        }
+      }
+    } else {
+      const leafChunkGraph = parentSecondary ? {
+        chunks: parentSecondary.subChunks,
+        edges: parentSecondary.edges,
+        stateIndex: parentSecondary.stateIndex
+      } : chunkGraph;
+      const leafWeakBridges = parentSecondary?.weakBridgeTransitionIds;
+      const leafOnNavigate = parentSecondary ? (siblingId) => {
+        setViewMode({
+          kind: "drilled",
+          path: [...path.slice(0, path.length - 1), siblingId]
+        });
+      } : drillInto;
+      body = /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(
+        DrilledCanvas,
+        {
+          chunk: currentChunk,
+          chunkGraph: leafChunkGraph,
+          states,
+          transitions,
+          dagreLib,
+          selectedStateId,
+          selectedTransitionId,
+          effectiveInitialStateId,
+          elementThumbnails,
+          chunkLabels,
+          highlightedTransitionIds,
+          weakBridgeTransitionIds: leafWeakBridges,
+          transitionCounts,
+          onSelectState,
+          onSelectTransition,
+          resolveTransitionSelectionId,
+          onNavigateToChunk: leafOnNavigate,
+          isDragging,
+          dropTargetStateId,
+          onStartElementDrag
+        }
+      );
+    }
     return /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)(
       "div",
       {
@@ -1528,39 +1741,16 @@ function ChunkedGraphViewInner(props) {
         onDragOver,
         onDrop,
         children: [
-          /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(DrilledBreadcrumb, { chunkName: drilledName, onBack: goOverview }),
-          /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("div", { className: "flex-1 min-h-0", children: isGiant ? /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(
-            GiantChunkPanel,
+          /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(
+            Breadcrumb,
             {
-              chunk,
-              states,
-              selectedStateId,
-              onSelectState
+              labels,
+              onBack: popOneLevel,
+              onGoOverview: goOverview,
+              onGoDepth: popToDepth
             }
-          ) : /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(
-            DrilledCanvas,
-            {
-              chunk,
-              chunkGraph,
-              states,
-              transitions,
-              dagreLib,
-              selectedStateId,
-              selectedTransitionId,
-              effectiveInitialStateId,
-              elementThumbnails,
-              chunkLabels,
-              highlightedTransitionIds,
-              transitionCounts,
-              onSelectState,
-              onSelectTransition,
-              resolveTransitionSelectionId,
-              onNavigateToChunk: drillInto,
-              isDragging,
-              dropTargetStateId,
-              onStartElementDrag
-            }
-          ) })
+          ),
+          /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("div", { className: "flex-1 min-h-0", children: body })
         ]
       }
     );
@@ -1587,36 +1777,65 @@ function ChunkedGraphViewInner(props) {
     }
   ) });
 }
-function DrilledBreadcrumb({
-  chunkName,
-  onBack
+function Breadcrumb({
+  labels,
+  onBack,
+  onGoOverview,
+  onGoDepth
 }) {
+  const backTitle = labels.length <= 1 ? "Back to overview (Esc)" : "Back one level (Esc to overview)";
   return /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("div", { className: "flex items-center gap-2 px-3 py-2 border-b border-border-secondary bg-bg-secondary/40 shrink-0", children: [
     /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)(
       "button",
       {
         type: "button",
+        id: "chunked-graph-back",
+        "data-ui-bridge-id": "chunked-graph-back",
         onClick: onBack,
         className: "flex items-center gap-1 px-2 py-1 text-xs text-text-secondary hover:text-text-primary hover:bg-bg-tertiary rounded transition-colors",
-        title: "Back to overview (Esc)",
+        title: backTitle,
         children: [
           /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(import_lucide_react5.ArrowLeft, { className: "size-3.5" }),
           "Back"
         ]
       }
     ),
-    /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("div", { className: "text-xs text-text-muted flex items-center gap-1.5", children: [
+    /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("div", { className: "text-xs text-text-muted flex items-center gap-1.5 flex-wrap", children: [
       /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(
         "button",
         {
           type: "button",
-          onClick: onBack,
+          "data-ui-bridge-id": "chunked-graph-crumb-0",
+          onClick: onGoOverview,
           className: "hover:text-text-primary transition-colors",
           children: "All states"
         }
       ),
-      /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("span", { className: "text-text-muted/60", children: ">" }),
-      /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("span", { className: "text-text-primary font-medium truncate max-w-[240px]", children: chunkName })
+      labels.map((label, i) => {
+        const isLast = i === labels.length - 1;
+        const depth = i + 1;
+        return /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("span", { className: "flex items-center gap-1.5", children: [
+          /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("span", { className: "text-text-muted/60", children: ">" }),
+          isLast ? /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(
+            "span",
+            {
+              "data-testid": "chunked-graph-current",
+              className: "text-text-primary font-medium truncate max-w-[240px]",
+              children: label
+            }
+          ) : /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(
+            "button",
+            {
+              type: "button",
+              "data-ui-bridge-id": `chunked-graph-crumb-${depth}`,
+              onClick: () => onGoDepth(i),
+              className: "hover:text-text-primary transition-colors truncate max-w-[240px]",
+              title: `Back to ${label}`,
+              children: label
+            }
+          )
+        ] }, i);
+      })
     ] })
   ] });
 }
@@ -5496,6 +5715,68 @@ function DiagramTab({
     ] })
   ] });
 }
+
+// src/components/state-machine/__fixtures__/giant-scc.ts
+function generateGiantSCC(opts = {}) {
+  const branches = opts.branches ?? 10;
+  const branchLength = opts.branchLength ?? 20;
+  const idPrefix = opts.idPrefix ?? "giant";
+  const configId = opts.configId ?? "synthetic-giant-scc";
+  const timestamp = "2026-04-24T00:00:00Z";
+  const mkState = (stateId, name) => ({
+    acceptance_criteria: [],
+    confidence: 1,
+    config_id: configId,
+    created_at: timestamp,
+    description: null,
+    domain_knowledge: [],
+    element_ids: [],
+    extra_metadata: stateId === `${idPrefix}-hub` ? { initial: true } : {},
+    id: `uuid-${stateId}`,
+    name,
+    render_ids: [],
+    state_id: stateId,
+    updated_at: timestamp
+  });
+  const mkTransition = (transitionId, from, to) => ({
+    actions: [],
+    activate_states: [to],
+    config_id: configId,
+    created_at: timestamp,
+    exit_states: [],
+    extra_metadata: {},
+    from_states: [from],
+    id: `uuid-${transitionId}`,
+    name: transitionId,
+    path_cost: 1,
+    stays_visible: false,
+    transition_id: transitionId,
+    updated_at: timestamp
+  });
+  const hubId = `${idPrefix}-hub`;
+  const states = [mkState(hubId, "Hub")];
+  const transitions = [];
+  let tCounter = 0;
+  const nextTid = () => `${idPrefix}-t${tCounter++}`;
+  for (let k = 1; k <= branches; k++) {
+    const branchIds = [];
+    for (let i = 0; i < branchLength; i++) {
+      const sid = `${idPrefix}-b${k}-s${i}`;
+      branchIds.push(sid);
+      states.push(mkState(sid, `Branch ${k} Step ${i}`));
+    }
+    transitions.push(mkTransition(nextTid(), hubId, branchIds[0]));
+    for (let i = 1; i < branchLength; i++) {
+      transitions.push(
+        mkTransition(nextTid(), branchIds[i - 1], branchIds[i])
+      );
+    }
+    transitions.push(
+      mkTransition(nextTid(), branchIds[branchLength - 1], hubId)
+    );
+  }
+  return { states, transitions, hubStateId: hubId };
+}
 // Annotate the CommonJS export names for ESM import in node:
 0 && (module.exports = {
   ChunkOverviewNode,
@@ -5510,6 +5791,7 @@ function DiagramTab({
   StateViewPanel,
   StateViewTable,
   TransitionEditor,
-  TransitionsPanel
+  TransitionsPanel,
+  generateGiantSCC
 });
 //# sourceMappingURL=index.cjs.map

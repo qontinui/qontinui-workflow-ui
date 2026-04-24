@@ -24,6 +24,7 @@ import {
   useMemo,
   useRef,
   useState,
+  type ReactNode,
 } from "react";
 import {
   ReactFlow,
@@ -50,11 +51,13 @@ import type {
 } from "@qontinui/shared-types";
 import {
   chunkStateMachine,
+  decomposeGiantSCC,
   firstActionTargetString,
   getLayoutedElements,
   STATE_MACHINE_LAYOUT_OPTIONS,
   type Chunk,
   type ChunkGraph,
+  type SecondaryChunkGraph,
 } from "@qontinui/workflow-utils";
 
 import type { StateMachineGraphViewProps } from "./StateMachineGraphView";
@@ -71,11 +74,40 @@ export interface ChunkedGraphViewProps extends StateMachineGraphViewProps {}
 
 type ViewMode =
   | { kind: "overview" }
-  | { kind: "drilled"; chunkId: string };
+  | {
+      kind: "drilled";
+      /**
+       * Breadcrumb path root → current. Each element is a chunk id at its
+       * own nesting level: `path[0]` is the primary chunk id (from
+       * `chunkGraph`), `path[1]` / `path[2]` are sub-chunk ids from
+       * successive secondary decompositions. Immutable array — push/pop
+       * produces a fresh array for React memo identity.
+       */
+      path: string[];
+    };
 
 /** Per-chunk node-count ceiling. Above this we render a scrollable list
  *  fallback instead of mounting ReactFlow. */
 const CHUNK_MAX_NODES = 150;
+
+/** Recursion ceiling for secondary decomposition. `path.length - 1` equals
+ *  the current secondary depth (`path.length == 1` means the user is at a
+ *  top-level primary chunk — depth 0; `path.length == 3` means the user is
+ *  two sub-chunks deep — depth 2 == MAX_DEPTH). */
+const MAX_DEPTH = 2;
+
+/** Per-sub-chunk size ceiling for secondary decomposition (passed as
+ *  `subChunkMax` to `decomposeGiantSCC`). Kept local to the UI because it
+ *  is a UX parameter, not a shared contract. */
+const SUB_CHUNK_MAX = 40;
+
+/** Stable empty-set identity for nested OverviewCanvas renderings (avoids
+ *  creating a fresh `new Set()` per render that would retrigger memos). */
+const emptySet: Set<string> = new Set();
+
+/** No-op chain-expand toggle used by nested overviews (sub-chunks are all
+ *  `kind: "scc"` so the expand affordance never fires anyway). */
+const noopToggle: (chunkId: string) => void = () => {};
 
 // Shared fitView options (mirror StateMachineGraphView).
 const FIT_VIEW_OPTIONS = { padding: 0.2, minZoom: 0.3 } as const;
@@ -518,6 +550,15 @@ interface DrilledCanvasProps {
    */
   chunkLabels?: Map<string, string>;
   highlightedTransitionIds: Set<string>;
+  /**
+   * Transition ids flagged as weak (structural) bridges by the secondary
+   * decomposition. When set, matching internal transition edges render
+   * with the amber accent defined in Phase 3. Empty set is the default
+   * — top-level non-giant chunks have no secondary context so no edges
+   * are accented. Not a ReactFlow prop — consumed locally to set each
+   * edge's `style` object, which ReactFlow merges onto the path.
+   */
+  weakBridgeTransitionIds?: Set<string>;
   transitionCounts: {
     outgoing: Map<string, number>;
     incoming: Map<string, number>;
@@ -543,6 +584,7 @@ function DrilledCanvasInner({
   elementThumbnails,
   chunkLabels,
   highlightedTransitionIds,
+  weakBridgeTransitionIds,
   transitionCounts,
   onSelectState,
   onSelectTransition,
@@ -702,11 +744,16 @@ function DrilledCanvasInner({
     return t?.transition_id ?? null;
   }, [selectedTransitionId, transitions, getSelectionId]);
 
-  // Build internal transition edges.
+  // Build internal transition edges. Weak-bridge transitions are flagged
+  // via `weakBridgeTransitionIds` (from the secondary decomposition when
+  // this canvas renders a nested leaf) and get an amber accent via
+  // ReactFlow's edge `style` prop — which merges onto the outer path
+  // element so we don't need to modify `StateMachineTransitionEdge`.
   const stateEdges: Edge[] = useMemo(() => {
     const list: Edge[] = [];
     for (const t of internalTransitions) {
       const isSelected = t.transition_id === selectedTransitionSemanticId;
+      const isWeakBridge = weakBridgeTransitionIds?.has(t.transition_id) === true;
       for (const from of t.from_states) {
         if (!chunkStateIds.has(from)) continue;
         for (const to of t.activate_states) {
@@ -718,6 +765,14 @@ function DrilledCanvasInner({
             type: "transitionEdge",
             selected: isSelected,
             markerEnd: { type: MarkerType.ArrowClosed, width: 15, height: 15 },
+            ...(isWeakBridge
+              ? {
+                  style: {
+                    stroke: "var(--amber-400, #fbbf24)",
+                    strokeWidth: 3,
+                  },
+                }
+              : {}),
             data: {
               transitionId: t.transition_id,
               name: t.name,
@@ -738,6 +793,7 @@ function DrilledCanvasInner({
     chunkStateIds,
     selectedTransitionSemanticId,
     highlightedTransitionIds,
+    weakBridgeTransitionIds,
   ]);
 
   // Build phantom port nodes (input + output).
@@ -1129,6 +1185,35 @@ function ChunkedGraphViewInner(props: ChunkedGraphViewProps) {
     });
   }, []);
 
+  // --- Secondary decomposition cache ---
+  //
+  // `decomposeGiantSCC` is pure but does real work (Lengauer-Tarjan + Tarjan
+  // bridge DFS). It's invoked on two code paths — the `isGiant` render
+  // branch (Phase 4) and the auto-drill effect (Phase 5) — so we memoise
+  // by chunk id in a ref-held Map that survives renders. The cache is
+  // invalidated wholesale whenever `states`, `transitions`, or
+  // `effectiveInitialStateId` change, because the primary chunk graph
+  // itself is recomputed from those inputs.
+  const decomposeCache = useRef<Map<string, SecondaryChunkGraph>>(new Map());
+  useEffect(() => {
+    decomposeCache.current.clear();
+  }, [states, transitions, effectiveInitialStateId]);
+
+  const getDecomposition = useCallback(
+    (c: Chunk): SecondaryChunkGraph => {
+      const cached = decomposeCache.current.get(c.id);
+      if (cached) return cached;
+      const result = decomposeGiantSCC(states, transitions, c, {
+        rootStateId: effectiveInitialStateId,
+        subChunkMax: SUB_CHUNK_MAX,
+        maxDepth: MAX_DEPTH,
+      });
+      decomposeCache.current.set(c.id, result);
+      return result;
+    },
+    [states, transitions, effectiveInitialStateId],
+  );
+
   // Chunk id → list of contained state names (for hover tooltips).
   const stateNamesByChunkId = useMemo(() => {
     const nameById = new Map<string, string>();
@@ -1162,20 +1247,61 @@ function ChunkedGraphViewInner(props: ChunkedGraphViewProps) {
   }, [searchQuery, states, chunkGraph.stateIndex]);
 
   // Auto-drill on external selection change.
-  //   overview + selected in chunk X      → drill X
-  //   drilled A + selected in chunk B ≠ A → drill B
-  //   drilled + selected in same chunk    → no-op
-  //   drilled + selection null            → stay drilled
-  const currentChunkId = viewMode.kind === "drilled" ? viewMode.chunkId : null;
+  //
+  // With nested decomposition, "drill to the state" is no longer a single
+  // chunk id — for a state that lives inside a giant primary SCC which
+  // itself decomposes into sub-chunks, we need to walk the full path:
+  //
+  //   primary chunk id → (depth-1 sub-chunk id) → (depth-2 sub-chunk id) → …
+  //
+  // Stopping at the first non-giant chunk OR at MAX_DEPTH. `pathForState`
+  // uses the same `decomposeCache` as the render branch, so lookup is
+  // cheap after the first decomposition.
+  const pathForState = useCallback(
+    (stateId: string): string[] => {
+      const primaryChunkId = chunkGraph.stateIndex.get(stateId);
+      if (!primaryChunkId) return [];
+      const path: string[] = [primaryChunkId];
+
+      let current = chunkById.get(primaryChunkId);
+      while (
+        current &&
+        current.stateIds.length > CHUNK_MAX_NODES &&
+        path.length - 1 < MAX_DEPTH
+      ) {
+        const secondary = getDecomposition(current);
+        if (secondary.degenerate) break;
+        const subChunkId = secondary.stateIndex.get(stateId);
+        if (!subChunkId) break;
+        path.push(subChunkId);
+        const nextChunk = secondary.subChunks.find((c) => c.id === subChunkId);
+        if (!nextChunk) break;
+        current = nextChunk;
+      }
+      return path;
+    },
+    [chunkGraph.stateIndex, chunkById, getDecomposition],
+  );
+
+  // `path.length === 0` ⇒ overview; otherwise treat the path as the
+  // current drilled path for identity comparisons.
+  const currentPath = viewMode.kind === "drilled" ? viewMode.path : [];
+  const currentPathKey = currentPath.join(">");
   useEffect(() => {
     if (!selectedStateId) return;
-    const targetChunkId = chunkGraph.stateIndex.get(selectedStateId);
-    if (!targetChunkId) return;
-    if (targetChunkId === currentChunkId) return;
-    setViewMode({ kind: "drilled", chunkId: targetChunkId });
-  }, [selectedStateId, chunkGraph.stateIndex, currentChunkId]);
+    const targetPath = pathForState(selectedStateId);
+    if (targetPath.length === 0) return;
+    const targetKey = targetPath.join(">");
+    if (targetKey === currentPathKey) return;
+    setViewMode({ kind: "drilled", path: targetPath });
+  }, [selectedStateId, pathForState, currentPathKey]);
 
-  // Esc while drilled returns to overview.
+  // Esc returns to the root overview from any depth.
+  //
+  // UX choice: Esc is kept as "go all the way out" (simplest mental model
+  // matching the v1 behaviour). Per-level pop is available via the
+  // Breadcrumb's Back button or by clicking an ancestor segment in the
+  // breadcrumb trail.
   useEffect(() => {
     if (viewMode.kind !== "drilled") return;
     const handler = (e: KeyboardEvent) => {
@@ -1193,8 +1319,29 @@ function ChunkedGraphViewInner(props: ChunkedGraphViewProps) {
     setViewMode({ kind: "overview" });
   }, []);
 
+  // Top-level drill-in from the primary overview: starts a fresh path.
   const drillInto = useCallback((chunkId: string) => {
-    setViewMode({ kind: "drilled", chunkId });
+    setViewMode({ kind: "drilled", path: [chunkId] });
+  }, []);
+
+  // Pop to a specific depth (0 = primary chunk only). Used by breadcrumb
+  // segment clicks.
+  const popToDepth = useCallback((depth: number) => {
+    setViewMode((prev) => {
+      if (prev.kind !== "drilled") return prev;
+      if (depth < 0) return { kind: "overview" };
+      if (depth >= prev.path.length) return prev;
+      return { kind: "drilled", path: prev.path.slice(0, depth + 1) };
+    });
+  }, []);
+
+  // "Back" button — pop one level, or go to overview if already at depth 0.
+  const popOneLevel = useCallback(() => {
+    setViewMode((prev) => {
+      if (prev.kind !== "drilled") return prev;
+      if (prev.path.length <= 1) return { kind: "overview" };
+      return { kind: "drilled", path: prev.path.slice(0, prev.path.length - 1) };
+    });
   }, []);
 
   // --- Empty state ---
@@ -1208,17 +1355,199 @@ function ChunkedGraphViewInner(props: ChunkedGraphViewProps) {
 
   // --- Drilled view ---
   if (viewMode.kind === "drilled") {
-    const chunk = chunkById.get(viewMode.chunkId);
-    if (!chunk) {
-      // Chunk id no longer exists (e.g. after states mutation). Fall back.
-      return (
-        <ChunkedGraphViewFallbackMissingChunk onBack={goOverview} />
-      );
+    // Walk the path resolving each level's chunk. If any segment is
+    // missing (e.g. after a states mutation orphaned the id), fall back
+    // to the missing-chunk view.
+    //
+    // `parentSecondary` tracks the secondary decomposition of the most
+    // recent GIANT ancestor — needed so:
+    //   (a) the nested overview at the next level can render sub-chunks,
+    //   (b) a non-giant leaf inside a decomposed parent can receive a
+    //       synthetic ChunkGraph + weakBridgeTransitionIds for Phase 3.
+    const path = viewMode.path;
+    const primaryChunk = chunkById.get(path[0]!);
+    if (!primaryChunk) {
+      return <ChunkedGraphViewFallbackMissingChunk onBack={goOverview} />;
     }
 
-    const isGiant = chunk.stateIds.length > CHUNK_MAX_NODES;
+    let currentChunk: Chunk = primaryChunk;
+    let parentSecondary: SecondaryChunkGraph | null = null;
+    let pathValid = true;
+    for (let i = 1; i < path.length; i++) {
+      const parentIsGiant = currentChunk.stateIds.length > CHUNK_MAX_NODES;
+      if (!parentIsGiant) {
+        // Path reaches further than the parent can support (e.g. parent
+        // became non-giant after a state edit). Truncate silently.
+        pathValid = false;
+        break;
+      }
+      const secondary = getDecomposition(currentChunk);
+      if (secondary.degenerate) {
+        pathValid = false;
+        break;
+      }
+      const nextSubId = path[i]!;
+      const nextSub = secondary.subChunks.find((c) => c.id === nextSubId);
+      if (!nextSub) {
+        pathValid = false;
+        break;
+      }
+      currentChunk = nextSub;
+      parentSecondary = secondary;
+    }
 
-    const drilledName = chunkLabels?.get(chunk.id) || chunk.name;
+    if (!pathValid) {
+      return <ChunkedGraphViewFallbackMissingChunk onBack={goOverview} />;
+    }
+
+    const currentDepth = path.length - 1;
+    const isGiant = currentChunk.stateIds.length > CHUNK_MAX_NODES;
+
+    // Build breadcrumb label list aligned with `path`.
+    const labelFor = (c: Chunk): string =>
+      chunkLabels?.get(c.id) || c.name;
+    const labels: string[] = [];
+    {
+      let cursor: Chunk = primaryChunk;
+      labels.push(labelFor(cursor));
+      for (let i = 1; i < path.length; i++) {
+        // Safe: pathValid guarantees cursor is giant and decomposition
+        // contains path[i].
+        const secondary = getDecomposition(cursor);
+        const nextSub = secondary.subChunks.find((c) => c.id === path[i])!;
+        cursor = nextSub;
+        labels.push(labelFor(cursor));
+      }
+    }
+
+    // Phase 4 — giant branch ------------------------------------------------
+    //
+    //   currentDepth < MAX_DEPTH AND currentChunk is giant AND
+    //   decomposition is non-degenerate → render nested overview.
+    //   currentDepth >= MAX_DEPTH OR degenerate → GiantChunkPanel (tail).
+    let body: ReactNode;
+    if (isGiant) {
+      if (currentDepth >= MAX_DEPTH) {
+        body = (
+          <GiantChunkPanel
+            chunk={currentChunk}
+            states={states}
+            selectedStateId={selectedStateId}
+            onSelectState={onSelectState}
+          />
+        );
+      } else {
+        const secondary = getDecomposition(currentChunk);
+        if (secondary.degenerate) {
+          body = (
+            <GiantChunkPanel
+              chunk={currentChunk}
+              states={states}
+              selectedStateId={selectedStateId}
+              onSelectState={onSelectState}
+            />
+          );
+        } else {
+          // Synthesise a ChunkGraph-shaped view so OverviewCanvas can render
+          // the secondary decomposition with the same visual as the primary
+          // overview. Sub-chunks are all `kind: "scc"` per the decomposer,
+          // so chain-expand logic is a no-op at this depth.
+          const nestedChunkGraph: ChunkGraph = {
+            chunks: secondary.subChunks,
+            edges: secondary.edges,
+            stateIndex: secondary.stateIndex,
+          };
+          const onDrillInNested = (subId: string) => {
+            setViewMode({ kind: "drilled", path: [...path, subId] });
+          };
+          // Per-chunk state-name tooltips for the nested view.
+          const nestedNames = new Map<string, string[]>();
+          const nameById = new Map<string, string>();
+          for (const s of states) nameById.set(s.state_id, s.name);
+          for (const sc of secondary.subChunks) {
+            nestedNames.set(
+              sc.id,
+              sc.stateIds.map((id) => nameById.get(id) ?? id),
+            );
+          }
+          body = (
+            <OverviewCanvas
+              chunkGraph={nestedChunkGraph}
+              dagreLib={dagreLib}
+              onDrillIn={onDrillInNested}
+              stateNamesByChunkId={nestedNames}
+              // No search filter at nested depth — the primary search
+              // already scoped to the containing chunk.
+              perChunkMatches={null}
+              // No chain-expand at nested depth (no chain sub-chunks exist).
+              expandedChainIds={emptySet}
+              onToggleChainExpand={noopToggle}
+              // Rename affordance is a primary-overview feature only.
+              chunkLabels={undefined}
+              onSaveChunkLabel={undefined}
+              states={states}
+              transitionCounts={transitionCounts}
+              effectiveInitialStateId={effectiveInitialStateId}
+              selectedStateId={selectedStateId}
+              onSelectState={onSelectState}
+              onSelectTransition={onSelectTransition}
+              elementThumbnails={elementThumbnails}
+            />
+          );
+        }
+      }
+    } else {
+      // Non-giant leaf. If nested (parentSecondary != null), synthesise a
+      // ChunkGraph from the parent's secondary decomposition so the
+      // phantom-port logic inside DrilledCanvas can reason about
+      // neighbouring sub-chunks at the same depth.
+      const leafChunkGraph: ChunkGraph = parentSecondary
+        ? {
+            chunks: parentSecondary.subChunks,
+            edges: parentSecondary.edges,
+            stateIndex: parentSecondary.stateIndex,
+          }
+        : chunkGraph;
+      const leafWeakBridges: Set<string> | undefined =
+        parentSecondary?.weakBridgeTransitionIds;
+
+      // Nested drill-in from a phantom port: the target is a sibling
+      // sub-chunk id at the current depth, i.e. replace the last segment
+      // of the path rather than pushing.
+      const leafOnNavigate = parentSecondary
+        ? (siblingId: string) => {
+            setViewMode({
+              kind: "drilled",
+              path: [...path.slice(0, path.length - 1), siblingId],
+            });
+          }
+        : drillInto;
+
+      body = (
+        <DrilledCanvas
+          chunk={currentChunk}
+          chunkGraph={leafChunkGraph}
+          states={states}
+          transitions={transitions}
+          dagreLib={dagreLib}
+          selectedStateId={selectedStateId}
+          selectedTransitionId={selectedTransitionId}
+          effectiveInitialStateId={effectiveInitialStateId}
+          elementThumbnails={elementThumbnails}
+          chunkLabels={chunkLabels}
+          highlightedTransitionIds={highlightedTransitionIds}
+          weakBridgeTransitionIds={leafWeakBridges}
+          transitionCounts={transitionCounts}
+          onSelectState={onSelectState}
+          onSelectTransition={onSelectTransition}
+          resolveTransitionSelectionId={resolveTransitionSelectionId}
+          onNavigateToChunk={leafOnNavigate}
+          isDragging={isDragging}
+          dropTargetStateId={dropTargetStateId}
+          onStartElementDrag={onStartElementDrag}
+        />
+      );
+    }
 
     return (
       <div
@@ -1226,39 +1555,13 @@ function ChunkedGraphViewInner(props: ChunkedGraphViewProps) {
         onDragOver={onDragOver}
         onDrop={onDrop}
       >
-        <DrilledBreadcrumb chunkName={drilledName} onBack={goOverview} />
-        <div className="flex-1 min-h-0">
-          {isGiant ? (
-            <GiantChunkPanel
-              chunk={chunk}
-              states={states}
-              selectedStateId={selectedStateId}
-              onSelectState={onSelectState}
-            />
-          ) : (
-            <DrilledCanvas
-              chunk={chunk}
-              chunkGraph={chunkGraph}
-              states={states}
-              transitions={transitions}
-              dagreLib={dagreLib}
-              selectedStateId={selectedStateId}
-              selectedTransitionId={selectedTransitionId}
-              effectiveInitialStateId={effectiveInitialStateId}
-              elementThumbnails={elementThumbnails}
-              chunkLabels={chunkLabels}
-              highlightedTransitionIds={highlightedTransitionIds}
-              transitionCounts={transitionCounts}
-              onSelectState={onSelectState}
-              onSelectTransition={onSelectTransition}
-              resolveTransitionSelectionId={resolveTransitionSelectionId}
-              onNavigateToChunk={drillInto}
-              isDragging={isDragging}
-              dropTargetStateId={dropTargetStateId}
-              onStartElementDrag={onStartElementDrag}
-            />
-          )}
-        </div>
+        <Breadcrumb
+          labels={labels}
+          onBack={popOneLevel}
+          onGoOverview={goOverview}
+          onGoDepth={popToDepth}
+        />
+        <div className="flex-1 min-h-0">{body}</div>
       </div>
     );
   }
@@ -1288,36 +1591,86 @@ function ChunkedGraphViewInner(props: ChunkedGraphViewProps) {
   );
 }
 
-function DrilledBreadcrumb({
-  chunkName,
+/**
+ * Nested-aware breadcrumb.
+ *
+ *   All states > Hub Flow > Settings Branch > (leaf)
+ *
+ * - The "Back" button pops one level (going to overview when already at
+ *   depth 0 — i.e. `labels.length === 1`).
+ * - Each segment (including "All states") is clickable. Clicking a segment
+ *   pops the trail back to that depth. Clicking the final segment is a
+ *   no-op (it's the current view).
+ * - Esc (handled in the main component) goes all the way to overview.
+ *
+ * UX choice: per-level pop via the Back button matches a "file navigator"
+ * mental model; Esc as a single-shot exit matches the v1 behaviour and
+ * avoids a modal-feeling multi-press for users who just want out.
+ */
+function Breadcrumb({
+  labels,
   onBack,
+  onGoOverview,
+  onGoDepth,
 }: {
-  chunkName: string;
+  labels: string[];
   onBack: () => void;
+  onGoOverview: () => void;
+  onGoDepth: (depth: number) => void;
 }) {
+  const backTitle =
+    labels.length <= 1
+      ? "Back to overview (Esc)"
+      : "Back one level (Esc to overview)";
   return (
     <div className="flex items-center gap-2 px-3 py-2 border-b border-border-secondary bg-bg-secondary/40 shrink-0">
       <button
         type="button"
+        id="chunked-graph-back"
+        data-ui-bridge-id="chunked-graph-back"
         onClick={onBack}
         className="flex items-center gap-1 px-2 py-1 text-xs text-text-secondary hover:text-text-primary hover:bg-bg-tertiary rounded transition-colors"
-        title="Back to overview (Esc)"
+        title={backTitle}
       >
         <ArrowLeft className="size-3.5" />
         Back
       </button>
-      <div className="text-xs text-text-muted flex items-center gap-1.5">
+      <div className="text-xs text-text-muted flex items-center gap-1.5 flex-wrap">
         <button
           type="button"
-          onClick={onBack}
+          data-ui-bridge-id="chunked-graph-crumb-0"
+          onClick={onGoOverview}
           className="hover:text-text-primary transition-colors"
         >
           All states
         </button>
-        <span className="text-text-muted/60">&gt;</span>
-        <span className="text-text-primary font-medium truncate max-w-[240px]">
-          {chunkName}
-        </span>
+        {labels.map((label, i) => {
+          const isLast = i === labels.length - 1;
+          const depth = i + 1;
+          return (
+            <span key={i} className="flex items-center gap-1.5">
+              <span className="text-text-muted/60">&gt;</span>
+              {isLast ? (
+                <span
+                  data-testid="chunked-graph-current"
+                  className="text-text-primary font-medium truncate max-w-[240px]"
+                >
+                  {label}
+                </span>
+              ) : (
+                <button
+                  type="button"
+                  data-ui-bridge-id={`chunked-graph-crumb-${depth}`}
+                  onClick={() => onGoDepth(i)}
+                  className="hover:text-text-primary transition-colors truncate max-w-[240px]"
+                  title={`Back to ${label}`}
+                >
+                  {label}
+                </button>
+              )}
+            </span>
+          );
+        })}
       </div>
     </div>
   );

@@ -53,3 +53,15 @@ export type { StateViewTableProps } from "./StateViewTable";
 
 export { DiagramTab } from "./DiagramTab";
 export type { DiagramTabProps } from "./DiagramTab";
+
+// Dev/test fixtures — NOT intended for production code paths. The
+// generator is re-exported here so dev fixtures in qontinui-runner can
+// import it via the clean subpath `@qontinui/workflow-ui/state-machine`
+// instead of reaching into internal paths. Keep consumers in dev-only
+// components (tree-shaking drops the import in production builds only
+// if the consumer is also gated by `import.meta.env.DEV`).
+export {
+  generateGiantSCC,
+  type GenerateGiantSCCOptions,
+  type GiantSCCFixture,
+} from "./__fixtures__/giant-scc";
