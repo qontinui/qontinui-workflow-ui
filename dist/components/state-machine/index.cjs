@@ -3965,8 +3965,14 @@ function ScreenshotStateView({
     },
     [getElementAtPoint]
   );
-  const handlePrev = () => setCurrentIndex((i) => Math.max(0, i - 1));
-  const handleNext = () => setCurrentIndex((i) => Math.min(captureScreenshots.length - 1, i + 1));
+  const handlePrev = (0, import_react18.useCallback)(
+    () => setCurrentIndex((i) => Math.max(0, i - 1)),
+    []
+  );
+  const handleNext = (0, import_react18.useCallback)(
+    () => setCurrentIndex((i) => Math.min(captureScreenshots.length - 1, i + 1)),
+    [captureScreenshots.length]
+  );
   (0, import_react18.useEffect)(() => {
     const handler = (e) => {
       if (e.key === "ArrowLeft") handlePrev();
@@ -3975,7 +3981,7 @@ function ScreenshotStateView({
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [captureScreenshots.length]);
+  }, [handlePrev, handleNext]);
   if (captureScreenshots.length === 0) {
     return /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("div", { className: "flex items-center justify-center h-full text-text-muted", children: /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)("div", { className: "text-center", children: [
       /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(import_lucide_react11.Image, { className: "size-12 mx-auto mb-3 opacity-30" }),

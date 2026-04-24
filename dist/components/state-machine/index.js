@@ -4055,8 +4055,14 @@ function ScreenshotStateView({
     },
     [getElementAtPoint]
   );
-  const handlePrev = () => setCurrentIndex((i) => Math.max(0, i - 1));
-  const handleNext = () => setCurrentIndex((i) => Math.min(captureScreenshots.length - 1, i + 1));
+  const handlePrev = useCallback7(
+    () => setCurrentIndex((i) => Math.max(0, i - 1)),
+    []
+  );
+  const handleNext = useCallback7(
+    () => setCurrentIndex((i) => Math.min(captureScreenshots.length - 1, i + 1)),
+    [captureScreenshots.length]
+  );
   useEffect7(() => {
     const handler = (e) => {
       if (e.key === "ArrowLeft") handlePrev();
@@ -4065,7 +4071,7 @@ function ScreenshotStateView({
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [captureScreenshots.length]);
+  }, [handlePrev, handleNext]);
   if (captureScreenshots.length === 0) {
     return /* @__PURE__ */ jsx12("div", { className: "flex items-center justify-center h-full text-text-muted", children: /* @__PURE__ */ jsxs12("div", { className: "text-center", children: [
       /* @__PURE__ */ jsx12(Image, { className: "size-12 mx-auto mb-3 opacity-30" }),
