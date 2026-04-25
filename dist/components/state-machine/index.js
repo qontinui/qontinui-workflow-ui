@@ -330,8 +330,11 @@ function StateMachineTransitionEdgeInner(props) {
   });
   const isHighlighted = edgeData?.isHighlighted ?? false;
   const isActive = isHighlighted || selected;
+  const isWeakBridge = edgeData?.isWeakBridge === true;
   const actionTypes = edgeData?.actionTypes ?? [];
   const uniqueActionTypes = [...new Set(actionTypes)];
+  const strokeColor = isActive ? "var(--brand-primary)" : isWeakBridge ? "var(--amber-400, #fbbf24)" : "var(--border-secondary)";
+  const strokeWidth = isActive ? 2.5 : isWeakBridge ? 3 : 1.5;
   return /* @__PURE__ */ jsxs2(Fragment, { children: [
     /* @__PURE__ */ jsx2(
       BaseEdge,
@@ -346,8 +349,8 @@ function StateMachineTransitionEdgeInner(props) {
         path: edgePath,
         markerEnd,
         style: {
-          stroke: isActive ? "var(--brand-primary)" : "var(--border-secondary)",
-          strokeWidth: isActive ? 2.5 : 1.5,
+          stroke: strokeColor,
+          strokeWidth,
           transition: "stroke 0.15s, stroke-width 0.15s"
         }
       }
@@ -360,6 +363,7 @@ function StateMachineTransitionEdgeInner(props) {
           position: "absolute",
           transform: `translate(-50%, -50%) translate(${labelX}px,${labelY}px)`
         },
+        title: isWeakBridge ? "Choke point \u2014 unique path" : void 0,
         children: /* @__PURE__ */ jsxs2(
           "div",
           {
@@ -1164,12 +1168,11 @@ function DrilledCanvasInner({
             type: "transitionEdge",
             selected: isSelected,
             markerEnd: { type: MarkerType.ArrowClosed, width: 15, height: 15 },
-            ...isWeakBridge ? {
-              style: {
-                stroke: "var(--amber-400, #fbbf24)",
-                strokeWidth: 3
-              }
-            } : {},
+            // Pass the weak-bridge flag via `data` (not `style`) — the
+            // custom `StateMachineTransitionEdge` derives its own stroke
+            // and ignores ReactFlow's inline `style` prop, so an amber
+            // accent has to flow through the data channel it actually
+            // reads. See StateMachineTransitionEdge.tsx for the merge.
             data: {
               transitionId: t.transition_id,
               name: t.name,
@@ -1178,7 +1181,8 @@ function DrilledCanvasInner({
               actionTypes: t.actions.map((a) => a.type),
               isHighlighted: highlightedTransitionIds.has(t.transition_id),
               staysVisible: t.stays_visible,
-              firstActionTarget: firstActionTargetString(t.actions[0])
+              firstActionTarget: firstActionTargetString(t.actions[0]),
+              ...isWeakBridge ? { isWeakBridge: true } : {}
             }
           });
         }

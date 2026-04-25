@@ -51,7 +51,13 @@ function StateMachineTransitionEdgeInner(props: EdgeProps) {
     selected,
   } = props;
 
-  const edgeData = data as unknown as TransitionEdgeData;
+  // Local superset of the schema-generated shape: ChunkedGraphView's
+  // nested-leaf path passes an extra `isWeakBridge` flag via `data` to
+  // request the amber choke-point accent (Phase 3 of the giant-SCC plan).
+  // Kept as an inline cast rather than a shared-types change because
+  // TransitionEdgeData is auto-generated from Rust and the flag is purely
+  // a UI hint with no backing field on the transition.
+  const edgeData = data as unknown as TransitionEdgeData & { isWeakBridge?: boolean };
 
   const [edgePath, labelX, labelY] = getBezierPath({
     sourceX,
@@ -64,8 +70,18 @@ function StateMachineTransitionEdgeInner(props: EdgeProps) {
 
   const isHighlighted = edgeData?.isHighlighted ?? false;
   const isActive = isHighlighted || selected;
+  const isWeakBridge = edgeData?.isWeakBridge === true;
   const actionTypes = edgeData?.actionTypes ?? [];
   const uniqueActionTypes = [...new Set(actionTypes)];
+
+  // Stroke priority: active (selection / highlighted path) wins over the
+  // weak-bridge accent so users can still see what they have selected.
+  const strokeColor = isActive
+    ? "var(--brand-primary)"
+    : isWeakBridge
+      ? "var(--amber-400, #fbbf24)"
+      : "var(--border-secondary)";
+  const strokeWidth = isActive ? 2.5 : isWeakBridge ? 3 : 1.5;
 
   return (
     <>
@@ -78,8 +94,8 @@ function StateMachineTransitionEdgeInner(props: EdgeProps) {
         path={edgePath}
         markerEnd={markerEnd}
         style={{
-          stroke: isActive ? "var(--brand-primary)" : "var(--border-secondary)",
-          strokeWidth: isActive ? 2.5 : 1.5,
+          stroke: strokeColor,
+          strokeWidth,
           transition: "stroke 0.15s, stroke-width 0.15s",
         }}
       />
@@ -91,6 +107,7 @@ function StateMachineTransitionEdgeInner(props: EdgeProps) {
               position: "absolute",
               transform: `translate(-50%, -50%) translate(${labelX}px,${labelY}px)`,
             }}
+            title={isWeakBridge ? "Choke point — unique path" : undefined}
           >
             <div
               className={`

@@ -767,14 +767,11 @@ function DrilledCanvasInner({
             type: "transitionEdge",
             selected: isSelected,
             markerEnd: { type: MarkerType.ArrowClosed, width: 15, height: 15 },
-            ...(isWeakBridge
-              ? {
-                  style: {
-                    stroke: "var(--amber-400, #fbbf24)",
-                    strokeWidth: 3,
-                  },
-                }
-              : {}),
+            // Pass the weak-bridge flag via `data` (not `style`) — the
+            // custom `StateMachineTransitionEdge` derives its own stroke
+            // and ignores ReactFlow's inline `style` prop, so an amber
+            // accent has to flow through the data channel it actually
+            // reads. See StateMachineTransitionEdge.tsx for the merge.
             data: {
               transitionId: t.transition_id,
               name: t.name,
@@ -784,7 +781,8 @@ function DrilledCanvasInner({
               isHighlighted: highlightedTransitionIds.has(t.transition_id),
               staysVisible: t.stays_visible,
               firstActionTarget: firstActionTargetString(t.actions[0]),
-            } satisfies TransitionEdgeData,
+              ...(isWeakBridge ? { isWeakBridge: true } : {}),
+            } satisfies TransitionEdgeData & { isWeakBridge?: boolean },
           });
         }
       }
