@@ -718,8 +718,8 @@ var ChunkPortNode = memo4(ChunkPortNodeInner);
 // src/components/state-machine/ChunkedGraphView.tsx
 import { jsx as jsx5, jsxs as jsxs5 } from "react/jsx-runtime";
 var CHUNK_MAX_NODES = 150;
-var MAX_DEPTH = 2;
 var SUB_CHUNK_MAX = 40;
+var BREADCRUMB_MAX_SEGMENTS = 3;
 var emptySet = /* @__PURE__ */ new Set();
 var noopToggle = () => {
 };
@@ -1516,8 +1516,7 @@ function ChunkedGraphViewInner(props) {
       if (cached) return cached;
       const result = decomposeGiantSCC(states, transitions, c, {
         rootStateId: effectiveInitialStateId,
-        subChunkMax: SUB_CHUNK_MAX,
-        maxDepth: MAX_DEPTH
+        subChunkMax: SUB_CHUNK_MAX
       });
       decomposeCache.current.set(c.id, result);
       return result;
@@ -1556,7 +1555,7 @@ function ChunkedGraphViewInner(props) {
       if (!primaryChunkId) return [];
       const path = [primaryChunkId];
       let current = chunkById.get(primaryChunkId);
-      while (current && current.stateIds.length > CHUNK_MAX_NODES && path.length - 1 < MAX_DEPTH) {
+      while (current && current.stateIds.length > CHUNK_MAX_NODES) {
         const secondary = getDecomposition(current);
         if (secondary.degenerate) break;
         const subChunkId = secondary.stateIndex.get(stateId);
@@ -1648,7 +1647,6 @@ function ChunkedGraphViewInner(props) {
     if (!pathValid) {
       return /* @__PURE__ */ jsx5(ChunkedGraphViewFallbackMissingChunk, { onBack: goOverview });
     }
-    const currentDepth = path.length - 1;
     const isGiant = currentChunk.stateIds.length > CHUNK_MAX_NODES;
     const labelFor = (c) => chunkLabels?.get(c.id) || c.name;
     const labels = [];
@@ -1664,7 +1662,8 @@ function ChunkedGraphViewInner(props) {
     }
     let body;
     if (isGiant) {
-      if (currentDepth >= MAX_DEPTH) {
+      const secondary = getDecomposition(currentChunk);
+      if (secondary.degenerate) {
         body = /* @__PURE__ */ jsx5(
           GiantChunkPanel,
           {
@@ -1675,57 +1674,44 @@ function ChunkedGraphViewInner(props) {
           }
         );
       } else {
-        const secondary = getDecomposition(currentChunk);
-        if (secondary.degenerate) {
-          body = /* @__PURE__ */ jsx5(
-            GiantChunkPanel,
-            {
-              chunk: currentChunk,
-              states,
-              selectedStateId,
-              onSelectState
-            }
-          );
-        } else {
-          const nestedChunkGraph = {
-            chunks: secondary.subChunks,
-            edges: secondary.edges,
-            stateIndex: secondary.stateIndex
-          };
-          const onDrillInNested = (subId) => {
-            setViewMode({ kind: "drilled", path: [...path, subId] });
-          };
-          const nestedNames = /* @__PURE__ */ new Map();
-          const nameById = /* @__PURE__ */ new Map();
-          for (const s of states) nameById.set(s.state_id, s.name);
-          for (const sc of secondary.subChunks) {
-            nestedNames.set(
-              sc.id,
-              sc.stateIds.map((id) => nameById.get(id) ?? id)
-            );
-          }
-          body = /* @__PURE__ */ jsx5(
-            OverviewCanvas,
-            {
-              chunkGraph: nestedChunkGraph,
-              dagreLib,
-              onDrillIn: onDrillInNested,
-              stateNamesByChunkId: nestedNames,
-              perChunkMatches: null,
-              expandedChainIds: emptySet,
-              onToggleChainExpand: noopToggle,
-              chunkLabels: void 0,
-              onSaveChunkLabel: void 0,
-              states,
-              transitionCounts,
-              effectiveInitialStateId,
-              selectedStateId,
-              onSelectState,
-              onSelectTransition,
-              elementThumbnails
-            }
+        const nestedChunkGraph = {
+          chunks: secondary.subChunks,
+          edges: secondary.edges,
+          stateIndex: secondary.stateIndex
+        };
+        const onDrillInNested = (subId) => {
+          setViewMode({ kind: "drilled", path: [...path, subId] });
+        };
+        const nestedNames = /* @__PURE__ */ new Map();
+        const nameById = /* @__PURE__ */ new Map();
+        for (const s of states) nameById.set(s.state_id, s.name);
+        for (const sc of secondary.subChunks) {
+          nestedNames.set(
+            sc.id,
+            sc.stateIds.map((id) => nameById.get(id) ?? id)
           );
         }
+        body = /* @__PURE__ */ jsx5(
+          OverviewCanvas,
+          {
+            chunkGraph: nestedChunkGraph,
+            dagreLib,
+            onDrillIn: onDrillInNested,
+            stateNamesByChunkId: nestedNames,
+            perChunkMatches: null,
+            expandedChainIds: emptySet,
+            onToggleChainExpand: noopToggle,
+            chunkLabels: void 0,
+            onSaveChunkLabel: void 0,
+            states,
+            transitionCounts,
+            effectiveInitialStateId,
+            selectedStateId,
+            onSelectState,
+            onSelectTransition,
+            elementThumbnails
+          }
+        );
       }
     } else {
       const leafChunkGraph = parentSecondary ? {
@@ -1816,6 +1802,28 @@ function Breadcrumb({
   onGoDepth
 }) {
   const backTitle = labels.length <= 1 ? "Back to overview (Esc)" : "Back one level (Esc to overview)";
+  const visible = (() => {
+    if (labels.length <= BREADCRUMB_MAX_SEGMENTS) {
+      return labels.map((label, i) => ({
+        kind: "label",
+        label,
+        depth: i,
+        isLast: i === labels.length - 1
+      }));
+    }
+    const lastIdx = labels.length - 1;
+    const hidden = labels.slice(1, lastIdx);
+    return [
+      { kind: "label", label: labels[0], depth: 0, isLast: false },
+      {
+        kind: "ellipsis",
+        hiddenLabels: hidden,
+        // Pop to the deepest hidden level (one above the current leaf).
+        rewindToDepth: lastIdx - 1
+      },
+      { kind: "label", label: labels[lastIdx], depth: lastIdx, isLast: true }
+    ];
+  })();
   return /* @__PURE__ */ jsxs5("div", { className: "flex items-center gap-2 px-3 py-2 border-b border-border-secondary bg-bg-secondary/40 shrink-0", children: [
     /* @__PURE__ */ jsxs5(
       "button",
@@ -1843,30 +1851,44 @@ function Breadcrumb({
           children: "All states"
         }
       ),
-      labels.map((label, i) => {
-        const isLast = i === labels.length - 1;
-        const depth = i + 1;
+      visible.map((seg, i) => {
+        if (seg.kind === "ellipsis") {
+          return /* @__PURE__ */ jsxs5("span", { className: "flex items-center gap-1.5", children: [
+            /* @__PURE__ */ jsx5("span", { className: "text-text-muted/60", children: ">" }),
+            /* @__PURE__ */ jsx5(
+              "button",
+              {
+                type: "button",
+                "data-ui-bridge-id": "chunked-graph-crumb-ellipsis",
+                onClick: () => onGoDepth(seg.rewindToDepth),
+                className: "hover:text-text-primary transition-colors px-1 rounded",
+                title: `Hidden levels: ${seg.hiddenLabels.join(" > ")} (click to rewind)`,
+                children: "\u2026"
+              }
+            )
+          ] }, `ellipsis-${i}`);
+        }
         return /* @__PURE__ */ jsxs5("span", { className: "flex items-center gap-1.5", children: [
           /* @__PURE__ */ jsx5("span", { className: "text-text-muted/60", children: ">" }),
-          isLast ? /* @__PURE__ */ jsx5(
+          seg.isLast ? /* @__PURE__ */ jsx5(
             "span",
             {
               "data-testid": "chunked-graph-current",
               className: "text-text-primary font-medium truncate max-w-[240px]",
-              children: label
+              children: seg.label
             }
           ) : /* @__PURE__ */ jsx5(
             "button",
             {
               type: "button",
-              "data-ui-bridge-id": `chunked-graph-crumb-${depth}`,
-              onClick: () => onGoDepth(i),
+              "data-ui-bridge-id": `chunked-graph-crumb-${seg.depth + 1}`,
+              onClick: () => onGoDepth(seg.depth),
               className: "hover:text-text-primary transition-colors truncate max-w-[240px]",
-              title: `Back to ${label}`,
-              children: label
+              title: `Back to ${seg.label}`,
+              children: seg.label
             }
           )
-        ] }, i);
+        ] }, `label-${i}`);
       })
     ] })
   ] });
