@@ -71,5 +71,5 @@
     "picomatch": "^4.0.4"
   },
   "author": "Joshua Spinak",
-  "license": "MIT"
+  "license": "AGPL-3.0-or-later"
 }
