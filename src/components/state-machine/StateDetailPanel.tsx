@@ -25,6 +25,31 @@ import {
 } from "@qontinui/workflow-utils";
 
 // =============================================================================
+// Utilities
+// =============================================================================
+
+/** Structural deep equality check. Avoids JSON.stringify allocation on every render. */
+function deepEqual(a: unknown, b: unknown): boolean {
+  if (a === b) return true;
+  if (a === null || b === null) return a === b;
+  if (typeof a !== "object" || typeof b !== "object") return false;
+  if (Array.isArray(a) !== Array.isArray(b)) return false;
+  if (Array.isArray(a) && Array.isArray(b)) {
+    if (a.length !== b.length) return false;
+    return a.every((v, i) => deepEqual(v, b[i]));
+  }
+  const keysA = Object.keys(a as object);
+  const keysB = Object.keys(b as object);
+  if (keysA.length !== keysB.length) return false;
+  return keysA.every((k) =>
+    deepEqual(
+      (a as Record<string, unknown>)[k],
+      (b as Record<string, unknown>)[k],
+    ),
+  );
+}
+
+// =============================================================================
 // Props
 // =============================================================================
 
@@ -93,10 +118,9 @@ export function StateDetailPanel({
   const hasChanges =
     name !== state.name ||
     description !== (state.description ?? "") ||
-    JSON.stringify(elementIds) !== JSON.stringify(state.element_ids) ||
-    JSON.stringify(acceptanceCriteria) !==
-      JSON.stringify(state.acceptance_criteria) ||
-    JSON.stringify(domainKnowledge) !== JSON.stringify(state.domain_knowledge);
+    !deepEqual(elementIds, state.element_ids) ||
+    !deepEqual(acceptanceCriteria, state.acceptance_criteria) ||
+    !deepEqual(domainKnowledge, state.domain_knowledge);
 
   const handleSave = useCallback(async () => {
     if (!hasChanges) return;
@@ -106,17 +130,11 @@ export function StateDetailPanel({
       if (name.trim() !== state.name) updates.name = name.trim();
       if (description.trim() !== (state.description ?? ""))
         updates.description = description.trim() || undefined;
-      if (JSON.stringify(elementIds) !== JSON.stringify(state.element_ids))
+      if (!deepEqual(elementIds, state.element_ids))
         updates.element_ids = elementIds;
-      if (
-        JSON.stringify(acceptanceCriteria) !==
-        JSON.stringify(state.acceptance_criteria)
-      )
+      if (!deepEqual(acceptanceCriteria, state.acceptance_criteria))
         updates.acceptance_criteria = acceptanceCriteria;
-      if (
-        JSON.stringify(domainKnowledge) !==
-        JSON.stringify(state.domain_knowledge)
-      )
+      if (!deepEqual(domainKnowledge, state.domain_knowledge))
         updates.domain_knowledge = domainKnowledge;
 
       await onSave(state.id, updates);

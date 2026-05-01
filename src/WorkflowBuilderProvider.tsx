@@ -22,6 +22,31 @@ import {
 } from "@qontinui/workflow-utils";
 
 // ============================================================================
+// Utilities
+// ============================================================================
+
+/** Structural deep equality check. Avoids JSON.stringify allocation on every render. */
+function deepEqual(a: unknown, b: unknown): boolean {
+  if (a === b) return true;
+  if (a === null || b === null) return a === b;
+  if (typeof a !== "object" || typeof b !== "object") return false;
+  if (Array.isArray(a) !== Array.isArray(b)) return false;
+  if (Array.isArray(a) && Array.isArray(b)) {
+    if (a.length !== b.length) return false;
+    return a.every((v, i) => deepEqual(v, b[i]));
+  }
+  const keysA = Object.keys(a as object);
+  const keysB = Object.keys(b as object);
+  if (keysA.length !== keysB.length) return false;
+  return keysA.every((k) =>
+    deepEqual(
+      (a as Record<string, unknown>)[k],
+      (b as Record<string, unknown>)[k],
+    ),
+  );
+}
+
+// ============================================================================
 // State
 // ============================================================================
 
@@ -499,7 +524,7 @@ export function WorkflowBuilderProvider({
 
   const hasUnsavedChanges =
     state.originalWorkflow !== null &&
-    JSON.stringify(state.workflow) !== JSON.stringify(state.originalWorkflow);
+    !deepEqual(state.workflow, state.originalWorkflow);
 
   const selectedStep = (() => {
     if (!state.selectedStepId) return null;
