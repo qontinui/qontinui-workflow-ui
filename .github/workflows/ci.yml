@@ -1,0 +1,34 @@
+name: CI
+
+# Push/PR gate for qontinui-workflow-ui. The existing publish.yml is
+# tag-triggered, so it only runs on releases — too late to catch a
+# qontinui-schemas cascade. This workflow runs on every push/PR to
+# master so consumer-side camelCase / deny_unknown_fields drift fails
+# fast. Closes Item 4 of the schemas-camelcase-cascade-2026-04-18 plan.
+#
+# package.json defines `typecheck` and `build` scripts but no `lint`
+# script today, so this workflow only invokes the two that exist.
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+
+jobs:
+  lint-and-typecheck:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Build
+        run: npm run build
