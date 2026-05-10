@@ -38,7 +38,7 @@
     "src"
   ],
   "scripts": {
-    "build": "tsup && test -s dist/index.d.ts",
+    "build": "tsup && node -e \"require('fs').statSync('dist/index.d.ts').size>0||process.exit(1)\"",
     "dev": "tsup --watch",
     "typecheck": "tsc --noEmit",
     "clean": "rimraf dist"
