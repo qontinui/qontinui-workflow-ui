@@ -41,7 +41,8 @@
     "build": "tsup && node -e \"require('fs').statSync('dist/index.d.ts').size>0||process.exit(1)\"",
     "dev": "tsup --watch",
     "typecheck": "tsc --noEmit",
-    "clean": "rimraf dist"
+    "clean": "rimraf dist",
+    "prepublishOnly": "npm run build"
   },
   "dependencies": {
     "@qontinui/shared-types": "^0.2.1",
