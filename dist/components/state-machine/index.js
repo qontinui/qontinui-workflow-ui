@@ -3407,6 +3407,25 @@ import {
   getConfidenceColor
 } from "@qontinui/workflow-utils";
 import { Fragment as Fragment3, jsx as jsx9, jsxs as jsxs9 } from "react/jsx-runtime";
+function deepEqual(a, b) {
+  if (a === b) return true;
+  if (a === null || b === null) return a === b;
+  if (typeof a !== "object" || typeof b !== "object") return false;
+  if (Array.isArray(a) !== Array.isArray(b)) return false;
+  if (Array.isArray(a) && Array.isArray(b)) {
+    if (a.length !== b.length) return false;
+    return a.every((v, i) => deepEqual(v, b[i]));
+  }
+  const keysA = Object.keys(a);
+  const keysB = Object.keys(b);
+  if (keysA.length !== keysB.length) return false;
+  return keysA.every(
+    (k) => deepEqual(
+      a[k],
+      b[k]
+    )
+  );
+}
 function StateDetailPanel({
   state,
   onSave,
@@ -3446,7 +3465,7 @@ function StateDetailPanel({
     setShowNewDk(false);
     setEditingCriterionIdx(null);
   }, [state]);
-  const hasChanges = name !== state.name || description !== (state.description ?? "") || JSON.stringify(elementIds) !== JSON.stringify(state.element_ids) || JSON.stringify(acceptanceCriteria) !== JSON.stringify(state.acceptance_criteria) || JSON.stringify(domainKnowledge) !== JSON.stringify(state.domain_knowledge);
+  const hasChanges = name !== state.name || description !== (state.description ?? "") || !deepEqual(elementIds, state.element_ids) || !deepEqual(acceptanceCriteria, state.acceptance_criteria) || !deepEqual(domainKnowledge, state.domain_knowledge);
   const handleSave = useCallback6(async () => {
     if (!hasChanges) return;
     setIsSaving(true);
@@ -3455,11 +3474,11 @@ function StateDetailPanel({
       if (name.trim() !== state.name) updates.name = name.trim();
       if (description.trim() !== (state.description ?? ""))
         updates.description = description.trim() || void 0;
-      if (JSON.stringify(elementIds) !== JSON.stringify(state.element_ids))
+      if (!deepEqual(elementIds, state.element_ids))
         updates.element_ids = elementIds;
-      if (JSON.stringify(acceptanceCriteria) !== JSON.stringify(state.acceptance_criteria))
+      if (!deepEqual(acceptanceCriteria, state.acceptance_criteria))
         updates.acceptance_criteria = acceptanceCriteria;
-      if (JSON.stringify(domainKnowledge) !== JSON.stringify(state.domain_knowledge))
+      if (!deepEqual(domainKnowledge, state.domain_knowledge))
         updates.domain_knowledge = domainKnowledge;
       await onSave(state.id, updates);
     } finally {

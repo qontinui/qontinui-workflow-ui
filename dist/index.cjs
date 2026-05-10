@@ -66,6 +66,25 @@ var import_react2 = require("react");
 var import_workflow_utils = require("@qontinui/workflow-utils");
 var import_workflow_utils2 = require("@qontinui/workflow-utils");
 var import_jsx_runtime2 = require("react/jsx-runtime");
+function deepEqual(a, b) {
+  if (a === b) return true;
+  if (a === null || b === null) return a === b;
+  if (typeof a !== "object" || typeof b !== "object") return false;
+  if (Array.isArray(a) !== Array.isArray(b)) return false;
+  if (Array.isArray(a) && Array.isArray(b)) {
+    if (a.length !== b.length) return false;
+    return a.every((v, i) => deepEqual(v, b[i]));
+  }
+  const keysA = Object.keys(a);
+  const keysB = Object.keys(b);
+  if (keysA.length !== keysB.length) return false;
+  return keysA.every(
+    (k) => deepEqual(
+      a[k],
+      b[k]
+    )
+  );
+}
 function getPhaseSteps(workflow, phase, stageIndex) {
   const source = workflow.stages && workflow.stages.length > 0 && stageIndex < workflow.stages.length ? workflow.stages[stageIndex] : workflow;
   switch (phase) {
@@ -402,7 +421,7 @@ function WorkflowBuilderProvider({
   const features = (0, import_workflow_utils2.detectWorkflowFeatures)(state.workflow);
   const isEmpty = (0, import_workflow_utils2.isWorkflowEmpty)(state.workflow);
   const totalStepCount = (0, import_workflow_utils2.getTotalStepCount)(state.workflow);
-  const hasUnsavedChanges = state.originalWorkflow !== null && JSON.stringify(state.workflow) !== JSON.stringify(state.originalWorkflow);
+  const hasUnsavedChanges = state.originalWorkflow !== null && !deepEqual(state.workflow, state.originalWorkflow);
   const selectedStep = (() => {
     if (!state.selectedStepId) return null;
     const allSteps = [

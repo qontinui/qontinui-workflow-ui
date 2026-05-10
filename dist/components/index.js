@@ -1,16 +1,16 @@
 import {
   SkillCatalog,
   useUIPrimitives
-} from "../chunk-7BR6KOI7.js";
+} from "../chunk-4XNQM6HX.js";
 import {
   PHASE_COLORS
-} from "../chunk-SK7ZPJYY.js";
+} from "../chunk-WTHARRTP.js";
 import {
   ChatHeader,
   ChatInput,
   ChatMessageArea,
   WorkflowPreviewPanel
-} from "../chunk-HXI7LBFZ.js";
+} from "../chunk-YYTVJCM3.js";
 
 // src/components/PhaseSection.tsx
 import { useState, useCallback } from "react";

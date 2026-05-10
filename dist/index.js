@@ -2,13 +2,13 @@ import {
   SkillCatalog,
   UIProvider,
   useUIPrimitives
-} from "./chunk-7BR6KOI7.js";
+} from "./chunk-4XNQM6HX.js";
 import {
   ChatHeader,
   ChatInput,
   ChatMessageArea,
   WorkflowPreviewPanel
-} from "./chunk-HXI7LBFZ.js";
+} from "./chunk-YYTVJCM3.js";
 
 // src/WorkflowDataProvider.tsx
 import { createContext, useContext } from "react";
@@ -46,6 +46,25 @@ import {
   getTotalStepCount
 } from "@qontinui/workflow-utils";
 import { jsx as jsx2 } from "react/jsx-runtime";
+function deepEqual(a, b) {
+  if (a === b) return true;
+  if (a === null || b === null) return a === b;
+  if (typeof a !== "object" || typeof b !== "object") return false;
+  if (Array.isArray(a) !== Array.isArray(b)) return false;
+  if (Array.isArray(a) && Array.isArray(b)) {
+    if (a.length !== b.length) return false;
+    return a.every((v, i) => deepEqual(v, b[i]));
+  }
+  const keysA = Object.keys(a);
+  const keysB = Object.keys(b);
+  if (keysA.length !== keysB.length) return false;
+  return keysA.every(
+    (k) => deepEqual(
+      a[k],
+      b[k]
+    )
+  );
+}
 function getPhaseSteps(workflow, phase, stageIndex) {
   const source = workflow.stages && workflow.stages.length > 0 && stageIndex < workflow.stages.length ? workflow.stages[stageIndex] : workflow;
   switch (phase) {
@@ -382,7 +401,7 @@ function WorkflowBuilderProvider({
   const features = detectWorkflowFeatures(state.workflow);
   const isEmpty = isWorkflowEmpty(state.workflow);
   const totalStepCount = getTotalStepCount(state.workflow);
-  const hasUnsavedChanges = state.originalWorkflow !== null && JSON.stringify(state.workflow) !== JSON.stringify(state.originalWorkflow);
+  const hasUnsavedChanges = state.originalWorkflow !== null && !deepEqual(state.workflow, state.originalWorkflow);
   const selectedStep = (() => {
     if (!state.selectedStepId) return null;
     const allSteps = [
