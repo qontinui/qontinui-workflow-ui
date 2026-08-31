@@ -27,6 +27,28 @@ name: qontinui CI
 #
 # `pull_request:` is deliberately left UNFILTERED so stacked PRs based on a
 # long-lived integration branch still get CI.
+#
+# THIS IS THE REPO'S ONLY PUSH/PR GATE. It absorbed `.github/workflows/ci.yml`
+# (workflow `CI`, job `lint-and-typecheck`), which ran the same three commands
+# and so posted a SECOND, redundant set of check runs to every head SHA -
+# `1d9cee45` carried `CI` and `qontinui CI` twice over, once per event. That is
+# the same duplicate-run defect the `on:` scoping above fixes, one axis over
+# (two workflows rather than two events), and a `concurrency:` block cannot
+# deduplicate it either: distinct workflows never share a group.
+#
+# The absorbed workflow existed to close Item 4 of the
+# `schemas-camelcase-cascade-2026-04-18` plan - fail fast when a
+# `qontinui-schemas` cascade breaks this consumer, since `publish.yml` is
+# tag-triggered and only runs at release time, far too late. That obligation is
+# kept here, and the two places the old `qontinui CI` was WEAKER than the gate it
+# replaces are tightened rather than inherited:
+#   * `npm ci` is strict. The previous `npm ci || npm install` fell back to a
+#     resolver run that ignores the lockfile, which would mask exactly the
+#     dependency drift Item 4 is about.
+#   * typecheck and build invoke the package's own declared scripts instead of
+#     `--if-present`, so renaming or dropping one fails the gate rather than
+#     silently skipping it. `lint` and `test` stay `--if-present`: this package
+#     declares neither today, and they should start gating the day it does.
 on:
   push:
     branches:
@@ -39,17 +61,18 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with:
           node-version: 20
+          cache: npm
       - name: Install dependencies
-        run: npm ci || npm install
+        run: npm ci
       - name: Type check
-        run: if [ -f tsconfig.json ]; then npx --yes tsc --noEmit; fi
+        run: npm run typecheck
       - name: Lint
         run: npm run lint --if-present
       - name: Build
-        run: npm run build --if-present
+        run: npm run build
       - name: Test
         run: npm test --if-present
