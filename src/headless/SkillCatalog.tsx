@@ -12,9 +12,15 @@
 import { useState, useMemo, useCallback } from "react";
 import type {
   SkillDefinition,
-  SkillCategory,
   WorkflowPhase,
 } from "@qontinui/shared-types/workflow";
+
+/**
+ * A skill's category as the catalog holds it: shared-types publishes
+ * `SkillCategory` as the known vocabulary, but the field is open (the runner
+ * reads categories back from user rows and imports), so key on the field.
+ */
+type SkillCategory = SkillDefinition["category"];
 import {
   searchSkills,
   getSkillCategories,
