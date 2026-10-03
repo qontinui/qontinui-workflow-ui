@@ -19,8 +19,8 @@ import {
   getSkillCategories,
   getSkillsByPhase,
   validateSkillParams,
-  instantiateSkill,
-  instantiateComposition,
+  instantiateSkillSteps,
+  skillProducesSteps,
   type SkillSearchFilters,
 } from "@qontinui/workflow-utils";
 import type { UnifiedStep } from "@qontinui/shared-types/workflow";
@@ -33,25 +33,21 @@ import type { UnifiedStep } from "@qontinui/shared-types/workflow";
 type SkillCategory = SkillDefinition["category"];
 
 /**
- * Whether the catalog can turn this skill into workflow steps.
- * `instantiateSkill` handles single- and multi-step templates and
- * `instantiateComposition` handles compositions. Any other kind — a
- * `playbook`, which injects domain knowledge into prompts and carries no
- * steps, or a kind this build does not know — is refused by both, so offering
- * it would open a configure view whose confirm can never succeed.
+ * Whether the catalog can turn this skill into workflow steps. Re-exported
+ * from workflow-utils, which also checks that every composition ref resolves
+ * and itself produces steps, so a composition with a dangling, step-less or
+ * cyclic ref is not offered either.
  */
-export function skillProducesSteps(skill: SkillDefinition): boolean {
-  const kind = skill.template.kind;
-  return (
-    kind === "single_step" || kind === "multi_step" || kind === "composition"
-  );
-}
+export { skillProducesSteps };
 
 /**
- * Whether a composition may reference this skill. `instantiateComposition`
- * expands each reference with `instantiateSkill`, which handles single- and
- * multi-step templates only — a nested composition (which would also allow
- * circular refs), a step-less `playbook`, or an unknown kind can never expand.
+ * Whether the composition builder may offer this skill as a ref: single- and
+ * multi-step skills only. A step-less `playbook` or an unknown kind can never
+ * expand. `instantiateComposition` does expand nested compositions, refusing
+ * a cycle, but the builder is not told which composition it is editing, so it
+ * cannot keep a picked composition ref from closing a cycle through it.
+ * New nested refs are therefore not offered; a nested ref already in a loaded
+ * composition is kept unless the registry proves it cyclic.
  */
 export function skillIsComposable(skill: SkillDefinition): boolean {
   const kind = skill.template.kind;
@@ -203,10 +199,7 @@ export function SkillCatalog({
 
     let steps: UnifiedStep[];
     try {
-      steps =
-        selectedSkill.template.kind === "composition"
-          ? instantiateComposition(selectedSkill, phase, paramValues)
-          : instantiateSkill(selectedSkill, phase, paramValues);
+      steps = instantiateSkillSteps(selectedSkill, phase, paramValues);
     } catch (err) {
       setConfirmError(err instanceof Error ? err.message : String(err));
       return;
