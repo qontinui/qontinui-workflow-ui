@@ -13,6 +13,9 @@ import type {
   WorkflowPhase,
   UnifiedStep,
 } from "@qontinui/shared-types/workflow";
+import { getSkillCategoryIconData, type StepIconData } from "@qontinui/workflow-utils";
+import { SkillCatalog as HeadlessSkillCatalog } from "../headless/SkillCatalog";
+import { SkillParamForm } from "./SkillParamForm";
 
 /**
  * A skill's category as the catalog holds it: shared-types publishes
@@ -20,9 +23,6 @@ import type {
  * reads categories back from user rows and imports), so key on the field.
  */
 type SkillCategory = SkillDefinition["category"];
-import { getSkillCategoryIconData, type StepIconData } from "@qontinui/workflow-utils";
-import { SkillCatalog as HeadlessSkillCatalog } from "../headless/SkillCatalog";
-import { SkillParamForm } from "./SkillParamForm";
 
 // =============================================================================
 // Types
