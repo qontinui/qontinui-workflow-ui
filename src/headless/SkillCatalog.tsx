@@ -47,6 +47,17 @@ export function skillProducesSteps(skill: SkillDefinition): boolean {
   );
 }
 
+/**
+ * Whether a composition may reference this skill. `instantiateComposition`
+ * expands each reference with `instantiateSkill`, which handles single- and
+ * multi-step templates only — a nested composition (which would also allow
+ * circular refs), a step-less `playbook`, or an unknown kind can never expand.
+ */
+export function skillIsComposable(skill: SkillDefinition): boolean {
+  const kind = skill.template.kind;
+  return kind === "single_step" || kind === "multi_step";
+}
+
 // =============================================================================
 // Types
 // =============================================================================

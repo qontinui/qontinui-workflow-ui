@@ -51,7 +51,11 @@ export type {
   AddStepDropdownProps,
 } from "./headless/AddStepDropdown";
 
-export { SkillCatalog, skillProducesSteps } from "./headless/SkillCatalog";
+export {
+  SkillCatalog,
+  skillProducesSteps,
+  skillIsComposable,
+} from "./headless/SkillCatalog";
 export type {
   SkillCatalogRenderProps,
   SkillCatalogProps,

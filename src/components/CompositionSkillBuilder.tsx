@@ -18,6 +18,7 @@ import {
   type StepIconData,
 } from "@qontinui/workflow-utils";
 import { SkillParamForm } from "./SkillParamForm";
+import { skillIsComposable } from "../headless/SkillCatalog";
 
 // =============================================================================
 // Types
@@ -186,6 +187,16 @@ export function CompositionSkillBuilder({
     []
   );
 
+  // Refs loaded from an existing composition that resolve to a skill no
+  // composition can expand (see `skillIsComposable`). Saving them would store
+  // a composition `instantiateComposition` always refuses, so they must be
+  // removed first. Unknown skill ids are left alone: the skill may simply not
+  // be registered in this build yet.
+  const uncomposableCount = useMemo(
+    () => refs.filter((r) => r._skill && !skillIsComposable(r._skill)).length,
+    [refs]
+  );
+
   const handleSave = useCallback(() => {
     // Strip internal fields before saving
     const cleanRefs: SkillRef[] = refs.map(({ _skill, _uid, ...rest }) => {
@@ -260,6 +271,12 @@ export function CompositionSkillBuilder({
       </div>
 
       {/* Footer */}
+      {uncomposableCount > 0 && (
+        <p className="px-4 pt-2 text-xs text-red-400">
+          Remove {uncomposableCount} skill{uncomposableCount !== 1 ? "s" : ""}{" "}
+          that cannot be composed before saving.
+        </p>
+      )}
       <div className="px-4 py-3 border-t border-zinc-800 flex justify-end gap-2">
         <button
           onClick={onCancel}
@@ -269,7 +286,7 @@ export function CompositionSkillBuilder({
         </button>
         <button
           onClick={handleSave}
-          disabled={refs.length === 0}
+          disabled={refs.length === 0 || uncomposableCount > 0}
           className="px-3 py-1.5 text-sm bg-blue-600 hover:bg-blue-500 text-white rounded disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
         >
           Save Composition ({refs.length} skill{refs.length !== 1 ? "s" : ""})
@@ -343,6 +360,11 @@ function SkillRefItem({
           </span>
           {!skill && (
             <span className="text-xs text-red-400">Unknown skill</span>
+          )}
+          {skill && !skillIsComposable(skill) && (
+            <span className="text-xs text-red-400">
+              Cannot be composed ({skill.template.kind} skill)
+            </span>
           )}
         </div>
 
@@ -440,14 +462,7 @@ function MiniSkillPicker({
 
   const availableSkills = useMemo(() => {
     const all = getAllSkills();
-    // Only step-producing skills can be referenced: a composition would allow
-    // circular refs, and anything else (a step-less `playbook`, or a kind this
-    // build does not know) is refused by `instantiateSkill`, so the
-    // composition could never be instantiated.
-    let filtered = all.filter(
-      (s) =>
-        s.template.kind === "single_step" || s.template.kind === "multi_step",
-    );
+    let filtered = all.filter(skillIsComposable);
 
     // Apply search filter
     const trimmed = search.trim().toLowerCase();
