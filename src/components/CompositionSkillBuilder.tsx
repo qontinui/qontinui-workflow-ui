@@ -198,6 +198,9 @@ export function CompositionSkillBuilder({
   );
 
   const handleSave = useCallback(() => {
+    // The Save button is disabled in these states; refuse here too so no other
+    // caller can store a composition that can never be instantiated.
+    if (refs.length === 0 || uncomposableCount > 0) return;
     // Strip internal fields before saving
     const cleanRefs: SkillRef[] = refs.map(({ _skill, _uid, ...rest }) => {
       const clean: SkillRef = { skill_id: rest.skill_id };
@@ -210,7 +213,7 @@ export function CompositionSkillBuilder({
       return clean;
     });
     onSave(cleanRefs);
-  }, [refs, onSave]);
+  }, [refs, uncomposableCount, onSave]);
 
   return (
     <div className="flex flex-col h-full max-h-[500px]">
