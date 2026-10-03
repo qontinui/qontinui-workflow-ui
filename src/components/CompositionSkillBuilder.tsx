@@ -440,8 +440,14 @@ function MiniSkillPicker({
 
   const availableSkills = useMemo(() => {
     const all = getAllSkills();
-    // Filter out composition skills to prevent circular refs
-    let filtered = all.filter((s) => s.template.kind !== "composition");
+    // Only single- and multi-step skills can be composed: a composition ref
+    // would allow cycles, and a step-less template (a `playbook`) would make
+    // the whole composition fail at instantiation. Compared through `string`
+    // so this compiles with and without the playbook variant.
+    let filtered = all.filter((s) => {
+      const kind: string = s.template.kind;
+      return kind === "single_step" || kind === "multi_step";
+    });
 
     // Apply search filter
     const trimmed = search.trim().toLowerCase();

@@ -15,12 +15,6 @@ import type {
   WorkflowPhase,
 } from "@qontinui/shared-types/workflow";
 
-/**
- * A skill's category as the catalog holds it: shared-types publishes
- * `SkillCategory` as the known vocabulary, but the field is open (the runner
- * reads categories back from user rows and imports), so key on the field.
- */
-type SkillCategory = SkillDefinition["category"];
 import {
   searchSkills,
   getSkillCategories,
@@ -30,6 +24,25 @@ import {
   type SkillSearchFilters,
 } from "@qontinui/workflow-utils";
 import type { UnifiedStep } from "@qontinui/shared-types/workflow";
+
+/**
+ * A skill's category as the catalog holds it: shared-types publishes
+ * `SkillCategory` as the known vocabulary, but the field is open (the runner
+ * reads categories back from user rows and imports), so key on the field.
+ */
+type SkillCategory = SkillDefinition["category"];
+
+/**
+ * Whether a skill can be added as steps. A `playbook` template injects domain
+ * knowledge into prompts and carries no steps, so `instantiateSkill` refuses it;
+ * offering it here would leave the user with a confirm that cannot succeed.
+ * Compared through `string` so this compiles against shared-types versions
+ * with and without the playbook variant.
+ */
+function producesSteps(skill: SkillDefinition): boolean {
+  const kind: string = skill.template.kind;
+  return kind !== "playbook";
+}
 
 // =============================================================================
 // Types
@@ -98,7 +111,7 @@ export function SkillCatalog({
 
   // Categories available in this phase
   const categories = useMemo(() => {
-    const phaseSkills = getSkillsByPhase(phase);
+    const phaseSkills = getSkillsByPhase(phase).filter(producesSteps);
     const cats = new Set<SkillCategory>();
     for (const skill of phaseSkills) {
       cats.add(skill.category);
@@ -108,7 +121,7 @@ export function SkillCatalog({
 
   // Check if there are any non-builtin skills
   const hasNonBuiltinSkills = useMemo(() => {
-    const phaseSkills = getSkillsByPhase(phase);
+    const phaseSkills = getSkillsByPhase(phase).filter(producesSteps);
     return phaseSkills.some((s) => s.source !== "builtin");
   }, [phase]);
 
@@ -121,7 +134,7 @@ export function SkillCatalog({
     if (selectedSource) {
       filters.source = selectedSource;
     }
-    return searchSkills(searchQuery, filters);
+    return searchSkills(searchQuery, filters).filter(producesSteps);
   }, [searchQuery, selectedCategory, selectedSource, phase]);
 
   // Select a skill to configure
