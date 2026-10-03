@@ -74,7 +74,7 @@ To cut a release:
 
 ### Dependency ordering
 
-`@qontinui/workflow-ui` depends on `@qontinui/shared-types` and `@qontinui/workflow-utils`. Both must be published to npm at the version this package depends on before this package's tag-triggered build will succeed (otherwise `npm ci` fails to resolve them).
+`@qontinui/workflow-ui` depends on `@qontinui/shared-types`, and takes `@qontinui/workflow-utils` as a **peer** dependency. The skill registry is module state, so a consumer must resolve exactly one copy of workflow-utils, shared with this package: pin it in the same range this package's `peerDependencies` declares, and bump both together. Both must be published to npm at the version this package depends on before this package's tag-triggered build will succeed (otherwise `npm ci` fails to resolve them).
 
 When making coordinated changes across the three packages, publish in dependency order:
 

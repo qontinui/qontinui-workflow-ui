@@ -90,6 +90,42 @@ const ChevronRightIcon = ({ className }: { className?: string }) => (
 // Helper: resolve a SkillRef into an EditableSkillRef
 // =============================================================================
 
+/**
+ * Whether a ref loaded from an existing composition may be saved again: any
+ * skill the picker offers, plus a nested composition that does not close a
+ * cycle (see `uncomposableCount`).
+ */
+function refCanStay(skill: SkillDefinition): boolean {
+  if (skill.template.kind === "composition") {
+    return !reachesCycle(skill, [], new Set());
+  }
+  return skillIsComposable(skill);
+}
+
+/**
+ * Whether expanding this composition through the registry ever revisits a
+ * composition already on the path. Ref ids that do not resolve are skipped
+ * rather than counted against it: they may not be registered yet. `acyclic`
+ * memoizes compositions already proven cycle-free, so shared sub-trees are
+ * walked once.
+ */
+function reachesCycle(
+  skill: SkillDefinition,
+  path: string[],
+  acyclic: Set<string>,
+): boolean {
+  if (skill.template.kind !== "composition") return false;
+  if (path.includes(skill.id)) return true;
+  if (acyclic.has(skill.id)) return false;
+  const next = [...path, skill.id];
+  const cyclic = skill.template.skill_refs.some((ref) => {
+    const refSkill = getSkill(ref.skill_id);
+    return refSkill !== undefined && reachesCycle(refSkill, next, acyclic);
+  });
+  if (!cyclic) acyclic.add(skill.id);
+  return cyclic;
+}
+
 function resolveRef(ref: SkillRef): EditableSkillRef {
   const skill = getSkill(ref.skill_id);
   return {
@@ -187,13 +223,16 @@ export function CompositionSkillBuilder({
     []
   );
 
-  // Refs loaded from an existing composition that resolve to a skill no
-  // composition can expand (see `skillIsComposable`). Saving them would store
-  // a composition `instantiateComposition` always refuses, so they must be
-  // removed first. Unknown skill ids are left alone: the skill may simply not
-  // be registered in this build yet.
+  // Refs loaded from an existing composition that `instantiateComposition`
+  // would always refuse: a step-less `playbook`, an unknown kind, or a nested
+  // composition whose expansion through the registry proves a cycle (for
+  // instance back through the composition being edited). They must be removed
+  // before saving. Any other nested composition is kept; a dangling or
+  // step-less ref inside it is left to `instantiateComposition`'s error, which
+  // names the path. Unresolved ids, here and nested, are not judged: the skill
+  // may simply not be registered in this build yet.
   const uncomposableCount = useMemo(
-    () => refs.filter((r) => r._skill && !skillIsComposable(r._skill)).length,
+    () => refs.filter((r) => r._skill && !refCanStay(r._skill)).length,
     [refs]
   );
 
@@ -361,9 +400,11 @@ function SkillRefItem({
           {!skill && (
             <span className="text-xs text-red-400">Unknown skill</span>
           )}
-          {skill && !skillIsComposable(skill) && (
+          {skill && !refCanStay(skill) && (
             <span className="text-xs text-red-400">
-              Cannot be composed ({skill.template.kind} skill)
+              {skill.template.kind === "composition"
+                ? "Cannot be composed (its refs form a cycle)"
+                : `Cannot be composed (${skill.template.kind} skill)`}
             </span>
           )}
         </div>
