@@ -14,6 +14,16 @@ import type {
   SkillDefinition,
   WorkflowPhase,
 } from "@qontinui/shared-types/workflow";
+import {
+  searchSkills,
+  getSkillCategories,
+  getSkillsByPhase,
+  validateSkillParams,
+  instantiateSkill,
+  instantiateComposition,
+  type SkillSearchFilters,
+} from "@qontinui/workflow-utils";
+import type { UnifiedStep } from "@qontinui/shared-types/workflow";
 
 /**
  * A skill's category as the catalog holds it: shared-types publishes
@@ -21,15 +31,21 @@ import type {
  * reads categories back from user rows and imports), so key on the field.
  */
 type SkillCategory = SkillDefinition["category"];
-import {
-  searchSkills,
-  getSkillCategories,
-  getSkillsByPhase,
-  validateSkillParams,
-  instantiateSkill,
-  type SkillSearchFilters,
-} from "@qontinui/workflow-utils";
-import type { UnifiedStep } from "@qontinui/shared-types/workflow";
+
+/**
+ * Whether the catalog can turn this skill into workflow steps.
+ * `instantiateSkill` handles single- and multi-step templates and
+ * `instantiateComposition` handles compositions. Any other kind — a
+ * `playbook`, which injects domain knowledge into prompts and carries no
+ * steps, or a kind this build does not know — is refused by both, so offering
+ * it would open a configure view whose confirm can never succeed.
+ */
+export function skillProducesSteps(skill: SkillDefinition): boolean {
+  const kind = skill.template.kind;
+  return (
+    kind === "single_step" || kind === "multi_step" || kind === "composition"
+  );
+}
 
 // =============================================================================
 // Types
@@ -93,24 +109,32 @@ export function SkillCatalog({
     null,
   );
   const [paramValues, setParamValues] = useState<Record<string, unknown>>({});
+  // Why the last confirm could not instantiate the skill (a missing
+  // dependency or referenced skill, say). Cleared whenever the input changes.
+  const [confirmError, setConfirmError] = useState<string | null>(null);
 
   const mode = selectedSkill ? "configure" : "browse";
 
+  // Skills in this phase the catalog can actually add
+  const phaseSkills = useMemo(
+    () => getSkillsByPhase(phase).filter(skillProducesSteps),
+    [phase],
+  );
+
   // Categories available in this phase
   const categories = useMemo(() => {
-    const phaseSkills = getSkillsByPhase(phase);
     const cats = new Set<SkillCategory>();
     for (const skill of phaseSkills) {
       cats.add(skill.category);
     }
     return Array.from(cats);
-  }, [phase]);
+  }, [phaseSkills]);
 
   // Check if there are any non-builtin skills
-  const hasNonBuiltinSkills = useMemo(() => {
-    const phaseSkills = getSkillsByPhase(phase);
-    return phaseSkills.some((s) => s.source !== "builtin");
-  }, [phase]);
+  const hasNonBuiltinSkills = useMemo(
+    () => phaseSkills.some((s) => s.source !== "builtin"),
+    [phaseSkills],
+  );
 
   // Filtered skills for browse mode
   const filteredSkills = useMemo(() => {
@@ -121,13 +145,14 @@ export function SkillCatalog({
     if (selectedSource) {
       filters.source = selectedSource;
     }
-    return searchSkills(searchQuery, filters);
+    return searchSkills(searchQuery, filters).filter(skillProducesSteps);
   }, [searchQuery, selectedCategory, selectedSource, phase]);
 
   // Select a skill to configure
   const onSelectSkill = useCallback(
     (skill: SkillDefinition) => {
       setSelectedSkill(skill);
+      setConfirmError(null);
 
       // Pre-fill defaults
       const defaults: Record<string, unknown> = {};
@@ -145,32 +170,48 @@ export function SkillCatalog({
   const setParamValue = useCallback(
     (name: string, value: unknown) => {
       setParamValues((prev) => ({ ...prev, [name]: value }));
+      setConfirmError(null);
     },
     [],
   );
 
   // Validation
-  const validationErrors = useMemo(() => {
+  const paramErrors = useMemo(() => {
     if (!selectedSkill) return [];
     return validateSkillParams(selectedSkill, paramValues);
   }, [selectedSkill, paramValues]);
 
+  const validationErrors = useMemo(
+    () => (confirmError ? [...paramErrors, confirmError] : paramErrors),
+    [paramErrors, confirmError],
+  );
+
   // Confirm: instantiate skill and add steps
   const onConfirm = useCallback(() => {
-    if (!selectedSkill || validationErrors.length > 0) return;
+    if (!selectedSkill || paramErrors.length > 0) return;
 
-    const steps = instantiateSkill(selectedSkill, phase, paramValues);
+    let steps: UnifiedStep[];
+    try {
+      steps =
+        selectedSkill.template.kind === "composition"
+          ? instantiateComposition(selectedSkill, phase, paramValues)
+          : instantiateSkill(selectedSkill, phase, paramValues);
+    } catch (err) {
+      setConfirmError(err instanceof Error ? err.message : String(err));
+      return;
+    }
     onAddSteps(steps, phase);
     if (onSkillUsed) {
       onSkillUsed(selectedSkill.id);
     }
     onClose();
-  }, [selectedSkill, phase, paramValues, validationErrors, onAddSteps, onSkillUsed, onClose]);
+  }, [selectedSkill, phase, paramValues, paramErrors, onAddSteps, onSkillUsed, onClose]);
 
   // Back to browse
   const onBack = useCallback(() => {
     setSelectedSkill(null);
     setParamValues({});
+    setConfirmError(null);
   }, []);
 
   return (
